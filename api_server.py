@@ -26,7 +26,7 @@ import traceback
 import uuid
 from typing import Optional
 
-import torch
+import torch # type: ignore
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
