@@ -10,6 +10,7 @@
 import importlib
 import itertools as itt
 import os
+import random
 import re
 import sys
 from typing import Any, Callable, Iterator, Union
@@ -133,16 +134,18 @@ def pytorch_worker_seed(group=None):
 
 def worker_init_fn(_):
     worker_info = torch.utils.data.get_worker_info()
-    worker_id = worker_info.id
+    seed = torch.initial_seed() % (2 ** 32)
+    random.seed(seed)
+    np.random.seed(seed)
 
-    # dataset = worker_info.dataset
-    # split_size = dataset.num_records // worker_info.num_workers
-    # # reset num_records to the true number to retain reliable length information
-    # dataset.sample_ids = dataset.valid_ids[worker_id * split_size:(worker_id + 1) * split_size]
-    # current_id = np.random.choice(len(np.random.get_state()[1]), 1)
-    # return np.random.seed(np.random.get_state()[1][current_id] + worker_id)
-
-    return np.random.seed(np.random.get_state()[1][0] + worker_id)
+    # Windows DataLoader workers use spawn. Seed the dataset-owned RNG as well
+    # so each worker selects a different render-view sequence.
+    if worker_info is not None:
+        dataset = worker_info.dataset
+        if hasattr(dataset, "seed_rng"):
+            dataset.seed_rng(seed)
+        elif hasattr(dataset, "rng"):
+            dataset.rng.seed(seed)
 
 
 def collation_fn(samples, combine_tensors=True, combine_scalars=True):

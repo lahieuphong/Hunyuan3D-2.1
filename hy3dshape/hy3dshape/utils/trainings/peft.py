@@ -14,65 +14,68 @@
 # fine-tuning enabling code and other elements of the foregoing made publicly available
 # by Tencent in accordance with TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT.
 
-import os
+from pathlib import Path
+from typing import Optional
+
 from pytorch_lightning.callbacks import Callback
-from omegaconf import OmegaConf, ListConfig
+from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
+
 
 class PeftSaveCallback(Callback):
-    def __init__(self, peft_model, save_dir: str, save_every_n_steps: int = None):
+    """Save only the trainable PEFT adapter instead of the frozen base model."""
+
+    def __init__(
+        self,
+        save_dir: str,
+        save_every_n_steps: Optional[int] = None,
+        save_on_train_epoch_end: bool = False,
+    ) -> None:
         super().__init__()
-        self.peft_model = peft_model
-        self.save_dir = save_dir
+        self.save_dir = Path(save_dir)
         self.save_every_n_steps = save_every_n_steps
-        os.makedirs(self.save_dir, exist_ok=True)
+        self.save_on_train_epoch_end = save_on_train_epoch_end
+        self._last_saved_step = -1
 
-    def recursive_convert(self, obj):
-        from omegaconf import OmegaConf, ListConfig
-        if isinstance(obj, (OmegaConf, ListConfig)):
-            return OmegaConf.to_container(obj, resolve=True)
-        elif isinstance(obj, dict):
-            return {k: self.recursive_convert(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self.recursive_convert(i) for i in obj]
-        elif isinstance(obj, type):
-            # 避免修改类对象
-            return obj
-        elif hasattr(obj, '__dict__'):
-            for attr_name, attr_value in vars(obj).items():
-                setattr(obj, attr_name, self.recursive_convert(attr_value))
-            return obj
-        else:
-            return obj
+        if self.save_every_n_steps is not None and self.save_every_n_steps <= 0:
+            raise ValueError("save_every_n_steps must be greater than zero or None")
 
-    # def recursive_convert(self, obj):
-    #     if isinstance(obj, (OmegaConf, ListConfig)):
-    #         return OmegaConf.to_container(obj, resolve=True)
-    #     elif isinstance(obj, dict):
-    #         return {k: self.recursive_convert(v) for k, v in obj.items()}
-    #     elif isinstance(obj, list):
-    #         return [self.recursive_convert(i) for i in obj]
-    #     elif hasattr(obj, '__dict__'):
-    #         for attr_name, attr_value in vars(obj).items():
-    #             setattr(obj, attr_name, self.recursive_convert(attr_value))
-    #         return obj
-    #     else:
-    #         return obj
+    @staticmethod
+    def _get_peft_model(pl_module):
+        peft_model = getattr(pl_module, "model", None)
+        if peft_model is None or not hasattr(peft_model, "peft_config"):
+            raise RuntimeError(
+                "PeftSaveCallback requires pl_module.model to be a PEFT model. "
+                "Enable model.params.lora_config in the training config."
+            )
+        return peft_model
 
-    def _convert_peft_config(self):
-        pc = self.peft_model.peft_config
-        self.peft_model.peft_config = self.recursive_convert(pc)
+    @rank_zero_only
+    def _save(self, pl_module, folder_name: str, global_step: int) -> None:
+        if global_step == self._last_saved_step and folder_name != "final":
+            return
 
-    def on_train_epoch_end(self, trainer, pl_module):
-        self._convert_peft_config()
-        save_path = os.path.join(self.save_dir, f"epoch_{trainer.current_epoch}")
-        self.peft_model.save_pretrained(save_path)
-        print(f"[PeftSaveCallback] Saved LoRA weights to {save_path}")
+        peft_model = self._get_peft_model(pl_module)
+        save_path = self.save_dir / folder_name
+        save_path.mkdir(parents=True, exist_ok=True)
+        peft_model.save_pretrained(str(save_path), safe_serialization=True)
+        self._last_saved_step = global_step
+        rank_zero_info(f"[PeftSaveCallback] Saved LoRA adapter to {save_path}")
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        if self.save_every_n_steps is not None:
-            global_step = trainer.global_step
-            if global_step % self.save_every_n_steps == 0 and global_step > 0:
-                self._convert_peft_config()
-                save_path = os.path.join(self.save_dir, f"step_{global_step}")
-                self.peft_model.save_pretrained(save_path)
-                print(f"[PeftSaveCallback] Saved LoRA weights to {save_path}")
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:
+        if self.save_every_n_steps is None:
+            return
+
+        global_step = trainer.global_step
+        if global_step > 0 and global_step % self.save_every_n_steps == 0:
+            self._save(pl_module, f"step_{global_step:08d}", global_step)
+
+    def on_train_epoch_end(self, trainer, pl_module) -> None:
+        if self.save_on_train_epoch_end:
+            self._save(
+                pl_module,
+                f"epoch_{trainer.current_epoch:06d}",
+                trainer.global_step,
+            )
+
+    def on_train_end(self, trainer, pl_module) -> None:
+        self._save(pl_module, "final", trainer.global_step)

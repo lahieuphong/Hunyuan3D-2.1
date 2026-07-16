@@ -59,15 +59,37 @@ class Diffuser(pl.LightningModule):
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
 
-        # ========= config lora model ========= #
-        if lora_config is not None:
-            from peft import LoraConfig, get_peft_model
-            loraconfig = LoraConfig(
-                r=lora_config.rank,
-                lora_alpha=lora_config.rank,
-                target_modules=lora_config.get('target_modules')
-            )
-            self.model = get_peft_model(self.model, loraconfig)
+        # ========= config LoRA model ========= #
+        self.lora_config = lora_config
+        self.is_lora_enabled = lora_config is not None
+        if self.is_lora_enabled:
+            from peft import LoraConfig, PeftModel, get_peft_model
+
+            target_modules = list(lora_config.get('target_modules', []))
+            if not target_modules:
+                raise ValueError("lora_config.target_modules must not be empty")
+
+            adapter_path = lora_config.get('adapter_path')
+            if adapter_path:
+                self.model = PeftModel.from_pretrained(
+                    self.model,
+                    str(adapter_path),
+                    is_trainable=True,
+                )
+                rank_zero_info(f"Loaded trainable LoRA adapter from {adapter_path}")
+            else:
+                rank = int(lora_config.get('rank', 8))
+                peft_config = LoraConfig(
+                    r=rank,
+                    lora_alpha=int(lora_config.get('alpha', rank)),
+                    lora_dropout=float(lora_config.get('dropout', 0.0)),
+                    bias=str(lora_config.get('bias', 'none')),
+                    target_modules=target_modules,
+                    inference_mode=False,
+                )
+                self.model = get_peft_model(self.model, peft_config)
+
+            self.model.print_trainable_parameters()
 
         # ========= config ema model ========= #
         self.ema_config = ema_config
@@ -178,7 +200,19 @@ class Diffuser(pl.LightningModule):
         lr = self.learning_rate
 
         params_list = []
-        trainable_parameters = list(self.model.parameters())
+        trainable_parameters = [
+            parameter for parameter in self.model.parameters()
+            if parameter.requires_grad
+        ]
+        if not trainable_parameters:
+            raise RuntimeError("The denoiser has no trainable parameters")
+
+        trainable_count = sum(parameter.numel() for parameter in trainable_parameters)
+        total_count = sum(parameter.numel() for parameter in self.model.parameters())
+        rank_zero_info(
+            f"Denoiser trainable parameters: {trainable_count:,} / {total_count:,} "
+            f"({100.0 * trainable_count / total_count:.4f}%)"
+        )
         params_list.append({'params': trainable_parameters, 'lr': lr})
 
         no_decay = ['bias', 'norm.weight', 'norm.bias', 'norm1.weight', 'norm1.bias', 'norm2.weight', 'norm2.bias']

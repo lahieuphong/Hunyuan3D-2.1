@@ -26,7 +26,9 @@ xatlas
 
 # Training
 accelerate
-#pytorch_lightning
+pytorch-lightning==1.9.5
+peft==0.13.2
+tensorboard
 #scikit-learn
 #scikit-image
 

@@ -13,5 +13,32 @@
 # by Tencent in accordance with TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT.
 
 from .pipelines import Hunyuan3DDiTPipeline, Hunyuan3DDiTFlowMatchingPipeline
-from .postprocessors import FaceReducer, FloaterRemover, DegenerateFaceRemover, MeshSimplifier
 from .preprocessors import ImageProcessorV2, IMAGE_PROCESSORS, DEFAULT_IMAGEPROCESSOR
+
+
+_POSTPROCESSOR_NAMES = {
+    "FaceReducer",
+    "FloaterRemover",
+    "DegenerateFaceRemover",
+    "MeshSimplifier",
+}
+
+
+def __getattr__(name):
+    """Load optional PyMeshLab postprocessors only when they are requested."""
+    if name not in _POSTPROCESSOR_NAMES:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    try:
+        from . import postprocessors
+    except ModuleNotFoundError as error:
+        if error.name == "pymeshlab":
+            raise ModuleNotFoundError(
+                "Mesh postprocessors require the optional 'pymeshlab' package. "
+                "It is not required for Shape DiT LoRA training."
+            ) from error
+        raise
+
+    value = getattr(postprocessors, name)
+    globals()[name] = value
+    return value

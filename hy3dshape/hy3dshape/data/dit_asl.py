@@ -16,15 +16,12 @@
 
 
 import os
-import io
 import sys
 import time
 import random
-import traceback
-from typing import Optional, Union, List, Tuple, Dict
+from typing import Union, List, Tuple
 
 import json
-import glob
 import cv2
 import numpy as np
 import trimesh
@@ -61,10 +58,8 @@ class ResampledShards(torch.utils.data.dataset.IterableDataset):
 
             
 def read_npz(data):
-    # Load a numpy .npz file from a file path or file-like object
-    # The commented line shows how to load from bytes in memory
-    # return np.load(io.BytesIO(data))
-    return np.load(data)
+    # Load a NumPy archive without permitting pickled Python objects.
+    return np.load(data, allow_pickle=False)
 
 
 def read_json(path):
@@ -143,17 +138,46 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
         deterministic = False,
         worker_seed = None,
         padding = True,
-        padding_ratio_range=[1.15, 1.15]
+        padding_ratio_range=[1.15, 1.15],
+        max_consecutive_failures: int = 16,
+        max_total_failures: int = 100,
     ):
         super().__init__()
-        if isinstance(data_list, str) and data_list.endswith('.json'):
-            self.data_list = read_json(data_list_json)
+        if isinstance(data_list, str) and data_list.lower().endswith('.json'):
+            self.data_list = read_json(data_list)
+            if not isinstance(self.data_list, list):
+                raise TypeError(f"Dataset JSON must contain a list: {data_list}")
+            json_dir = os.path.dirname(os.path.abspath(data_list))
+            self.data_list = [
+                os.fspath(item) if os.path.isabs(os.fspath(item))
+                else os.path.join(json_dir, os.fspath(item))
+                for item in self.data_list
+            ]
         elif isinstance(data_list, str) and os.path.isdir(data_list):
-            self.data_list = glob.glob(data_list + '/*')
+            self.data_list = sorted(
+                os.path.join(data_list, name)
+                for name in os.listdir(data_list)
+                if os.path.isdir(os.path.join(data_list, name))
+            )
         else:
             self.data_list = data_list
-        assert isinstance(self.data_list, list)
+        if not isinstance(self.data_list, list):
+            raise TypeError("data_list must be a directory path, JSON list, or list of object directories")
+        if not self.data_list:
+            raise ValueError(f"No object directories found in dataset: {data_list}")
+
+        self.data_list = [os.path.normpath(os.fspath(item)) for item in self.data_list]
         self.rng = random.Random(0)
+        self.np_rng = np.random.default_rng(0)
+        self._rng_initialized = False
+        self.deterministic = deterministic
+        self.worker_seed = worker_seed
+        self.max_consecutive_failures = max_consecutive_failures
+        self.max_total_failures = max_total_failures
+        if self.max_consecutive_failures <= 0:
+            raise ValueError("max_consecutive_failures must be greater than zero")
+        if self.max_total_failures <= 0:
+            raise ValueError("max_total_failures must be greater than zero")
         
         self.cond_stage_key = cond_stage_key
         self.image_transform = image_transform
@@ -173,6 +197,11 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
         rank_zero_info(f'# of Sharpedge Surface Points: {self.pc_sharpedge_size}')
         rank_zero_info(f'Using sharp edge label: {self.sharpedge_label}')
         rank_zero_info(f'*' * 50)
+
+    def seed_rng(self, seed: int) -> None:
+        self.rng.seed(seed)
+        self.np_rng = np.random.default_rng(seed)
+        self._rng_initialized = True
 
 
     def load_surface_sdf_points(self, rng, random_surface, sharpedge_surface):
@@ -212,7 +241,10 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
         images, masks = [], []
         for image_path in imgs_choice:
             image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-            assert image.shape[2] == 4
+            if image is None:
+                raise FileNotFoundError(f"Could not read render image: {image_path}")
+            if image.ndim != 3 or image.shape[2] != 4:
+                raise ValueError(f"Render must be an RGBA image: {image_path}")
             alpha = image[:, :, 3:4].astype(np.float32) / 255
             forground = image[:, :, :3]
             background = np.ones_like(forground) * 255
@@ -225,6 +257,8 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
                 h, w = image.shape[:2]
                 binary = mask > 0.3
                 non_zero_coords = np.argwhere(binary)
+                if non_zero_coords.size == 0:
+                    raise ValueError(f"Render alpha mask is empty: {image_path}")
                 x_min, y_min = non_zero_coords.min(axis=0)
                 x_max, y_max = non_zero_coords.max(axis=0)
                 image, mask = padding(
@@ -245,25 +279,32 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
         return images, masks
 
     def decode(self, item):
-        uid = item.split('/')[-1]
-        render_img_paths = [os.path.join(item, f'render_cond/{i:03d}.png') for i in range(24)]
+        item = os.path.normpath(os.fspath(item))
+        uid = os.path.basename(item)
+        render_img_paths = [
+            os.path.join(item, 'render_cond', f'{i:03d}.png')
+            for i in range(24)
+        ]
         # transforms_json_path = os.path.join(item, 'render_cond/transforms.json')
-        surface_npz_path = os.path.join(item, f'geo_data/{uid}_surface.npz')
+        surface_npz_path = os.path.join(item, 'geo_data', f'{uid}_surface.npz')
         # sdf_npz_path = os.path.join(item, f'geo_data/{uid}_sdf.npz')
         # watertight_obj_path = os.path.join(item, f'geo_data/{uid}_watertight.obj')
         sample = {}
         sample["image"] = render_img_paths
-        surface_data = read_npz(surface_npz_path)
-        sample["random_surface"] = surface_data['random_surface']
-        sample["sharpedge_surface"] = surface_data['sharp_surface']
+        with read_npz(surface_npz_path) as surface_data:
+            sample["random_surface"] = surface_data['random_surface'].copy()
+            sample["sharpedge_surface"] = surface_data['sharp_surface'].copy()
         return sample
 
     def transform(self, sample):
-        rng = np.random.default_rng()
         random_surface = sample.get("random_surface", 0)
         sharpedge_surface = sample.get("sharpedge_surface", 0)
         image_input, mask_input = self.load_render(sample['image'])
-        surface, geo_points = self.load_surface_sdf_points(rng, random_surface, sharpedge_surface)
+        surface, geo_points = self.load_surface_sdf_points(
+            self.np_rng,
+            random_surface,
+            sharpedge_surface,
+        )
         sample = {
             "surface": surface,
             "geo_points": geo_points,
@@ -273,9 +314,18 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
         return sample
 
     def __iter__(self):
+        if not self._rng_initialized:
+            self.seed_rng(torch.initial_seed() % (2 ** 32))
+
         total_num = 0
         failed_num = 0
-        for data in ResampledShards(self.data_list):
+        consecutive_failures = 0
+        shards = ResampledShards(
+            self.data_list,
+            worker_seed=self.worker_seed,
+            deterministic=self.deterministic,
+        )
+        for data in shards:
             total_num += 1
             if total_num % 1000 == 0:
                 print(f"Current failure rate of data loading:")
@@ -284,9 +334,23 @@ class AlignedShapeLatentDataset(torch.utils.data.dataset.IterableDataset):
                 sample = self.decode(data)
                 sample = self.transform(sample)
             except Exception as err:
-                print(err)
                 failed_num += 1
+                consecutive_failures += 1
+                if consecutive_failures <= 3:
+                    print(f"Failed to load dataset item {data}: {err}")
+                if consecutive_failures >= self.max_consecutive_failures:
+                    raise RuntimeError(
+                        f"Dataset loading failed {consecutive_failures} consecutive times. "
+                        f"Last item: {data}. Run tools/validate_shape_dataset.py."
+                    ) from err
+                if failed_num >= self.max_total_failures:
+                    raise RuntimeError(
+                        f"Dataset loading reached the total failure limit "
+                        f"({self.max_total_failures}). Last item: {data}. "
+                        f"Run tools/validate_shape_dataset.py."
+                    ) from err
                 continue
+            consecutive_failures = 0
             yield sample
 
 
@@ -307,7 +371,10 @@ class AlignedShapeLatentModule(LightningDataModule):
         sharpedge_label: bool = False,
         return_normal: bool = False, 
         padding = True,
-        padding_ratio_range=[1.15, 1.15]
+        padding_ratio_range=[1.15, 1.15],
+        deterministic: bool = False,
+        max_consecutive_failures: int = 16,
+        max_total_failures: int = 100,
     ):
 
         super().__init__()
@@ -338,6 +405,9 @@ class AlignedShapeLatentModule(LightningDataModule):
 
         self.padding = padding
         self.padding_ratio_range = padding_ratio_range
+        self.deterministic = deterministic
+        self.max_consecutive_failures = max_consecutive_failures
+        self.max_total_failures = max_total_failures
         
     def train_dataloader(self):
         asl_params = {
@@ -349,7 +419,10 @@ class AlignedShapeLatentModule(LightningDataModule):
             "sharpedge_label": self.sharpedge_label,
             "return_normal": self.return_normal,
             "padding": self.padding,
-            "padding_ratio_range": self.padding_ratio_range
+            "padding_ratio_range": self.padding_ratio_range,
+            "deterministic": self.deterministic,
+            "max_consecutive_failures": self.max_consecutive_failures,
+            "max_total_failures": self.max_total_failures,
         }
         dataset = AlignedShapeLatentDataset(**asl_params)
         return torch.utils.data.DataLoader(
@@ -371,7 +444,10 @@ class AlignedShapeLatentModule(LightningDataModule):
             "sharpedge_label": self.sharpedge_label,
             "return_normal": self.return_normal, 
             "padding": self.padding,
-            "padding_ratio_range": self.padding_ratio_range
+            "padding_ratio_range": self.padding_ratio_range,
+            "deterministic": self.deterministic,
+            "max_consecutive_failures": self.max_consecutive_failures,
+            "max_total_failures": self.max_total_failures,
         }
         dataset = AlignedShapeLatentDataset(**asl_params)
         return torch.utils.data.DataLoader(

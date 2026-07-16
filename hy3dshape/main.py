@@ -31,6 +31,7 @@ from pytorch_lightning.loggers import Logger, TensorBoardLogger
 from pytorch_lightning.utilities import rank_zero_info
 
 from hy3dshape.utils import get_config_from_file, instantiate_from_config
+from hy3dshape.utils.trainings.peft import PeftSaveCallback
 
 
 class SetupCallback(Callback):
@@ -43,27 +44,30 @@ class SetupCallback(Callback):
     def on_fit_start(self, trainer: pl.trainer.Trainer, pl_module: pl.LightningModule) -> None:
         if trainer.global_rank == 0:
             os.makedirs(self.logdir, exist_ok=True)
-            os.makedirs(self.ckptdir, exist_ok=True)
+            if self.config.training.get("save_full_checkpoint", True):
+                os.makedirs(self.ckptdir, exist_ok=True)
 
 
 def setup_callbacks(config: DictConfig) -> Tuple[List[Callback], Logger]:
     training_cfg = config.training
     basedir = Path(training_cfg.output_dir)
     os.makedirs(basedir, exist_ok=True)
+    OmegaConf.save(config, basedir / "training_config_effective.yaml")
     all_callbacks = []
 
     setup_callback = SetupCallback(config, basedir)
     all_callbacks.append(setup_callback)
     
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=setup_callback.ckptdir,
-        filename="ckpt-{step:08d}",
-        monitor=training_cfg.monitor,
-        mode="max",
-        save_top_k=-1,
-        verbose=False,
-        every_n_train_steps=training_cfg.every_n_train_steps)
-    all_callbacks.append(checkpoint_callback)
+    if training_cfg.get("save_full_checkpoint", True):
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=setup_callback.ckptdir,
+            filename="ckpt-{step:08d}",
+            monitor=training_cfg.monitor,
+            mode=training_cfg.get("monitor_mode", "min"),
+            save_top_k=-1,
+            verbose=False,
+            every_n_train_steps=training_cfg.every_n_train_steps)
+        all_callbacks.append(checkpoint_callback)
 
     if "callbacks" in config:
         for key, value in config['callbacks'].items():
@@ -76,16 +80,47 @@ def setup_callbacks(config: DictConfig) -> Tuple[List[Callback], Logger]:
 
 
 def merge_cfg(cfg, arg_cfg):
+    # Preserve training-only options that are not exposed by argparse (for
+    # example LoRA adapter saving), while retaining the original behavior in
+    # which YAML values override argparse defaults.
+    cfg.training = OmegaConf.merge(DictConfig(arg_cfg), cfg.training)
     for key in arg_cfg.keys():
         if key in cfg.training:
             arg_cfg[key] = cfg.training[key]
-    cfg.training = DictConfig(arg_cfg)
     return cfg
+
+
+def apply_smoke_test_overrides(config, args):
+    """Make a run stop after one optimizer step without editing the YAML."""
+    if not args.smoke_test:
+        return config
+
+    config.training.steps = 1
+    config.training.update_every = 1
+    config.training.limit_val_batches = 0
+    config.training.lora_save_every_n_steps = 1
+    config.dataset.params.num_workers = 0
+    config.dataset.params.val_num_workers = 0
+    args.update_every = 1
+    return config
+
+
+def apply_dataset_overrides(config, args):
+    if args.train_data_list:
+        config.dataset.params.train_data_list = args.train_data_list
+    if args.val_data_list:
+        config.dataset.params.val_data_list = args.val_data_list
+    return config
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", action='store_true')
+    parser.add_argument(
+        "--smoke_test",
+        action='store_true',
+        help="run one optimizer step with zero DataLoader workers and no validation",
+    )
     parser.add_argument("-c", "--config", type=str, required=True)
     parser.add_argument("-s", "--seed", type=int, default=0)
     parser.add_argument("-nn", "--num_nodes", type=int, default=1)
@@ -104,6 +139,8 @@ def get_args():
     parser.add_argument("--monitor", type=str, default="val/total_loss")
     parser.add_argument("--output_dir", type=str, help="the output directory to save everything.")
     parser.add_argument("--ckpt_path", type=str, default="", help="the restore checkpoints.")
+    parser.add_argument("--train_data_list", type=str, default=None)
+    parser.add_argument("--val_data_list", type=str, default=None)
     parser.add_argument("--deepspeed", default=False, action="store_true")
     parser.add_argument("--deepspeed2", default=False, action="store_true")
     parser.add_argument("--scale_lr", type=bool, nargs="?", const=True, default=False,
@@ -127,6 +164,8 @@ if __name__ == "__main__":
     # Load configuration
     config = get_config_from_file(args.config)
     config = merge_cfg(config, vars(args))
+    config = apply_smoke_test_overrides(config, args)
+    config = apply_dataset_overrides(config, args)
     training_cfg = config.training
 
     # print config
@@ -142,6 +181,13 @@ if __name__ == "__main__":
 
     # Build model
     model: pl.LightningModule = instantiate_from_config(config.model)
+
+    if getattr(model, "is_lora_enabled", False):
+        callbacks.append(PeftSaveCallback(
+            save_dir=str(Path(training_cfg.output_dir) / "lora"),
+            save_every_n_steps=training_cfg.get("lora_save_every_n_steps", 500),
+            save_on_train_epoch_end=training_cfg.get("lora_save_on_train_epoch_end", False),
+        ))
     
     nodes = args.num_nodes
     ngpus = args.num_gpus
@@ -195,12 +241,13 @@ if __name__ == "__main__":
         strategy=ddp_strategy,
         gradient_clip_val=training_cfg.get('gradient_clip_val'),
         gradient_clip_algorithm=training_cfg.get('gradient_clip_algorithm'),
-        accumulate_grad_batches=args.update_every,
+        accumulate_grad_batches=training_cfg.update_every,
         logger=loggers,
         log_every_n_steps=training_cfg.log_every_n_steps,
         val_check_interval=training_cfg.val_check_interval,
         limit_val_batches=training_cfg.limit_val_batches,
-        check_val_every_n_epoch=None
+        check_val_every_n_epoch=None,
+        enable_checkpointing=training_cfg.get("save_full_checkpoint", True),
     )
 
     # Train

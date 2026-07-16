@@ -30,6 +30,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 from einops import rearrange
 
 from .moe_layers import MoEBlock
@@ -555,6 +556,7 @@ class HunYuanDiTPlain(nn.Module):
         use_pos_emb=False,
         use_attention_pooling=True,
         guidance_cond_proj_dim=None,
+        gradient_checkpointing=False,
         qkv_bias=True,
         num_moe_layers: int = 6,
         num_experts: int = 8,
@@ -579,6 +581,7 @@ class HunYuanDiTPlain(nn.Module):
         self.use_pos_emb = use_pos_emb
         self.use_attention_pooling = use_attention_pooling
         self.guidance_cond_proj_dim = guidance_cond_proj_dim
+        self.gradient_checkpointing = gradient_checkpointing
 
         self.text_len = text_len
 
@@ -659,7 +662,19 @@ class HunYuanDiTPlain(nn.Module):
         skip_value_list = []
         for layer, block in enumerate(self.blocks):
             skip_value = None if layer <= self.depth // 2 else skip_value_list.pop()
-            x = block(x, c, cond, skip_value=skip_value)
+            if self.training and self.gradient_checkpointing:
+                # Non-reentrant checkpointing is required for PEFT: the input
+                # activations can be frozen while LoRA parameters still need grads.
+                x = checkpoint(
+                    block,
+                    x,
+                    c,
+                    cond,
+                    skip_value,
+                    use_reentrant=False,
+                )
+            else:
+                x = block(x, c, cond, skip_value=skip_value)
             if layer < self.depth // 2:
                 skip_value_list.append(x)
 

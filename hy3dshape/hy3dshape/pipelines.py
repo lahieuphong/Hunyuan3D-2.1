@@ -250,6 +250,27 @@ class Hunyuan3DDiTPipeline:
         self.model = torch.compile(self.model)
         self.conditioner = torch.compile(self.conditioner)
 
+    def load_lora_adapter(self, adapter_path: str, merge: bool = True):
+        """Load a Shape DiT PEFT adapter for inference.
+
+        Merging is enabled by default so the rest of the pipeline keeps working
+        with the original denoiser type and has no PEFT wrapper overhead.
+        """
+        from peft import PeftModel
+
+        if hasattr(self.model, "peft_config"):
+            raise RuntimeError("A PEFT adapter is already loaded on this pipeline")
+
+        peft_model = PeftModel.from_pretrained(
+            self.model,
+            str(adapter_path),
+            is_trainable=False,
+        )
+        self.model = peft_model.merge_and_unload() if merge else peft_model
+        self.model.to(device=self.device, dtype=self.dtype)
+        self.model.eval()
+        return self
+
     def enable_flashvdm(
         self,
         enabled: bool = True,
