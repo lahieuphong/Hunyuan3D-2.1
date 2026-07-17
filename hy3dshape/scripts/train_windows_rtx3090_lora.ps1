@@ -6,6 +6,7 @@ param(
     [string]$ValDataset = "",
     [string]$OutputDir = "",
     [switch]$SmokeTest,
+    [switch]$PreflightOnly,
     [switch]$SkipDataValidation,
     [switch]$AllowExistingOutput
 )
@@ -56,48 +57,31 @@ if (-not (Test-Path -LiteralPath $ValDataset)) {
 $Config = (Resolve-Path -LiteralPath $Config).Path
 $TrainDataset = (Resolve-Path -LiteralPath $TrainDataset).Path
 $ValDataset = (Resolve-Path -LiteralPath $ValDataset).Path
-if (Test-Path -LiteralPath $OutputDir) {
-    $existingOutput = Get-ChildItem -LiteralPath $OutputDir -Force | Select-Object -First 1
-    if ($null -ne $existingOutput) {
-        if (-not $AllowExistingOutput) {
-            throw "Output directory is not empty: $OutputDir. Choose a new -OutputDir or pass -AllowExistingOutput intentionally."
+if (-not $PreflightOnly) {
+    if (Test-Path -LiteralPath $OutputDir) {
+        $existingOutput = Get-ChildItem -LiteralPath $OutputDir -Force | Select-Object -First 1
+        if ($null -ne $existingOutput) {
+            if (-not $AllowExistingOutput) {
+                throw "Output directory is not empty: $OutputDir. Choose a new -OutputDir or pass -AllowExistingOutput intentionally."
+            }
+            Write-Warning "Reusing a non-empty output directory can mix logs and adapter snapshots: $OutputDir"
         }
-        Write-Warning "Reusing a non-empty output directory can mix logs and adapter snapshots: $OutputDir"
     }
+    New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+    $OutputDir = (Resolve-Path -LiteralPath $OutputDir).Path
 }
-New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
-$OutputDir = (Resolve-Path -LiteralPath $OutputDir).Path
 
 $env:CUDA_VISIBLE_DEVICES = "0"
 $env:PYTHONUTF8 = "1"
 $env:TOKENIZERS_PARALLELISM = "false"
 $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
-$env:PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True"
-
-$preflight = @'
-import sys
-import torch
-import peft
-import torch_cluster
-
-if sys.version_info[:2] not in {(3, 10), (3, 11)}:
-    raise RuntimeError(f"Use Python 3.10 or 3.11, got {sys.version.split()[0]}")
-if not torch.cuda.is_available():
-    raise RuntimeError("PyTorch cannot access an NVIDIA CUDA GPU")
-if not torch.cuda.is_bf16_supported():
-    raise RuntimeError("The selected GPU/PyTorch build does not support BF16")
-
-props = torch.cuda.get_device_properties(0)
-print(f"Python: {sys.version.split()[0]}")
-print(f"PyTorch: {torch.__version__}; CUDA runtime: {torch.version.cuda}")
-print(f"GPU: {props.name}; VRAM: {props.total_memory / 1024**3:.1f} GiB")
-print(f"PEFT: {peft.__version__}")
-print(f"torch-cluster: {torch_cluster.__version__}")
-'@
+$env:PYTORCH_CUDA_ALLOC_CONF = "max_split_size_mb:128,garbage_collection_threshold:0.8"
+$env:HF_HOME = Join-Path $RepoRoot ".cache\huggingface"
+$env:HY3DGEN_MODELS = Join-Path $RepoRoot ".cache\hy3dgen"
 
 Push-Location $ShapeRoot
 try {
-    & $PythonExecutable -c $preflight
+    & $PythonExecutable "tools\check_windows_training_env.py"
     if ($LASTEXITCODE -ne 0) {
         throw "Training environment preflight failed."
     }
@@ -117,6 +101,11 @@ try {
         }
     }
 
+    if ($PreflightOnly) {
+        Write-Host "Environment and dataset preflight completed; training was not started."
+        return
+    }
+
     Copy-Item -LiteralPath $Config -Destination (Join-Path $OutputDir "training_config_source.yaml") -Force
 
     $trainArgs = @(
@@ -132,7 +121,7 @@ try {
     )
     if ($SmokeTest) {
         $trainArgs += "--smoke_test"
-        Write-Host "Starting one-step RTX 3090 LoRA smoke test..."
+        Write-Host "Starting two-step RTX 3090 LoRA smoke test..."
     }
     else {
         Write-Host "Starting RTX 3090 LoRA training..."

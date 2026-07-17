@@ -317,7 +317,18 @@ class Hunyuan3DDiTPipeline:
         if dtype is not None:
             self.dtype = dtype
             self.vae.to(dtype=dtype)
-            self.model.to(dtype=dtype)
+            if hasattr(self.model, "peft_config"):
+                # PEFT adapters used for training must keep their FP32 values.
+                # Casting the complete model first and upcasting afterwards is
+                # lossy when resuming small learned LoRA deltas.
+                from peft import cast_mixed_precision_params
+
+                cast_mixed_precision_params(self.model, dtype=dtype)
+                for buffer in self.model.buffers():
+                    if buffer.is_floating_point():
+                        buffer.data = buffer.data.to(dtype=dtype)
+            else:
+                self.model.to(dtype=dtype)
             self.conditioner.to(dtype=dtype)
         if device is not None:
             self.device = torch.device(device)

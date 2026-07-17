@@ -1,7 +1,7 @@
 name: "Hunyuan3D 2.1 Shape DiT LoRA; single RTX 3090; native Windows"
 
 # This is a pretrained LoRA fine-tune, not the random-weight mini model.
-# A one-step OOM smoke test is still required before a long run.
+# A two-step learned-delta/OOM smoke test is required before a long run.
 training:
   steps: 10000
   num_nodes: 1
@@ -21,6 +21,8 @@ training:
   # Full Lightning checkpoints contain the frozen 3.3B base model and are
   # intentionally disabled. Adapter snapshots are written under output/lora.
   save_full_checkpoint: false
+  # Lightning 1.9.x can miscount PEFT parameters in its automatic summary.
+  enable_model_summary: false
   lora_save_every_n_steps: 500
   lora_save_on_train_epoch_end: false
 

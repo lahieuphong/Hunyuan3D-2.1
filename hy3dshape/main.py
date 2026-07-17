@@ -91,14 +91,15 @@ def merge_cfg(cfg, arg_cfg):
 
 
 def apply_smoke_test_overrides(config, args):
-    """Make a run stop after one optimizer step without editing the YAML."""
+    """Make a run stop after two optimizer steps without editing the YAML."""
     if not args.smoke_test:
         return config
 
-    config.training.steps = 1
+    config.training.steps = 2
     config.training.update_every = 1
     config.training.limit_val_batches = 0
-    config.training.lora_save_every_n_steps = 1
+    config.training.lora_save_every_n_steps = 2
+    config.training.enable_model_summary = False
     config.dataset.params.num_workers = 0
     config.dataset.params.val_num_workers = 0
     args.update_every = 1
@@ -119,7 +120,7 @@ def get_args():
     parser.add_argument(
         "--smoke_test",
         action='store_true',
-        help="run one optimizer step with zero DataLoader workers and no validation",
+        help="run two optimizer steps with zero DataLoader workers and no validation",
     )
     parser.add_argument("-c", "--config", type=str, required=True)
     parser.add_argument("-s", "--seed", type=int, default=0)
@@ -181,6 +182,16 @@ if __name__ == "__main__":
 
     # Build model
     model: pl.LightningModule = instantiate_from_config(config.model)
+
+    smoke_trainable_snapshot = None
+    if args.smoke_test and getattr(model, "is_lora_enabled", False):
+        smoke_trainable_snapshot = {
+            name: parameter.detach().cpu().clone()
+            for name, parameter in model.model.named_parameters()
+            if parameter.requires_grad
+        }
+        if not smoke_trainable_snapshot:
+            raise RuntimeError("Smoke test found no trainable LoRA parameters to verify")
 
     if getattr(model, "is_lora_enabled", False):
         callbacks.append(PeftSaveCallback(
@@ -248,9 +259,33 @@ if __name__ == "__main__":
         limit_val_batches=training_cfg.limit_val_batches,
         check_val_every_n_epoch=None,
         enable_checkpointing=training_cfg.get("save_full_checkpoint", True),
+        enable_model_summary=training_cfg.get("enable_model_summary", True),
     )
 
     # Train
     if training_cfg.ckpt_path == '': 
         training_cfg.ckpt_path = None
     trainer.fit(model, datamodule=data, ckpt_path=training_cfg.ckpt_path)
+
+    if smoke_trainable_snapshot is not None:
+        current_parameters = dict(model.model.named_parameters())
+        changed_tensors = 0
+        changed_elements = 0
+        for name, before in smoke_trainable_snapshot.items():
+            after = current_parameters[name].detach().cpu()
+            if not torch.isfinite(after).all():
+                raise RuntimeError(f"Smoke test produced non-finite LoRA values in {name}")
+            changed = after.ne(before)
+            if changed.any():
+                changed_tensors += 1
+                changed_elements += int(changed.count_nonzero())
+
+        if changed_elements == 0:
+            raise RuntimeError(
+                "Smoke test completed but no trainable LoRA value changed; "
+                "check parameter dtype, gradients, and learning rate"
+            )
+        rank_zero_info(
+            f"Smoke-test optimizer verification PASSED: {changed_tensors} trainable tensors "
+            f"changed ({changed_elements:,} elements)."
+        )

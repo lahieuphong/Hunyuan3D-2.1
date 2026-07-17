@@ -63,7 +63,7 @@ class Diffuser(pl.LightningModule):
         self.lora_config = lora_config
         self.is_lora_enabled = lora_config is not None
         if self.is_lora_enabled:
-            from peft import LoraConfig, PeftModel, get_peft_model
+            from peft import LoraConfig, PeftModel, cast_mixed_precision_params, get_peft_model
 
             target_modules = list(lora_config.get('target_modules', []))
             if not target_modules:
@@ -130,6 +130,14 @@ class Diffuser(pl.LightningModule):
             conditioner=self.cond_stage_model,
             image_processor=self.image_processor,
         )
+
+        if self.is_lora_enabled:
+            # The inference pipeline moves the complete denoiser to FP16. Restore
+            # PEFT's recommended mixed-precision layout afterwards: frozen base
+            # weights stay in FP16 while trainable adapters use FP32. Keeping the
+            # optimizer parameters in FP32 prevents small LoRA updates from
+            # rounding to zero during warm-up.
+            cast_mixed_precision_params(self.model, dtype=self.pipeline.dtype)
 
         # ========= torch compile to accelerate ========= #
         self.torch_compile = torch_compile
@@ -206,6 +214,15 @@ class Diffuser(pl.LightningModule):
         ]
         if not trainable_parameters:
             raise RuntimeError("The denoiser has no trainable parameters")
+
+        if self.is_lora_enabled:
+            trainable_dtypes = {parameter.dtype for parameter in trainable_parameters}
+            if trainable_dtypes != {torch.float32}:
+                raise RuntimeError(
+                    "LoRA trainable parameters must remain FP32 for mixed-precision training; "
+                    f"got {sorted(map(str, trainable_dtypes))}"
+                )
+            rank_zero_info("LoRA trainable parameter dtype: torch.float32")
 
         trainable_count = sum(parameter.numel() for parameter in trainable_parameters)
         total_count = sum(parameter.numel() for parameter in self.model.parameters())
