@@ -1,4 +1,4 @@
-# Web UI 4-view trên Windows + RTX 3090
+# Web UI 1 ảnh / 4 ảnh trên Windows + RTX 3090
 
 Tài liệu này dành cho bản shape-only đã được kiểm chứng với:
 
@@ -12,12 +12,10 @@ Tài liệu này dành cho bản shape-only đã được kiểm chứng với:
 
 Web UI đã được khởi động thật tại `http://127.0.0.1:8080` và endpoint `/health` trả về trạng thái `ready`, `multiview=true`, `device=cuda`.
 
-Một lượt bốn ảnh đã được gửi qua chính endpoint Gradio `/shape_generation`:
+Hai chế độ đã được gửi qua chính endpoint Gradio `/shape_generation` với 30 inference steps, guidance 5.0 và octree resolution 256:
 
-- 30 inference steps, guidance 5.0, octree resolution 256.
-- Thời gian shape generation: 45,32 giây.
-- Tổng thời gian phía UI: 45,37 giây.
-- Output: 124.078 vertices và 248.160 faces.
+- Tab `1 ẢNH · Single View`: dùng view `front`, tổng thời gian 27,24 giây, output 132.274 vertices và 264.540 faces.
+- Tab `4 ẢNH · Multi View`: dùng `front`, `left`, `back`, `right`, tổng thời gian 46,30 giây, output 124.078 vertices và 248.160 faces.
 - GLB đã được nạp lại bằng Trimesh; vertex hữu hạn và face index hợp lệ.
 
 ## Mở Web UI bằng một lệnh
@@ -59,20 +57,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\start_w
 
 ## Cách sử dụng giao diện
 
-1. Tải ảnh chính diện vào `Front`.
-2. Tải các ảnh còn lại vào `Back`, `Left`, `Right`.
+1. Chọn tab `1 ẢNH · Single View` nếu chỉ có một ảnh chính diện; tải ảnh vào `Ảnh chính diện · Front`.
+2. Chọn tab `4 ẢNH · Multi View` nếu có đủ bốn hướng; tải đúng Front, Back, Left và Right vào bốn ô được đánh số.
 3. Giữ thiết lập đầu tiên: Steps 30, Guidance 5.0, Octree Resolution 256, Number of Chunks 8000.
 4. Tắt `Randomize seed` khi cần tái tạo đúng cùng một kết quả.
-5. Nhấn `Gen Shape` và chờ hàng đợi hoàn tất.
+5. Nhấn `Generate 3D · 1 Image` hoặc `Generate 3D · 4 Images` và chờ hàng đợi hoàn tất.
 6. Xem mesh ở khung `Generated Mesh`.
 7. Tải GLB từ trường `Generated mesh (direct download)`.
 
-Ảnh Front là bắt buộc. Ba ảnh còn lại là tùy chọn ở mức code, nhưng dùng đủ bốn ảnh thường cho hình học nhất quán hơn.
+Tab một ảnh yêu cầu đúng một ảnh chính diện. Tab bốn ảnh yêu cầu đủ cả bốn hướng; backend chỉ đọc dữ liệu của tab đang được chọn.
 
 ## Yêu cầu ảnh đầu vào
 
 - Dùng PNG RGBA có nền trong suốt.
-- Bốn ảnh phải là cùng một vật thể, không đổi tư thế hoặc hình dạng.
+- Với tab bốn ảnh, tất cả ảnh phải là cùng một vật thể, không đổi tư thế hoặc hình dạng.
 - Vật thể nằm giữa ảnh và có tỷ lệ gần giống nhau.
 - Camera có độ cao, khoảng cách và tiêu cự gần giống nhau.
 - Left/Right là camera quay quanh vật thể; không dùng ảnh Front lật gương.

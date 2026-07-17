@@ -256,6 +256,7 @@ height="{height}" width="100%" frameborder="0"></iframe>'
 @spaces.GPU(duration=60)
 def _gen_shape(
     caption=None,
+    input_mode='single',
     image=None,
     mv_image_front=None,
     mv_image_back=None,
@@ -272,17 +273,30 @@ def _gen_shape(
     if not MV_MODE and image is None and caption is None:
         raise gr.Error("Please provide either a caption or an image.")
     if MV_MODE:
-        if mv_image_front is None:
-            raise gr.Error("Please provide the Front view. Back, Left and Right are optional.")
-        image = {}
-        if mv_image_front is not None:
-            image['front'] = mv_image_front
-        if mv_image_back is not None:
-            image['back'] = mv_image_back
-        if mv_image_left is not None:
-            image['left'] = mv_image_left
-        if mv_image_right is not None:
-            image['right'] = mv_image_right
+        if input_mode == 'single':
+            if image is None:
+                raise gr.Error("Tab 1 ẢNH cần một ảnh chính diện của vật thể.")
+            image = {'front': image}
+        elif input_mode == 'four':
+            multi_view_images = {
+                'front': mv_image_front,
+                'left': mv_image_left,
+                'back': mv_image_back,
+                'right': mv_image_right,
+            }
+            missing_views = [
+                name.title() for name, view in multi_view_images.items() if view is None
+            ]
+            if missing_views:
+                raise gr.Error(
+                    "Tab 4 ẢNH cần đủ Front, Back, Left và Right. Còn thiếu: "
+                    + ", ".join(missing_views)
+                )
+            image = multi_view_images
+        else:
+            raise gr.Error("Chế độ ảnh không hợp lệ. Hãy tải lại trang Web UI.")
+    else:
+        input_mode = 'single'
 
     seed = int(randomize_seed_fn(seed, randomize_seed))
 
@@ -296,6 +310,8 @@ def _gen_shape(
         },
         'params': {
             'caption': caption,
+            'input_mode': input_mode,
+            'views_used': list(image.keys()) if MV_MODE else ['image'],
             'steps': steps,
             'guidance_scale': guidance_scale,
             'seed': seed,
@@ -364,6 +380,7 @@ def _gen_shape(
 @spaces.GPU(duration=60)
 def generation_all(
     caption=None,
+    input_mode='single',
     image=None,
     mv_image_front=None,
     mv_image_back=None,
@@ -379,8 +396,9 @@ def generation_all(
 ):
     start_time_0 = time.time()
     mesh, image, save_folder, stats, seed = _gen_shape(
-        caption,
-        image,
+        caption=caption,
+        input_mode=input_mode,
+        image=image,
         mv_image_front=mv_image_front,
         mv_image_back=mv_image_back,
         mv_image_left=mv_image_left,
@@ -447,6 +465,7 @@ def generation_all(
 @spaces.GPU(duration=60)
 def shape_generation(
     caption=None,
+    input_mode='single',
     image=None,
     mv_image_front=None,
     mv_image_back=None,
@@ -462,8 +481,9 @@ def shape_generation(
 ):
     start_time_0 = time.time()
     mesh, image, save_folder, stats, seed = _gen_shape(
-        caption,
-        image,
+        caption=caption,
+        input_mode=input_mode,
+        image=image,
         mv_image_front=mv_image_front,
         mv_image_back=mv_image_back,
         mv_image_left=mv_image_left,
@@ -511,8 +531,8 @@ def build_app():
     </div>
     """
     custom_css = """
-    .app.svelte-wpkpf6.svelte-wpkpf6:not(.fill_width) {
-        max-width: 1480px;
+    .gradio-container {
+        max-width: 1480px !important;
     }
     .mv-image button .wrap {
         font-size: 10px;
@@ -522,6 +542,62 @@ def build_app():
         width: 20px;
     }
 
+    #prompt-mode-tabs button[role="tab"] {
+        border: 1px solid var(--block-border-color);
+        border-radius: 10px;
+        flex: 1;
+        font-size: 14px;
+        font-weight: 700;
+        min-height: 44px;
+        padding: 10px 14px;
+    }
+
+    #prompt-mode-tabs button[role="tab"][aria-selected="true"] {
+        background: var(--primary-500);
+        border-color: var(--primary-500);
+        color: white;
+    }
+
+    .input-mode-guide {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(63, 81, 181, 0.14), rgba(33, 150, 243, 0.06));
+        border: 1px solid rgba(99, 130, 255, 0.35);
+        border-radius: 12px;
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+    }
+
+    .input-mode-number {
+        align-items: center;
+        background: #4263eb;
+        border-radius: 10px;
+        color: white;
+        display: flex;
+        flex: 0 0 38px;
+        font-size: 18px;
+        font-weight: 800;
+        height: 38px;
+        justify-content: center;
+    }
+
+    .input-mode-copy strong,
+    .input-mode-copy span {
+        display: block;
+    }
+
+    .input-mode-copy strong {
+        font-size: 14px;
+        margin-bottom: 3px;
+    }
+
+    .input-mode-copy span {
+        color: var(--body-text-color-subdued);
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
     """
 
     with gr.Blocks(theme=gr.themes.Base(), title=title, analytics_enabled=False, css=custom_css) as demo:
@@ -529,30 +605,53 @@ def build_app():
 
         with gr.Row():
             with gr.Column(scale=3):
-                selected_prompt_tab = 'tab_mv_prompt' if MV_MODE else 'tab_img_prompt'
-                with gr.Tabs(selected=selected_prompt_tab) as tabs_prompt:
-                    with gr.Tab('Image Prompt', id='tab_img_prompt', visible=not MV_MODE) as tab_ip:
-                        image = gr.Image(label='Image', type='pil', image_mode='RGBA', height=290)
+                input_mode = gr.Textbox(value='single', visible=False, label='Input mode')
+                with gr.Tabs(selected='tab_single_prompt', elem_id='prompt-mode-tabs') as tabs_prompt:
+                    with gr.Tab('1 ẢNH · Single View', id='tab_single_prompt') as tab_ip:
+                        gr.HTML("""
+                        <div class="input-mode-guide">
+                            <div class="input-mode-number">1</div>
+                            <div class="input-mode-copy">
+                                <strong>Một ảnh chính diện</strong>
+                                <span>Nhanh và đơn giản. Dùng ảnh Front rõ nét, nền trong suốt.</span>
+                            </div>
+                        </div>
+                        """)
+                        image = gr.Image(
+                            label='Ảnh chính diện · Front',
+                            type='pil',
+                            image_mode='RGBA',
+                            height=300,
+                            elem_classes='single-image',
+                        )
                         caption = gr.State(None)
 #                    with gr.Tab('Text Prompt', id='tab_txt_prompt', visible=HAS_T2I and not MV_MODE) as tab_tp:
 #                        caption = gr.Textbox(label='Text Prompt',
 #                                             placeholder='HunyuanDiT will be used to generate image.',
 #                                             info='Example: A 3D model of a cute cat, white background')
-                    with gr.Tab('MultiView Prompt', id='tab_mv_prompt', visible=MV_MODE) as tab_mv:
-                        # gr.Label('Please upload at least one front image.')
+                    with gr.Tab('4 ẢNH · Multi View', id='tab_mv_prompt', visible=MV_MODE) as tab_mv:
+                        gr.HTML("""
+                        <div class="input-mode-guide">
+                            <div class="input-mode-number">4</div>
+                            <div class="input-mode-copy">
+                                <strong>Bốn hướng đồng bộ</strong>
+                                <span>Đưa đủ Front, Back, Left và Right để hình học nhất quán hơn.</span>
+                            </div>
+                        </div>
+                        """)
                         with gr.Row():
-                            mv_image_front = gr.Image(label='Front', type='pil', image_mode='RGBA', height=140,
+                            mv_image_front = gr.Image(label='1 · Mặt trước · Front', type='pil', image_mode='RGBA', height=150,
                                                       min_width=100, elem_classes='mv-image')
-                            mv_image_back = gr.Image(label='Back', type='pil', image_mode='RGBA', height=140,
+                            mv_image_back = gr.Image(label='2 · Mặt sau · Back', type='pil', image_mode='RGBA', height=150,
                                                      min_width=100, elem_classes='mv-image')
                         with gr.Row():
-                            mv_image_left = gr.Image(label='Left', type='pil', image_mode='RGBA', height=140,
+                            mv_image_left = gr.Image(label='3 · Bên trái · Left', type='pil', image_mode='RGBA', height=150,
                                                      min_width=100, elem_classes='mv-image')
-                            mv_image_right = gr.Image(label='Right', type='pil', image_mode='RGBA', height=140,
+                            mv_image_right = gr.Image(label='4 · Bên phải · Right', type='pil', image_mode='RGBA', height=150,
                                                       min_width=100, elem_classes='mv-image')
 
                 with gr.Row():
-                    btn = gr.Button(value='Gen Shape', variant='primary', min_width=100)
+                    btn = gr.Button(value='Generate 3D · 1 Image', variant='primary', min_width=100)
                     btn_all = gr.Button(value='Gen Textured Shape',
                                         variant='primary',
                                         visible=HAS_TEXTUREGEN,
@@ -638,7 +737,7 @@ Fast for very complex cases, Standard seldom use.',
                     with gr.Tab('Mesh Statistic', id='stats_panel'):
                         stats = gr.Json({}, label='Mesh Stats')
 
-            with gr.Column(scale=3 if MV_MODE else 2):
+            with gr.Column(scale=2, visible=not MV_MODE):
                 with gr.Tabs(selected='tab_img_gallery') as gallery:
                     with gr.Tab('Image to 3D Gallery', 
                                 id='tab_img_gallery', 
@@ -647,7 +746,24 @@ Fast for very complex cases, Standard seldom use.',
                             gr.Examples(examples=example_is, inputs=[image],
                                         label=None, examples_per_page=18)
 
-        tab_ip.select(fn=lambda: gr.update(selected='tab_img_gallery'), outputs=gallery)
+        tab_ip.select(
+            fn=lambda: (
+                'single',
+                gr.update(value='Generate 3D · 1 Image'),
+            ),
+            outputs=[input_mode, btn],
+            queue=False,
+            api_name=False,
+        )
+        tab_mv.select(
+            fn=lambda: (
+                'four',
+                gr.update(value='Generate 3D · 4 Images'),
+            ),
+            outputs=[input_mode, btn],
+            queue=False,
+            api_name=False,
+        )
         #if HAS_T2I:
         #    tab_tp.select(fn=lambda: gr.update(selected='tab_txt_gallery'), outputs=gallery)
 
@@ -655,6 +771,7 @@ Fast for very complex cases, Standard seldom use.',
             shape_generation,
             inputs=[
                 caption,
+                input_mode,
                 image,
                 mv_image_front,
                 mv_image_back,
@@ -682,6 +799,7 @@ Fast for very complex cases, Standard seldom use.',
             generation_all,
             inputs=[
                 caption,
+                input_mode,
                 image,
                 mv_image_front,
                 mv_image_back,
