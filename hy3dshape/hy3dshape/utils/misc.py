@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import importlib
+from pathlib import Path
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
 import torch
@@ -9,18 +10,23 @@ from typing import Union
 
 
 def get_config_from_file(config_file: str) -> Union[DictConfig, ListConfig]:
-    config_file = OmegaConf.load(config_file)
+    config_path = Path(config_file).expanduser().resolve()
+    config_file = OmegaConf.load(config_path)
 
     if 'base_config' in config_file.keys():
-        if config_file['base_config'] == "default_base":
+        base_config_reference = config_file.pop('base_config')
+        if base_config_reference == "default_base":
             base_config = OmegaConf.create()
             # base_config = get_default_config()
-        elif config_file['base_config'].endswith(".yaml"):
-            base_config = get_config_from_file(config_file['base_config'])
+        elif base_config_reference.endswith(".yaml"):
+            base_config_path = Path(base_config_reference).expanduser()
+            if not base_config_path.is_absolute():
+                base_config_path = config_path.parent / base_config_path
+            base_config = get_config_from_file(base_config_path)
         else:
-            raise ValueError(f"{config_file} must be `.yaml` file or it contains `base_config` key.")
-
-        config_file = {key: value for key, value in config_file if key != "base_config"}
+            raise ValueError(
+                f"base_config must be 'default_base' or a .yaml file: {base_config_reference}"
+            )
 
         return OmegaConf.merge(base_config, config_file)
 

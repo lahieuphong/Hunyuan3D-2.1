@@ -6,6 +6,7 @@ param(
     [string]$ValDataset = "",
     [string]$OutputDir = "",
     [switch]$SmokeTest,
+    [switch]$Pilot,
     [switch]$PreflightOnly,
     [switch]$SkipDataValidation,
     [switch]$AllowExistingOutput
@@ -15,6 +16,10 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ShapeRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 $RepoRoot = (Resolve-Path (Join-Path $ShapeRoot "..")).Path
+
+if ($SmokeTest -and $Pilot) {
+    throw "Choose either -SmokeTest (2 steps) or -Pilot (200 steps), not both."
+}
 
 if ([string]::IsNullOrWhiteSpace($PythonExecutable)) {
     $PythonExecutable = Join-Path $RepoRoot ".venv-win\Scripts\python.exe"
@@ -31,7 +36,13 @@ else {
 }
 
 if ([string]::IsNullOrWhiteSpace($Config)) {
-    $Config = Join-Path $ShapeRoot "configs\hunyuandit-finetuning-flowmatching-dinol518-bf16-lora-rank8-rtx3090-windows.yaml"
+    $configName = if ($Pilot) {
+        "hunyuandit-finetuning-flowmatching-dinol518-bf16-lora-rank8-rtx3090-windows-pilot200.yaml"
+    }
+    else {
+        "hunyuandit-finetuning-flowmatching-dinol518-bf16-lora-rank8-rtx3090-windows.yaml"
+    }
+    $Config = Join-Path $ShapeRoot "configs\$configName"
 }
 if ([string]::IsNullOrWhiteSpace($TrainDataset)) {
     $TrainDataset = Join-Path $ShapeRoot "tools\mini_trainset\preprocessed"
@@ -40,7 +51,15 @@ if ([string]::IsNullOrWhiteSpace($ValDataset)) {
     $ValDataset = $TrainDataset
 }
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $outputName = if ($SmokeTest) { "lora_rtx3090_windows_smoke" } else { "lora_rtx3090_windows" }
+    $outputName = if ($SmokeTest) {
+        "lora_rtx3090_windows_smoke"
+    }
+    elseif ($Pilot) {
+        "lora_rtx3090_windows_pilot_200"
+    }
+    else {
+        "lora_rtx3090_windows"
+    }
     $OutputDir = Join-Path $ShapeRoot "output_folder\dit\$outputName"
 }
 
@@ -122,6 +141,9 @@ try {
     if ($SmokeTest) {
         $trainArgs += "--smoke_test"
         Write-Host "Starting two-step RTX 3090 LoRA smoke test..."
+    }
+    elseif ($Pilot) {
+        Write-Host "Starting 200-step RTX 3090 LoRA pilot..."
     }
     else {
         Write-Host "Starting RTX 3090 LoRA training..."

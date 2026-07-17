@@ -196,7 +196,40 @@ nvidia-smi -l 1
 
 Chỉ chuyển sang chạy dài khi smoke test hoàn tất mà không OOM, loss hữu hạn và thư mục adapter có đủ hai file PEFT.
 
-## 9. Chạy pilot 10.000 step
+## 9. Chạy pilot 200 optimizer step
+
+Sau smoke test 2 step, chưa nên chạy thẳng cấu hình 10.000 step trên bộ mini. Chế độ `-Pilot` dùng config kế thừa riêng với các giá trị:
+
+- 200 optimizer step, batch size 1 và gradient accumulation 1.
+- Warm-up 20 step, sau đó cosine decay.
+- Lưu adapter tại step 50, 100, 150, 200 và thư mục `final`.
+- Validation một batch mỗi 50 step.
+- DataLoader worker bằng 0 để lần chạy Windows dài đầu tiên dễ chẩn đoán.
+
+Chạy bằng một dòng trong CMD hoặc PowerShell tại thư mục gốc repository:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\train_windows_rtx3090_lora.ps1" -Pilot
+```
+
+Output mặc định:
+
+```text
+hy3dshape/output_folder/dit/lora_rtx3090_windows_pilot_200/
+├── training_config_source.yaml
+├── training_config_effective.yaml
+├── log/
+└── lora/
+    ├── step_00000050/
+    ├── step_00000100/
+    ├── step_00000150/
+    ├── step_00000200/
+    └── final/
+```
+
+Với tốc độ smoke test đã đo trên máy này, thời gian ước tính khoảng 12–20 phút. Số step tăng không làm tăng đáng kể VRAM đỉnh vì batch vẫn là 1; nó chủ yếu làm tăng thời gian chạy. Bộ mini chỉ có 8 object nên kết quả này dùng để kiểm tra overfit và so sánh adapter, không chứng minh khả năng tổng quát trên ảnh bất kỳ.
+
+## 10. Chạy dài 10.000 step
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File `
@@ -231,7 +264,7 @@ Launcher validate hai đường dẫn và truyền chúng vào `train_data_list`
 
 Launcher từ chối thư mục output không rỗng để tránh trộn adapter/log cũ. Chỉ dùng `-AllowExistingOutput` khi chủ động chấp nhận việc ghi đè/trộn artefact; phương án an toàn hơn là chọn `-OutputDir` mới.
 
-## 10. Tiếp tục từ adapter
+## 11. Tiếp tục từ adapter
 
 Để tiếp tục từ trọng số LoRA đã lưu, sửa trong YAML:
 
@@ -244,7 +277,7 @@ Cách này nạp lại trọng số adapter nhưng optimizer, scheduler và glob
 
 Source hiện bảo toàn chính xác tensor FP32 khi nạp `adapter_path`; phép kiểm tra round-trip trên adapter smoke cuối đã khớp 336/336 tensor. Dù vậy, đây vẫn là tiếp tục từ **trọng số LoRA**, không phải resume optimizer state/global step.
 
-## 11. Dùng adapter khi inference
+## 12. Dùng adapter khi inference
 
 ```python
 import sys
@@ -267,7 +300,7 @@ meshes = pipeline(image="input.png")
 meshes[0].export("output.glb")
 ```
 
-## 12. Nếu smoke test vẫn OOM
+## 13. Nếu smoke test vẫn OOM
 
 Thực hiện theo thứ tự:
 
@@ -277,9 +310,15 @@ Thực hiện theo thứ tự:
 4. Không kỳ vọng tăng `update_every` làm giảm VRAM đỉnh; nó chỉ thay đổi effective batch.
 5. Nếu vẫn OOM, bước phát triển tiếp theo là cache trước ShapeVAE latents/DINO embeddings hoặc offload model đóng băng. Không giảm latent tokens tùy tiện.
 
-## 13. Giới hạn còn lại trên Windows
+## 14. Giới hạn còn lại trên Windows
 
 - Đây chưa phải pipeline end-to-end từ mesh thô sang dữ liệu train trên Windows. `hy3dshape/tools/pipeline.sh` vẫn là Bash và dùng Blender path kiểu Linux. Bộ mini preprocessed có thể dùng ngay; dữ liệu GLB/OBJ mới cần một bước riêng để chuyển Blender/render/watertight sang PowerShell hoặc chạy thủ công.
 - Native Windows có thể gặp dependency/CUDA kernel chưa được bộ source gốc kiểm thử. Nếu blocker nằm ở thư viện chỉ hỗ trợ Linux, Docker Desktop hoặc WSL2 vẫn là đường chuyển tiếp sau này.
 - Phần Paint/PBR không được train trong config này.
 - Hãy đọc đầy đủ `TENCENT HUNYUAN 3D 2.1 COMMUNITY LICENSE AGREEMENT` trong file `LICENSE` và license của các thành phần thứ ba. Không nên diễn giải license này đơn giản là “phi thương mại”; nó có điều kiện riêng về lãnh thổ, sử dụng, phân phối và hoạt động thương mại.
+
+## 15. Inference bốn ảnh thành một mesh
+
+Source hiện đã có launcher riêng cho model `tencent/Hunyuan3D-2mv`. Luồng front/left/back/right → một GLB đã chạy thành công trên RTX 3090. Xem cấu hình, lệnh CMD và kết quả đo thực tế trong [`MULTIVIEW_WINDOWS_RTX3090.md`](MULTIVIEW_WINDOWS_RTX3090.md).
+
+LoRA trong tài liệu này vẫn là LoRA single-view của Hunyuan3D-2.1 và không được nạp vào model 2mv.

@@ -110,6 +110,12 @@ def export_to_trimesh(mesh_output):
 
 
 def get_obj_from_str(string, reload=False):
+    # Official Hunyuan3D-2mv configs still reference the package name used by
+    # the 2.0 repository. The same classes live under ``hy3dshape`` here.
+    legacy_prefix = "hy3dgen.shapegen"
+    if string == legacy_prefix or string.startswith(f"{legacy_prefix}."):
+        string = f"hy3dshape{string[len(legacy_prefix):]}"
+
     module, cls = string.rsplit(".", 1)
     if reload:
         module_imp = importlib.import_module(module)

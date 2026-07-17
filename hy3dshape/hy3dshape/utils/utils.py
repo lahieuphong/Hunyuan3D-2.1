@@ -93,36 +93,47 @@ def smart_load_model(
     variant,
 ):
     original_model_path = model_path
+    extension = 'ckpt' if not use_safetensors else 'safetensors'
+    variant_suffix = '' if variant is None else f'.{variant}'
+    ckpt_name = f'model{variant_suffix}.{extension}'
+
     # try local path
     base_dir = os.environ.get('HY3DGEN_MODELS', '~/.cache/hy3dgen')
     model_fld = os.path.expanduser(os.path.join(base_dir, model_path))
     model_path = os.path.expanduser(os.path.join(base_dir, model_path, subfolder))
+    config_path = os.path.join(model_path, 'config.yaml')
+    ckpt_path = os.path.join(model_path, ckpt_name)
     logger.info(f'Try to load model from local path: {model_path}')
-    if not os.path.exists(model_path):
-        logger.info('Model path not exists, try to download from huggingface')
+    if not os.path.isfile(config_path) or not os.path.isfile(ckpt_path):
+        logger.info('Required model files are missing, try to download from huggingface')
         try:
             from huggingface_hub import snapshot_download
-            # 只下载指定子目录
+
+            # Download only the requested serialization. Some repositories
+            # contain both a multi-GB checkpoint and equivalent safetensors.
             path = snapshot_download(
                 repo_id=original_model_path,
-                allow_patterns=[f"{subfolder}/*"],  # 关键修改：模式匹配子文件夹
-                local_dir=model_fld 
+                allow_patterns=[
+                    f"{subfolder}/config.yaml",
+                    f"{subfolder}/{ckpt_name}",
+                ],
+                local_dir=model_fld,
             )
-            model_path = os.path.join(path, subfolder)  # 保持路径拼接逻辑不变
+            model_path = os.path.join(path, subfolder)
+            config_path = os.path.join(model_path, 'config.yaml')
+            ckpt_path = os.path.join(model_path, ckpt_name)
         except ImportError:
             logger.warning(
                 "You need to install HuggingFace Hub to load models from the hub."
             )
             raise RuntimeError(f"Model path {model_path} not found")
-        except Exception as e:
-            raise e
+        except Exception:
+            raise
 
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model path {original_model_path} not found")
-
-    extension = 'ckpt' if not use_safetensors else 'safetensors'
-    variant = '' if variant is None else f'.{variant}'
-    ckpt_name = f'model{variant}.{extension}'
-    config_path = os.path.join(model_path, 'config.yaml')
-    ckpt_path = os.path.join(model_path, ckpt_name)
+    missing_files = [path for path in (config_path, ckpt_path) if not os.path.isfile(path)]
+    if missing_files:
+        raise FileNotFoundError(
+            f"Model {original_model_path}/{subfolder} is incomplete; missing: "
+            + ", ".join(missing_files)
+        )
     return config_path, ckpt_path
