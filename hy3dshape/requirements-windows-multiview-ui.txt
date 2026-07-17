@@ -1,0 +1,5 @@
+# Minimal dependencies for the Windows shape-only Gradio UI.
+# Core Hunyuan3D/CUDA packages are installed separately in .venv-win.
+gradio==5.33.0
+fastapi==0.115.12
+uvicorn==0.34.3

@@ -15,6 +15,7 @@
 # Apply torchvision compatibility fix before other imports
 
 import sys
+import importlib.util
 sys.path.insert(0, './hy3dshape')
 sys.path.insert(0, './hy3dpaint')
 
@@ -46,10 +47,9 @@ import uuid
 import numpy as np
 
 from hy3dshape.utils import logger
-from hy3dpaint.convert_utils import create_glb_with_pbr_materials
-
-
 MAX_SEED = 1e7
+HAS_REMBG = importlib.util.find_spec('rembg') is not None
+HAS_PYMESHLAB = importlib.util.find_spec('pymeshlab') is not None
 ENV = "Local" # "Huggingface"
 if ENV == 'Huggingface':
     """
@@ -83,6 +83,44 @@ else:
                 self.duration = duration
             def __call__(self, func):
                 return func 
+
+
+_RMBG_WORKER = None
+_POSTPROCESSORS = None
+
+
+def get_background_remover():
+    """Load rembg only when the user explicitly requests background removal."""
+    global _RMBG_WORKER
+    if _RMBG_WORKER is None:
+        try:
+            from hy3dshape.rembg import BackgroundRemover
+            _RMBG_WORKER = BackgroundRemover()
+        except ModuleNotFoundError as error:
+            raise gr.Error(
+                "Background removal is not installed. Install the Windows Web UI "
+                "dependencies or upload transparent PNG files and leave Remove Background off."
+            ) from error
+    return _RMBG_WORKER
+
+
+def get_postprocessors():
+    """Load PyMeshLab postprocessors only for optional transform operations."""
+    global _POSTPROCESSORS
+    if _POSTPROCESSORS is None:
+        try:
+            from hy3dshape import FaceReducer, FloaterRemover, DegenerateFaceRemover
+            _POSTPROCESSORS = (
+                FloaterRemover(),
+                DegenerateFaceRemover(),
+                FaceReducer(),
+            )
+        except ModuleNotFoundError as error:
+            raise gr.Error(
+                "Mesh transform tools are not installed. The generated GLB can still be "
+                "downloaded directly above."
+            ) from error
+    return _POSTPROCESSORS
 
 def get_example_img_list():
     """
@@ -165,6 +203,8 @@ def export_mesh(mesh, save_folder, textured=False, type='glb'):
 
 
 def quick_convert_with_obj2gltf(obj_path: str, glb_path: str) -> bool:
+    from hy3dpaint.convert_utils import create_glb_with_pbr_materials
+
     # 执行转换
     textures = {
         'albedo': obj_path.replace('.obj', '.jpg'),
@@ -198,10 +238,10 @@ def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
     with open(output_html_path, 'w', encoding='utf-8') as f:
         template_html = template_html.replace('#height#', f'{height - offset}')
         template_html = template_html.replace('#width#', f'{width}')
-        template_html = template_html.replace('#src#', f'{related_path}/')
+        template_html = template_html.replace('#src#', related_path)
         f.write(template_html)
 
-    rel_path = os.path.relpath(output_html_path, SAVE_DIR)
+    rel_path = os.path.relpath(output_html_path, SAVE_DIR).replace(os.sep, '/')
     iframe_tag = f'<iframe src="/static/{rel_path}" \
 height="{height}" width="100%" frameborder="0"></iframe>'
     print(f'Find html file {output_html_path}, \
@@ -232,17 +272,16 @@ def _gen_shape(
     if not MV_MODE and image is None and caption is None:
         raise gr.Error("Please provide either a caption or an image.")
     if MV_MODE:
-        if mv_image_front is None and mv_image_back is None \
-            and mv_image_left is None and mv_image_right is None:
-            raise gr.Error("Please provide at least one view image.")
+        if mv_image_front is None:
+            raise gr.Error("Please provide the Front view. Back, Left and Right are optional.")
         image = {}
-        if mv_image_front:
+        if mv_image_front is not None:
             image['front'] = mv_image_front
-        if mv_image_back:
+        if mv_image_back is not None:
             image['back'] = mv_image_back
-        if mv_image_left:
+        if mv_image_left is not None:
             image['left'] = mv_image_left
-        if mv_image_right:
+        if mv_image_right is not None:
             image['right'] = mv_image_right
 
     seed = int(randomize_seed_fn(seed, randomize_seed))
@@ -282,13 +321,13 @@ def _gen_shape(
         start_time = time.time()
         for k, v in image.items():
             if check_box_rembg or v.mode == "RGB":
-                img = rmbg_worker(v.convert('RGB'))
+                img = get_background_remover()(v.convert('RGB'))
                 image[k] = img
         time_meta['remove background'] = time.time() - start_time
     else:
         if check_box_rembg or image.mode == "RGB":
             start_time = time.time()
-            image = rmbg_worker(image.convert('RGB'))
+            image = get_background_remover()(image.convert('RGB'))
             time_meta['remove background'] = time.time() - start_time
 
     # remove disk io to make responding faster, uncomment at your will.
@@ -319,7 +358,7 @@ def _gen_shape(
     stats['number_of_vertices'] = mesh.vertices.shape[0]
 
     stats['time'] = time_meta
-    main_image = image if not MV_MODE else image['front']
+    main_image = image if not MV_MODE else image.get('front', next(iter(image.values())))
     return mesh, main_image, save_folder, stats, seed
 
 @spaces.GPU(duration=60)
@@ -367,6 +406,7 @@ def generation_all(
     # stats['time']['postprocessing'] = time.time() - tmp_time
 
     tmp_time = time.time()
+    _, _, face_reduce_worker = get_postprocessors()
     mesh = face_reduce_worker(mesh)
 
     # path = export_mesh(mesh, save_folder, textured=False, type='glb')
@@ -458,8 +498,6 @@ def build_app():
     if 'mini' in args.subfolder:
         title = 'Hunyuan3D-2mini: Strong 0.6B Image to Shape Generator'
 
-    title = 'Hunyuan-3D-2.1'
-        
     if TURBO_MODE:
         title = title.replace(':', '-Turbo: Fast ')
 
@@ -486,12 +524,13 @@ def build_app():
 
     """
 
-    with gr.Blocks(theme=gr.themes.Base(), title='Hunyuan-3D-2.1', analytics_enabled=False, css=custom_css) as demo:
+    with gr.Blocks(theme=gr.themes.Base(), title=title, analytics_enabled=False, css=custom_css) as demo:
         gr.HTML(title_html)
 
         with gr.Row():
             with gr.Column(scale=3):
-                with gr.Tabs(selected='tab_img_prompt') as tabs_prompt:
+                selected_prompt_tab = 'tab_mv_prompt' if MV_MODE else 'tab_img_prompt'
+                with gr.Tabs(selected=selected_prompt_tab) as tabs_prompt:
                     with gr.Tab('Image Prompt', id='tab_img_prompt', visible=not MV_MODE) as tab_ip:
                         image = gr.Image(label='Image', type='pil', image_mode='RGBA', height=290)
                         caption = gr.State(None)
@@ -499,7 +538,7 @@ def build_app():
 #                        caption = gr.Textbox(label='Text Prompt',
 #                                             placeholder='HunyuanDiT will be used to generate image.',
 #                                             info='Example: A 3D model of a cute cat, white background')
-                    with gr.Tab('MultiView Prompt', visible=MV_MODE) as tab_mv:
+                    with gr.Tab('MultiView Prompt', id='tab_mv_prompt', visible=MV_MODE) as tab_mv:
                         # gr.Label('Please upload at least one front image.')
                         with gr.Row():
                             mv_image_front = gr.Image(label='Front', type='pil', image_mode='RGBA', height=140,
@@ -520,10 +559,16 @@ def build_app():
                                         min_width=100)
 
                 with gr.Group():
-                    file_out = gr.File(label="File", visible=False)
+                    file_out = gr.File(label="Generated mesh (direct download)", visible=True,
+                                       interactive=False)
                     file_out2 = gr.File(label="File", visible=False)
 
-                with gr.Tabs(selected='tab_options' if TURBO_MODE else 'tab_export'):
+                selected_options_tab = (
+                    'tab_options' if TURBO_MODE
+                    else 'tab_export' if HAS_PYMESHLAB
+                    else 'tab_advanced_options'
+                )
+                with gr.Tabs(selected=selected_options_tab):
                     with gr.Tab("Options", id='tab_options', visible=TURBO_MODE):
                         gen_mode = gr.Radio(
                             label='Generation Mode',
@@ -539,8 +584,9 @@ Fast for very complex cases, Standard seldom use.',
                     with gr.Tab('Advanced Options', id='tab_advanced_options'):
                         with gr.Row():
                             check_box_rembg = gr.Checkbox(
-                                value=True, 
-                                label='Remove Background', 
+                                value=not MV_MODE,
+                                label='Remove Background',
+                                visible=HAS_REMBG,
                                 min_width=100)
                             randomize_seed = gr.Checkbox(
                                 label="Randomize seed", 
@@ -567,7 +613,7 @@ Fast for very complex cases, Standard seldom use.',
                             cfg_scale = gr.Number(value=5.0, label='Guidance Scale', min_width=100)
                             num_chunks = gr.Slider(maximum=5000000, minimum=1000, value=8000,
                                                    label='Number of Chunks', min_width=100)
-                    with gr.Tab("Export", id='tab_export'):
+                    with gr.Tab("Export", id='tab_export', visible=HAS_PYMESHLAB):
                         with gr.Row():
                             file_type = gr.Dropdown(label='File Type', 
                                                     choices=SUPPORTED_FORMATS,
@@ -701,6 +747,7 @@ Fast for very complex cases, Standard seldom use.',
                                                             textured=True)
             else:
                 mesh = trimesh.load(file_out)
+                floater_remove_worker, degenerate_face_remove_worker, face_reduce_worker = get_postprocessors()
                 mesh = floater_remove_worker(mesh)
                 mesh = degenerate_face_remove_worker(mesh)
                 if reduce_face:
@@ -734,11 +781,11 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, default='tencent/Hunyuan3D-2.1')
-    parser.add_argument("--subfolder", type=str, default='hunyuan3d-dit-v2-1')
+    parser.add_argument("--model_path", type=str, default='tencent/Hunyuan3D-2mv')
+    parser.add_argument("--subfolder", type=str, default='hunyuan3d-dit-v2-mv')
     parser.add_argument("--texgen_model_path", type=str, default='tencent/Hunyuan3D-2.1')
     parser.add_argument('--port', type=int, default=8080)
-    parser.add_argument('--host', type=str, default='0.0.0.0')
+    parser.add_argument('--host', type=str, default='127.0.0.1')
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--mc_algo', type=str, default='mc')
     parser.add_argument('--cache-path', type=str, default='./save_dir')
@@ -747,13 +794,16 @@ if __name__ == '__main__':
     parser.add_argument('--enable_flashvdm', action='store_true')
     parser.add_argument('--compile', action='store_true')
     parser.add_argument('--low_vram_mode', action='store_true')
+    parser.add_argument('--use_safetensors', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--variant', type=str, default='fp16')
+    parser.add_argument('--dtype', choices=['float16', 'bfloat16', 'float32'], default='float16')
     args = parser.parse_args()
     
     SAVE_DIR = args.cache_path
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MV_MODE = 'mv' in args.model_path
+    MV_MODE = 'mv' in f'{args.model_path}/{args.subfolder}'.lower()
     TURBO_MODE = 'turbo' in args.subfolder
 
     HTML_HEIGHT = 690 if MV_MODE else 650
@@ -826,17 +876,28 @@ if __name__ == '__main__':
         t2i_worker = HunyuanDiTPipeline('Tencent-Hunyuan/HunyuanDiT-v1.1-Diffusers-Distilled')
         HAS_T2I = True
 
-    from hy3dshape import FaceReducer, FloaterRemover, DegenerateFaceRemover, MeshSimplifier, \
-        Hunyuan3DDiTFlowMatchingPipeline
+    from hy3dshape import Hunyuan3DDiTFlowMatchingPipeline
     from hy3dshape.pipelines import export_to_trimesh
-    from hy3dshape.rembg import BackgroundRemover
 
-    rmbg_worker = BackgroundRemover()
+    if args.device == 'cuda' and not torch.cuda.is_available():
+        raise RuntimeError('CUDA was requested, but PyTorch cannot access an NVIDIA GPU.')
+
+    pipeline_dtype = {
+        'float16': torch.float16,
+        'bfloat16': torch.bfloat16,
+        'float32': torch.float32,
+    }[args.dtype]
+    print(
+        f'Loading shape model {args.model_path}/{args.subfolder} '
+        f'(safetensors={args.use_safetensors}, variant={args.variant}, dtype={args.dtype})'
+    )
     i23d_worker = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
         args.model_path,
         subfolder=args.subfolder,
-        use_safetensors=False,
+        use_safetensors=args.use_safetensors,
+        variant=args.variant or None,
         device=args.device,
+        dtype=pipeline_dtype,
     )
     if args.enable_flashvdm:
         mc_algo = 'mc' if args.device in ['cpu', 'mps'] else args.mc_algo
@@ -844,13 +905,20 @@ if __name__ == '__main__':
     if args.compile:
         i23d_worker.compile()
 
-    floater_remove_worker = FloaterRemover()
-    degenerate_face_remove_worker = DegenerateFaceRemover()
-    face_reduce_worker = FaceReducer()
-
     # https://discuss.huggingface.co/t/how-to-serve-an-html-file/33921/2
     # create a FastAPI app
     app = FastAPI()
+
+    @app.get('/health')
+    def health():
+        return {
+            'status': 'ready',
+            'pid': os.getpid(),
+            'model': args.model_path,
+            'subfolder': args.subfolder,
+            'multiview': MV_MODE,
+            'device': args.device,
+        }
     
     # create a static directory to store the static files
     static_dir = Path(SAVE_DIR).absolute()
@@ -861,5 +929,7 @@ if __name__ == '__main__':
     if args.low_vram_mode:
         torch.cuda.empty_cache()
     demo = build_app()
+    demo.queue(max_size=4, default_concurrency_limit=1)
     app = gr.mount_gradio_app(app, demo, path="/")
+    print(f'Web UI ready at http://{args.host}:{args.port}')
     uvicorn.run(app, host=args.host, port=args.port)
