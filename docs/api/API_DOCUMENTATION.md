@@ -22,7 +22,7 @@ The API now uses structured Pydantic models instead of raw JSON requests:
 class GenerationRequest(BaseModel):
     """Request model for 3D generation API"""
     image: str = Field(
-        ..., 
+        ...,
         description="Base64 encoded input image for 3D generation",
         example="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
     )
@@ -202,9 +202,10 @@ This script demonstrates:
 
 ### File Structure
 ```
-api_server.py          # Main API server with Pydantic models
-test_api_docs.py       # Test script demonstrating usage
-API_DOCUMENTATION.md   # This documentation file
+api_server.py                           # Main API server with Pydantic models
+test_api_server.py                      # API test suite
+docs/api/API_DOCUMENTATION.md           # Complete API guide
+docs/api/API_TESTING_SUMMARY.md         # API implementation/test summary
 ```
 
 ### Customization
@@ -245,4 +246,4 @@ To add new parameters or endpoints:
 
 ## Conclusion
 
-The enhanced API documentation provides a professional, user-friendly interface for the Hunyuan3D API. Users can now understand all parameters, test endpoints interactively, and integrate the API more easily into their applications. 
+The enhanced API documentation provides a professional, user-friendly interface for the Hunyuan3D API. Users can now understand all parameters, test endpoints interactively, and integrate the API more easily into their applications.

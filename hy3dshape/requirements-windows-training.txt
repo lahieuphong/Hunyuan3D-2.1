@@ -1,6 +1,6 @@
 # Native Windows dependencies for Shape DiT LoRA training.
 # Install the CUDA-enabled torch/torchvision wheels first; see
-# ../TRAINING_WINDOWS_RTX3090.md for the exact command used by this project.
+# ../docs/windows/TRAINING_WINDOWS_RTX3090.md for the exact command used by this project.
 
 accelerate==1.1.1
 diffusers==0.30.0

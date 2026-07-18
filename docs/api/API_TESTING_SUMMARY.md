@@ -68,7 +68,7 @@ All parameters in the `/generate` endpoint are now fully documented:
 
 ### Core API Files
 - **`api_server.py`**: Enhanced with Pydantic models and comprehensive documentation
-- **`API_DOCUMENTATION.md`**: Complete documentation guide
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)**: Complete documentation guide
 
 ### Test Files
 - **`test_generate_endpoint.py`**: Comprehensive API testing script
@@ -171,4 +171,4 @@ The API documentation enhancement is **complete and working**. Users can now:
 - ✅ Use the API with confidence
 - ✅ Avoid mesh upload related errors
 
-The FastAPI server now provides a professional, well-documented interface for the Hunyuan3D API with full parameter visibility and validation, simplified to focus on image-to-3D generation. 
+The FastAPI server now provides a professional, well-documented interface for the Hunyuan3D API with full parameter visibility and validation, simplified to focus on image-to-3D generation.

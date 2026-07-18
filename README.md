@@ -87,6 +87,12 @@ It takes 10 GB VRAM for shape generation, 21GB for texture generation and 29GB f
 | Hunyuan3D-Paint-v2-1       | Texture Generation Model    | 2025-06-14 | 2B | [Download](https://huggingface.co/tencent/Hunyuan3D-2.1/tree/main/hunyuan3d-paintpbr-v2-1)       |
 
 
+## Project Documentation
+
+- Windows + RTX 3090: [Web UI](docs/windows/WEB_UI_WINDOWS_RTX3090.md) · [4-view inference](docs/windows/MULTIVIEW_WINDOWS_RTX3090.md) · [Shape LoRA training](docs/windows/TRAINING_WINDOWS_RTX3090.md)
+- API: [Documentation](docs/api/API_DOCUMENTATION.md) · [Testing summary](docs/api/API_TESTING_SUMMARY.md)
+
+
 ## 🤗 Get Started with Hunyuan3D 2.1
 
 Hunyuan3D 2.1 supports Macos, Windows, Linux. You may follow the next steps to use Hunyuan3D 2.1 via:

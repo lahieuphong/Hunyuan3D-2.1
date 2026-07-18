@@ -51,6 +51,24 @@ MAX_SEED = 1e7
 HAS_REMBG = importlib.util.find_spec('rembg') is not None
 HAS_PYMESHLAB = importlib.util.find_spec('pymeshlab') is not None
 ENV = "Local" # "Huggingface"
+
+# These two profiles were exercised end-to-end with Hunyuan3D-2mv on the
+# workspace RTX 3090 (24 GiB). Keep the conservative profile as the initial UI
+# value, and let users opt into the denser mesh extraction explicitly.
+RTX3090_PRESETS = {
+    'safe': {
+        'steps': 30,
+        'guidance_scale': 5.0,
+        'octree_resolution': 256,
+        'num_chunks': 8000,
+    },
+    'quality': {
+        'steps': 30,
+        'guidance_scale': 5.0,
+        'octree_resolution': 384,
+        'num_chunks': 8000,
+    },
+}
 if ENV == 'Huggingface':
     """
     Setup environment for running on Huggingface platform.
@@ -87,6 +105,46 @@ else:
 
 _RMBG_WORKER = None
 _POSTPROCESSORS = None
+
+
+def get_rtx3090_preset(profile):
+    """Return Gradio values and an explanatory status card for a GPU preset."""
+    if profile not in RTX3090_PRESETS:
+        raise ValueError(f"Unknown RTX 3090 preset: {profile}")
+
+    preset = RTX3090_PRESETS[profile]
+    is_quality = profile == 'quality'
+    profile_name = 'Chất lượng cao' if is_quality else 'Mặc định an toàn'
+    profile_class = 'quality' if is_quality else 'safe'
+    detail = (
+        'Octree 384 tăng mật độ bề mặt. Đã chạy thành công trên máy này: '
+        'khoảng 58 giây với 1 ảnh và 77 giây với 4 ảnh.'
+        if is_quality else
+        'Octree 256 là mức khởi đầu ổn định nhất, phù hợp để kiểm tra ảnh đầu vào '
+        'trước khi xuất bản chất lượng cao.'
+    )
+    status_html = f"""
+    <div class="rtx-preset-status {profile_class}">
+        <div class="rtx-preset-status-title">
+            <span class="rtx-preset-dot"></span>
+            RTX 3090 · 1 ảnh &amp; 4 ảnh · {profile_name}
+        </div>
+        <div class="rtx-preset-values">
+            <span><b>{preset['steps']}</b> Steps</span>
+            <span><b>{preset['guidance_scale']}</b> Guidance</span>
+            <span><b>{preset['octree_resolution']}</b> Octree</span>
+            <span><b>{preset['num_chunks']}</b> Chunks</span>
+        </div>
+        <div class="rtx-preset-detail">{detail}</div>
+    </div>
+    """
+    return (
+        preset['steps'],
+        preset['guidance_scale'],
+        preset['octree_resolution'],
+        preset['num_chunks'],
+        status_html,
+    )
 
 
 def get_background_remover():
@@ -598,6 +656,172 @@ def build_app():
         line-height: 1.4;
     }
 
+    #rtx3090-preset {
+        background: linear-gradient(135deg, rgba(63, 81, 181, 0.13), rgba(33, 150, 243, 0.04));
+        border: 1px solid rgba(99, 130, 255, 0.35);
+        border-radius: 12px;
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+
+    #rtx3090-preset .rtx-preset-intro {
+        align-items: flex-start;
+        display: flex;
+        gap: 11px;
+        padding: 2px 2px 8px;
+    }
+
+    .rtx-preset-gpu {
+        align-items: center;
+        background: #4263eb;
+        border-radius: 9px;
+        color: white;
+        display: flex;
+        flex: 0 0 auto;
+        font-size: 12px;
+        font-weight: 800;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 10px;
+    }
+
+    .rtx-preset-copy strong,
+    .rtx-preset-copy span {
+        display: block;
+    }
+
+    .rtx-preset-copy strong {
+        font-size: 13px;
+        margin-bottom: 3px;
+    }
+
+    .rtx-preset-copy span,
+    .rtx-preset-footnote {
+        color: var(--body-text-color-subdued);
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .rtx-preset-actions {
+        gap: 8px;
+    }
+
+    .rtx-preset-status {
+        background: var(--block-background-fill);
+        border: 1px solid var(--block-border-color);
+        border-radius: 10px;
+        margin-top: 8px;
+        padding: 10px 12px;
+    }
+
+    .rtx-preset-status.quality {
+        border-color: rgba(66, 99, 235, 0.72);
+        box-shadow: inset 3px 0 0 #4263eb;
+    }
+
+    .rtx-preset-status.safe {
+        box-shadow: inset 3px 0 0 #2f9e44;
+    }
+
+    .rtx-preset-status-title {
+        align-items: center;
+        display: flex;
+        font-size: 12px;
+        font-weight: 750;
+        gap: 7px;
+    }
+
+    .rtx-preset-dot {
+        background: #2f9e44;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.15);
+        height: 7px;
+        width: 7px;
+    }
+
+    .rtx-preset-values {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin: 9px 0 7px;
+    }
+
+    .rtx-preset-values span {
+        background: var(--background-fill-secondary);
+        border-radius: 7px;
+        color: var(--body-text-color-subdued);
+        font-size: 10px;
+        padding: 6px 7px;
+        text-align: center;
+    }
+
+    .rtx-preset-values b {
+        color: var(--body-text-color);
+        display: block;
+        font-size: 12px;
+        margin-bottom: 1px;
+    }
+
+    .rtx-preset-detail {
+        color: var(--body-text-color-subdued);
+        font-size: 10px;
+        line-height: 1.45;
+    }
+
+    #rtx3090-quickbar {
+        align-items: center;
+        background: var(--block-background-fill);
+        border: 1px solid var(--block-border-color);
+        border-radius: 12px;
+        margin-top: 14px;
+        padding: 8px 10px;
+    }
+
+    #rtx3090-quickbar .column {
+        justify-content: center;
+    }
+
+    .rtx-quickbar-copy {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+    }
+
+    .rtx-quickbar-icon {
+        align-items: center;
+        background: rgba(66, 99, 235, 0.16);
+        border: 1px solid rgba(99, 130, 255, 0.38);
+        border-radius: 9px;
+        color: #748ffc;
+        display: flex;
+        flex: 0 0 34px;
+        font-size: 17px;
+        height: 34px;
+        justify-content: center;
+    }
+
+    .rtx-quickbar-text strong,
+    .rtx-quickbar-text span {
+        display: block;
+    }
+
+    .rtx-quickbar-text strong {
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+
+    .rtx-quickbar-text span {
+        color: var(--body-text-color-subdued);
+        font-size: 10px;
+        line-height: 1.35;
+    }
+
+    @media (max-width: 640px) {
+        .rtx-preset-values {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
     """
 
     with gr.Blocks(theme=gr.themes.Base(), title=title, analytics_enabled=False, css=custom_css) as demo:
@@ -681,6 +905,43 @@ Fast for very complex cases, Standard seldom use.',
                             choices=['Low', 'Standard', 'High'],
                             value='Standard')
                     with gr.Tab('Advanced Options', id='tab_advanced_options'):
+                        with gr.Accordion(
+                            'RTX 3090 · Cấu hình đề xuất',
+                            open=True,
+                            elem_id='rtx3090-preset',
+                            visible=MV_MODE and args.device == 'cuda',
+                        ):
+                            gr.HTML("""
+                            <div class="rtx-preset-intro">
+                                <div class="rtx-preset-gpu">24 GB</div>
+                                <div class="rtx-preset-copy">
+                                    <strong>Một nút tối ưu cho cả 1 ảnh và 4 ảnh</strong>
+                                    <span>
+                                        Giữ Mặc định an toàn cho lần thử đầu. Chọn Chất lượng cao
+                                        khi ảnh đã đúng; preset này tăng chi tiết mesh mà vẫn được
+                                        kiểm chứng không OOM trên máy hiện tại.
+                                    </span>
+                                </div>
+                            </div>
+                            """)
+                            with gr.Row(elem_classes='rtx-preset-actions'):
+                                rtx_quality_preset = gr.Button(
+                                    value='Chất lượng cao · RTX 3090',
+                                    variant='primary',
+                                    min_width=120,
+                                )
+                                rtx_safe_preset = gr.Button(
+                                    value='Khôi phục mặc định an toàn',
+                                    min_width=120,
+                                )
+                            rtx_preset_status = gr.HTML(get_rtx3090_preset('safe')[-1])
+                            gr.HTML("""
+                            <div class="rtx-preset-footnote">
+                                Seed không làm tăng VRAM: bật Randomize để thử biến thể, tắt để
+                                tái tạo đúng kết quả. Chunks 8000 cân bằng tốc độ/bộ nhớ và không
+                                làm tăng độ đẹp. Không đặt Octree 512 làm mặc định.
+                            </div>
+                            """)
                         with gr.Row():
                             check_box_rembg = gr.Checkbox(
                                 value=not MV_MODE,
@@ -746,6 +1007,35 @@ Fast for very complex cases, Standard seldom use.',
                             gr.Examples(examples=example_is, inputs=[image],
                                         label=None, examples_per_page=18)
 
+        with gr.Row(
+            elem_id='rtx3090-quickbar',
+            visible=MV_MODE and args.device == 'cuda',
+        ):
+            with gr.Column(scale=7, min_width=300):
+                gr.HTML("""
+                <div class="rtx-quickbar-copy">
+                    <div class="rtx-quickbar-icon">⚡</div>
+                    <div class="rtx-quickbar-text">
+                        <strong>Máy hiện tại · RTX 3090 · 24 GB VRAM</strong>
+                        <span>
+                            Áp dụng nhanh cho cả 1 ảnh và 4 ảnh. Chi tiết nằm trong
+                            Advanced Options → RTX 3090 · Cấu hình đề xuất.
+                        </span>
+                    </div>
+                </div>
+                """)
+            with gr.Column(scale=2, min_width=160):
+                rtx_quick_safe_preset = gr.Button(
+                    value='256 · An toàn',
+                    min_width=140,
+                )
+            with gr.Column(scale=2, min_width=180):
+                rtx_quick_quality_preset = gr.Button(
+                    value='384 · Chất lượng cao',
+                    variant='primary',
+                    min_width=160,
+                )
+
         tab_ip.select(
             fn=lambda: (
                 'single',
@@ -761,6 +1051,38 @@ Fast for very complex cases, Standard seldom use.',
                 gr.update(value='Generate 3D · 4 Images'),
             ),
             outputs=[input_mode, btn],
+            queue=False,
+            api_name=False,
+        )
+
+        rtx_preset_outputs = [
+            num_steps,
+            cfg_scale,
+            octree_resolution,
+            num_chunks,
+            rtx_preset_status,
+        ]
+        rtx_quality_preset.click(
+            fn=lambda: get_rtx3090_preset('quality'),
+            outputs=rtx_preset_outputs,
+            queue=False,
+            api_name=False,
+        )
+        rtx_safe_preset.click(
+            fn=lambda: get_rtx3090_preset('safe'),
+            outputs=rtx_preset_outputs,
+            queue=False,
+            api_name=False,
+        )
+        rtx_quick_quality_preset.click(
+            fn=lambda: get_rtx3090_preset('quality'),
+            outputs=rtx_preset_outputs,
+            queue=False,
+            api_name=False,
+        )
+        rtx_quick_safe_preset.click(
+            fn=lambda: get_rtx3090_preset('safe'),
+            outputs=rtx_preset_outputs,
             queue=False,
             api_name=False,
         )
