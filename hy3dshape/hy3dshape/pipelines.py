@@ -702,11 +702,31 @@ class Hunyuan3DDiTPipeline:
         num_chunks=20000,
         octree_resolution=256,
         mc_algo='mc',
-        enable_pbar=True
+        enable_pbar=True,
+        stage_callback=None,
     ):
+        def emit_stage(stage, **details):
+            if stage_callback is not None:
+                stage_callback(stage, details)
+
         if not output_type == "latent":
             latents = 1. / self.vae.scale_factor * latents
+            emit_stage(
+                'vae_decoding',
+                latent_shape=list(latents.shape),
+                dtype=str(latents.dtype),
+            )
             latents = self.vae(latents)
+            emit_stage(
+                'volume_decoding',
+                octree_resolution=int(octree_resolution),
+                num_chunks=int(num_chunks),
+                decoder=self.vae.volume_decoder.__class__.__name__,
+            )
+
+            def report_volume_progress(details):
+                emit_stage('volume_decoding_progress', **details)
+
             outputs = self.vae.latents2mesh(
                 latents,
                 bounds=box_v,
@@ -715,11 +735,20 @@ class Hunyuan3DDiTPipeline:
                 octree_resolution=octree_resolution,
                 mc_algo=mc_algo,
                 enable_pbar=enable_pbar,
+                progress_callback=(
+                    report_volume_progress if stage_callback is not None else None
+                ),
+                stage_callback=stage_callback,
+            )
+            emit_stage(
+                'surface_extraction_completed',
+                mesh_count=len(outputs) if hasattr(outputs, '__len__') else None,
             )
         else:
             outputs = latents
 
         if output_type == 'trimesh':
+            emit_stage('trimesh_conversion')
             outputs = export_to_trimesh(outputs)
 
         return outputs
@@ -749,6 +778,11 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
     ) -> List[List[trimesh.Trimesh]]:
         callback = kwargs.pop("callback", None)
         callback_steps = kwargs.pop("callback_steps", None)
+        stage_callback = kwargs.pop("stage_callback", None)
+
+        def emit_stage(stage, **details):
+            if stage_callback is not None:
+                stage_callback(stage, details)
 
         self.set_surface_extractor(mc_algo)
 
@@ -759,18 +793,33 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
             self.model.guidance_embed is True
         )
 
-        # print('image', type(image), 'mask', type(mask))
+        emit_stage(
+            'prepare_conditioning',
+            input_type=type(image).__name__,
+            view_count=len(image) if isinstance(image, dict) else 1,
+        )
         cond_inputs = self.prepare_image(image, mask)
         image = cond_inputs.pop('image')
+        emit_stage(
+            'encode_conditioning',
+            image_shape=list(image.shape),
+            dtype=str(image.dtype),
+        )
         cond = self.encode_cond(
             image=image,
             additional_cond_inputs=cond_inputs,
             do_classifier_free_guidance=do_classifier_free_guidance,
             dual_guidance=False,
         )
+        emit_stage('conditioning_ready', batch_size=int(image.shape[0]))
 
         batch_size = image.shape[0]
 
+        emit_stage(
+            'prepare_timestep_schedule',
+            scheduler=self.scheduler.__class__.__name__,
+            requested_steps=int(num_inference_steps),
+        )
         # 5. Prepare timesteps
         # NOTE: this is slightly different from common usage, we start from 0.
         sigmas = np.linspace(0, 1, num_inference_steps) if sigmas is None else sigmas
@@ -781,6 +830,13 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
             sigmas=sigmas,
         )
         latents = self.prepare_latents(batch_size, dtype, device, generator)
+        emit_stage(
+            'latents_initialized',
+            latent_shape=list(latents.shape),
+            dtype=str(latents.dtype),
+            device=str(latents.device),
+            actual_steps=int(num_inference_steps),
+        )
 
         guidance = None
         if hasattr(self.model, 'guidance_embed') and \
@@ -788,6 +844,7 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
             guidance = torch.tensor([guidance_scale] * batch_size, device=device, dtype=dtype)
             # logger.info(f'Using guidance embed with scale {guidance_scale}')
 
+        emit_stage('diffusion_started', total_steps=int(num_inference_steps))
         with synchronize_timer('Diffusion Sampling'):
             for i, t in enumerate(tqdm(timesteps, disable=not enable_pbar, desc="Diffusion Sampling:")):
                 # expand the latents if we are doing classifier free guidance
@@ -813,9 +870,12 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
                     step_idx = i // getattr(self.scheduler, "order", 1)
                     callback(step_idx, t, outputs)
 
+        emit_stage('diffusion_completed', total_steps=int(num_inference_steps))
+
         return self._export(
             latents,
             output_type,
             box_v, mc_level, num_chunks, octree_resolution, mc_algo,
             enable_pbar=enable_pbar,
+            stage_callback=stage_callback,
         )

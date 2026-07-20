@@ -12,6 +12,7 @@
 # fine-tuning enabling code and other elements of the foregoing made publicly available
 # by Tencent in accordance with TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT.
 
+import time
 from typing import Union, Tuple, List, Callable
 
 import numpy as np
@@ -153,6 +154,7 @@ class VanillaVolumeDecoder:
         device = latents.device
         dtype = latents.dtype
         batch_size = latents.shape[0]
+        progress_callback = kwargs.get('progress_callback')
 
         # 1. generate query points
         if isinstance(bounds, float):
@@ -169,12 +171,48 @@ class VanillaVolumeDecoder:
 
         # 2. latents to 3d volume
         batch_logits = []
-        for start in tqdm(range(0, xyz_samples.shape[0], num_chunks), desc=f"Volume Decoding",
-                          disable=not enable_pbar):
+        total_points = int(xyz_samples.shape[0])
+        total_chunks = max(1, (total_points + num_chunks - 1) // num_chunks)
+        report_every = max(1, total_chunks // 40)
+        decoding_started_at = time.perf_counter()
+        for chunk_index, start in enumerate(
+            tqdm(
+                range(0, total_points, num_chunks),
+                desc=f"Volume Decoding",
+                disable=not enable_pbar,
+            )
+        ):
             chunk_queries = xyz_samples[start: start + num_chunks, :]
             chunk_queries = repeat(chunk_queries, "p c -> b p c", b=batch_size)
             logits = geo_decoder(queries=chunk_queries, latents=latents)
             batch_logits.append(logits)
+
+            completed_chunks = chunk_index + 1
+            if (
+                progress_callback is not None
+                and (
+                    completed_chunks == 1
+                    or completed_chunks % report_every == 0
+                    or completed_chunks == total_chunks
+                )
+            ):
+                processed_points = min(completed_chunks * num_chunks, total_points)
+                elapsed_seconds = time.perf_counter() - decoding_started_at
+                volume_percent = completed_chunks / total_chunks * 100.0
+                eta_seconds = (
+                    elapsed_seconds / completed_chunks
+                    * max(0, total_chunks - completed_chunks)
+                )
+                progress_callback({
+                    'decoder': self.__class__.__name__,
+                    'chunk': completed_chunks,
+                    'total_chunks': total_chunks,
+                    'processed_points': processed_points,
+                    'total_points': total_points,
+                    'volume_percent': round(volume_percent, 2),
+                    'elapsed_seconds': round(elapsed_seconds, 3),
+                    'eta_seconds': round(eta_seconds, 3),
+                })
 
         grid_logits = torch.cat(batch_logits, dim=1)
         grid_logits = grid_logits.view((batch_size, *grid_size)).float()

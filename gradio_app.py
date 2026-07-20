@@ -44,7 +44,8 @@ import gradio as gr
 import torch
 import trimesh
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uuid
 import numpy as np
@@ -229,12 +230,19 @@ def normalize_generation_uid(generation_uid=None):
         raise gr.Error("Generation UID không hợp lệ. Hãy tải lại trang và thử lại.") from exc
 
 
-def generation_uid_from_request(request=None):
+def generation_uid_query_from_request(request=None):
     if request is not None:
         referer = request.headers.get('referer', '')
         generation_values = parse_qs(urlparse(referer).query).get('generation', [])
         if generation_values:
             return normalize_generation_uid(generation_values[0])
+    return None
+
+
+def generation_uid_from_request(request=None):
+    generation_uid = generation_uid_query_from_request(request)
+    if generation_uid:
+        return generation_uid
     return normalize_generation_uid()
 
 
@@ -278,17 +286,31 @@ def write_generation_manifest(save_folder, **updates):
 
 
 GENERATION_STAGE_PROGRESS = {
-    'request_received': 3,
-    'validating_input': 8,
-    'input_validated': 15,
-    'input_saved': 22,
-    'preprocessing_input': 30,
-    'input_ready': 38,
-    'shape_generation': 45,
-    'extracting_mesh': 78,
-    'mesh_ready': 85,
-    'exporting_glb': 90,
-    'building_preview': 96,
+    'request_received': 2,
+    'validating_input': 4,
+    'input_validated': 7,
+    'input_saved': 10,
+    'preprocessing_input': 13,
+    'input_ready': 16,
+    'shape_generation': 18,
+    'prepare_conditioning': 20,
+    'encode_conditioning': 23,
+    'conditioning_ready': 26,
+    'prepare_timestep_schedule': 28,
+    'latents_initialized': 30,
+    'diffusion_started': 31,
+    'diffusion_completed': 74,
+    'vae_decoding': 77,
+    'volume_decoding': 79,
+    'volume_decoding_progress': 80,
+    'volume_decoding_completed': 89,
+    'surface_extraction': 90,
+    'surface_extraction_completed': 91,
+    'trimesh_conversion': 92,
+    'extracting_mesh': 92,
+    'mesh_ready': 93,
+    'exporting_glb': 95,
+    'building_preview': 98,
     'completed': 100,
     'failed': 100,
 }
@@ -301,8 +323,22 @@ GENERATION_STAGE_MESSAGES = {
     'input_saved': 'Input snapshots saved to source storage',
     'preprocessing_input': 'Preprocessing input views',
     'input_ready': 'Input tensor is ready for inference',
-    'shape_generation': 'Running Hunyuan3D diffusion inference',
-    'extracting_mesh': 'Extracting mesh geometry',
+    'shape_generation': 'Starting Hunyuan3D inference pipeline',
+    'prepare_conditioning': 'Preparing image conditioning tensors',
+    'encode_conditioning': 'Encoding vision conditioning features',
+    'conditioning_ready': 'Vision conditioning is ready',
+    'prepare_timestep_schedule': 'Building diffusion timestep schedule',
+    'latents_initialized': 'Latent noise tensor initialized',
+    'diffusion_started': 'Diffusion sampling started',
+    'diffusion_completed': 'Diffusion sampling completed',
+    'vae_decoding': 'Decoding latent representation with ShapeVAE',
+    'volume_decoding': 'Starting dense volume decoding',
+    'volume_decoding_progress': 'Decoding dense volume chunks',
+    'volume_decoding_completed': 'Dense volume decoding completed',
+    'surface_extraction': 'Running marching-cubes surface extraction',
+    'surface_extraction_completed': 'Surface extraction completed',
+    'trimesh_conversion': 'Converting generated surface to Trimesh',
+    'extracting_mesh': 'Converting generated surface to Trimesh',
     'mesh_ready': 'Mesh geometry is ready',
     'exporting_glb': 'Exporting binary GLB',
     'building_preview': 'Building interactive 3D preview',
@@ -311,7 +347,14 @@ GENERATION_STAGE_MESSAGES = {
 }
 
 
-def update_generation_stage(save_folder, stage, message=None, **updates):
+def update_generation_stage(
+    save_folder,
+    stage,
+    message=None,
+    progress=None,
+    event_details=None,
+    **updates,
+):
     manifest_path = os.path.join(save_folder, 'generation.json')
     manifest = {}
     if os.path.isfile(manifest_path):
@@ -323,15 +366,23 @@ def update_generation_stage(save_folder, stage, message=None, **updates):
 
     updated_at = utc_now_iso()
     events = list(manifest.get('events', []))
-    events.append({
+    stage_progress = (
+        GENERATION_STAGE_PROGRESS.get(stage, 0)
+        if progress is None
+        else max(0, min(100, float(progress)))
+    )
+    event = {
         'stage': stage,
         'message': message or GENERATION_STAGE_MESSAGES.get(stage, stage),
         'at': updated_at,
-        'progress': GENERATION_STAGE_PROGRESS.get(stage, 0),
-    })
+        'progress': stage_progress,
+    }
+    if event_details:
+        event.update(event_details)
+    events.append(event)
     updates.update({
         'stage': stage,
-        'progress': GENERATION_STAGE_PROGRESS.get(stage, 0),
+        'progress': stage_progress,
         'updated_at': updated_at,
         'events': events,
     })
@@ -471,24 +522,38 @@ def randomize_seed_fn(seed: int, randomize_seed: bool) -> int:
     return seed
 
 
+def render_model_viewer_document(mesh_src, height, width, textured=False):
+    template_name = (
+        './assets/modelviewer-textured-template.html'
+        if textured
+        else './assets/modelviewer-template.html'
+    )
+    with open(os.path.join(CURRENT_DIR, template_name), 'r', encoding='utf-8') as f:
+        template_html = f.read()
+    return (
+        template_html
+        .replace('#height#', str(height))
+        .replace('#width#', str(width))
+        .replace('#src#', mesh_src)
+    )
+
+
 def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
-    # Remove first folder from path to make relative path
     if textured:
         related_path = f"./textured_mesh.glb"
-        template_name = './assets/modelviewer-textured-template.html'
         output_html_path = os.path.join(save_folder, f'textured_mesh.html')
     else:
         related_path = f"./white_mesh.glb"
-        template_name = './assets/modelviewer-template.html'
         output_html_path = os.path.join(save_folder, f'white_mesh.html')
     offset = 50 if textured else 10
-    with open(os.path.join(CURRENT_DIR, template_name), 'r', encoding='utf-8') as f:
-        template_html = f.read()
+    template_html = render_model_viewer_document(
+        related_path,
+        height - offset,
+        width,
+        textured=textured,
+    )
 
     with open(output_html_path, 'w', encoding='utf-8') as f:
-        template_html = template_html.replace('#height#', f'{height - offset}')
-        template_html = template_html.replace('#width#', f'{width}')
-        template_html = template_html.replace('#src#', related_path)
         f.write(template_html)
 
     rel_path = os.path.relpath(output_html_path, SAVE_DIR).replace(os.sep, '/')
@@ -498,10 +563,118 @@ height="{height}" width="100%" frameborder="0"></iframe>'
 {os.path.exists(output_html_path)}, relative HTML path is /static/{rel_path}')
 
     return f"""
-        <div style='height: {height}; width: 100%;'>
+        <div style='height: {height}px; width: 100%; overflow: hidden;'>
         {iframe_tag}
         </div>
     """
+
+
+def stored_generation_file(save_folder, filename):
+    """Resolve a manifest filename without allowing it outside its generation folder."""
+    if not filename or os.path.basename(str(filename)) != str(filename):
+        return None
+    save_folder = os.path.abspath(save_folder)
+    candidate = os.path.abspath(os.path.join(save_folder, str(filename)))
+    try:
+        if os.path.commonpath([save_folder, candidate]) != save_folder:
+            return None
+    except ValueError:
+        return None
+    return candidate if os.path.isfile(candidate) else None
+
+
+def build_stored_model_viewer_html(save_folder, mesh_filename, height=660):
+    """Embed a saved mesh through the current viewer UI without changing the GLB."""
+    mesh_path = stored_generation_file(save_folder, mesh_filename)
+    if not mesh_path:
+        return HTML_OUTPUT_PLACEHOLDER
+
+    generation_uid = os.path.basename(os.path.abspath(save_folder))
+    cache_key = os.stat(mesh_path).st_mtime_ns
+    iframe_tag = (
+        f'<iframe src="/generation-viewer/{generation_uid}?v={cache_key}" '
+        f'height="{height}" width="100%" frameborder="0"></iframe>'
+    )
+    return f"""
+        <div style='height: {height}px; width: 100%; overflow: hidden;'>
+        {iframe_tag}
+        </div>
+    """
+
+
+def restore_generation_from_request(request: gr.Request = None):
+    """Restore saved inputs, mesh preview and settings from a generation URL."""
+    unchanged = tuple(gr.update() for _ in range(17))
+    generation_uid = generation_uid_query_from_request(request)
+    if not generation_uid:
+        return unchanged
+
+    save_folder = os.path.join(SAVE_DIR, generation_uid)
+    manifest_path = os.path.join(save_folder, 'generation.json')
+    if not os.path.isfile(manifest_path):
+        logger.warning("Saved generation was not found: %s", generation_uid)
+        return unchanged
+
+    try:
+        with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+            manifest = json.load(manifest_file)
+    except (OSError, json.JSONDecodeError):
+        logger.exception("Could not restore generation manifest: %s", manifest_path)
+        return unchanged
+
+    params = manifest.get('params') or {}
+    inputs = manifest.get('inputs') or {}
+    outputs = manifest.get('outputs') or {}
+    input_mode = manifest.get('input_mode') or params.get('input_mode') or 'single'
+    input_mode = 'four' if input_mode in {'four', '4-view', 'multi-view'} else 'single'
+
+    def input_path(view_name, fallback_filename):
+        return stored_generation_file(
+            save_folder,
+            inputs.get(view_name) or fallback_filename,
+        )
+
+    front_image = input_path('front', 'input_front.png')
+    back_image = input_path('back', 'input_back.png')
+    left_image = input_path('left', 'input_left.png')
+    right_image = input_path('right', 'input_right.png')
+
+    mesh_path = stored_generation_file(
+        save_folder,
+        outputs.get('mesh') or 'white_mesh.glb',
+    )
+    viewer_html = (
+        build_stored_model_viewer_html(
+            save_folder,
+            outputs.get('mesh') or 'white_mesh.glb',
+            HTML_HEIGHT,
+        )
+        if mesh_path
+        else HTML_OUTPUT_PLACEHOLDER
+    )
+
+    return (
+        input_mode,
+        front_image if input_mode == 'single' else None,
+        front_image if input_mode == 'four' else None,
+        back_image if input_mode == 'four' else None,
+        left_image if input_mode == 'four' else None,
+        right_image if input_mode == 'four' else None,
+        mesh_path,
+        viewer_html,
+        manifest.get('stats') or {},
+        params.get('seed', 1234),
+        params.get('steps', 30),
+        params.get('guidance_scale', 5.0),
+        params.get('octree_resolution', 256),
+        params.get('check_box_rembg', not MV_MODE),
+        params.get('num_chunks', 8000),
+        False,
+        gr.update(value=(
+            'Generate 3D · 4 Images' if input_mode == 'four'
+            else 'Generate 3D · 1 Image'
+        )),
+    )
 
 @spaces.GPU(duration=60)
 def _gen_shape(
@@ -661,11 +834,190 @@ def _gen_shape(
 
     generator = torch.Generator()
     generator = generator.manual_seed(int(seed))
+    diffusion_clock = {
+        'started_at': None,
+        'last_step_at': None,
+    }
+    total_diffusion_steps = max(1, int(steps))
+
+    def report_stage_safely(stage, message=None, progress=None, details=None, **updates):
+        if not tracking_enabled:
+            return
+        try:
+            update_generation_stage(
+                save_folder,
+                stage,
+                message=message,
+                progress=progress,
+                event_details=details,
+                **updates,
+            )
+        except Exception as stage_error:
+            logger.warning(
+                "Could not report generation stage %s for %s: %s",
+                stage,
+                generation_uid,
+                stage_error,
+            )
+
+    def on_pipeline_stage(stage, details):
+        details = dict(details or {})
+        now = time.perf_counter()
+        message = GENERATION_STAGE_MESSAGES.get(stage, stage)
+        stage_progress = None
+
+        if stage == 'prepare_conditioning':
+            message = (
+                f"Preparing {details.get('view_count', 1)} input view(s) "
+                "for model conditioning"
+            )
+        elif stage == 'encode_conditioning':
+            message = (
+                "Encoding vision features from tensor "
+                f"{details.get('image_shape', [])} ({details.get('dtype', '-')})"
+            )
+        elif stage == 'conditioning_ready':
+            message = (
+                "Vision conditioning ready for batch_size="
+                f"{details.get('batch_size', 1)}"
+            )
+        elif stage == 'prepare_timestep_schedule':
+            message = (
+                f"Building {details.get('scheduler', 'diffusion')} schedule "
+                f"with {details.get('requested_steps', total_diffusion_steps)} steps"
+            )
+        elif stage == 'latents_initialized':
+            message = (
+                f"Initialized latent noise {details.get('latent_shape', [])} "
+                f"on {details.get('device', 'cuda')} as {details.get('dtype', '-')}"
+            )
+        elif stage == 'diffusion_started':
+            diffusion_clock['started_at'] = now
+            diffusion_clock['last_step_at'] = now
+            message = f"Starting {total_diffusion_steps} real diffusion steps on CUDA"
+        elif stage == 'diffusion_completed':
+            sampling_seconds = (
+                now - diffusion_clock['started_at']
+                if diffusion_clock['started_at'] is not None
+                else 0.0
+            )
+            details['sampling_seconds'] = round(sampling_seconds, 3)
+            message = f"Diffusion sampling completed in {sampling_seconds:.2f}s"
+        elif stage == 'vae_decoding':
+            message = (
+                f"ShapeVAE decoding latent {details.get('latent_shape', [])} "
+                f"({details.get('dtype', '-')})"
+            )
+        elif stage == 'volume_decoding':
+            message = (
+                f"Starting {details.get('decoder', 'volume decoder')} · "
+                f"octree={details.get('octree_resolution', octree_resolution)} "
+                f"chunks={details.get('num_chunks', num_chunks)} "
+            )
+        elif stage == 'volume_decoding_progress':
+            volume_percent = float(details.get('volume_percent', 0.0))
+            stage_progress = 79.0 + (volume_percent / 100.0 * 10.0)
+            message = (
+                f"Volume chunk {details.get('chunk', '-')}/{details.get('total_chunks', '-')} · "
+                f"points {details.get('processed_points', '-')}/{details.get('total_points', '-')} · "
+                f"{volume_percent:.1f}% · ETA {float(details.get('eta_seconds', 0.0)):.1f}s"
+            )
+        elif stage == 'volume_decoding_completed':
+            message = (
+                f"Dense volume ready from {details.get('decoder', 'decoder')} · "
+                f"grid={details.get('grid_shape', [])}"
+            )
+        elif stage == 'surface_extraction':
+            message = (
+                "Running marching cubes with "
+                f"{details.get('extractor', 'surface extractor')}"
+            )
+        elif stage == 'surface_extraction_completed':
+            message = (
+                "Surface extraction completed · mesh_count="
+                f"{details.get('mesh_count', '-') }"
+            )
+
+        logger.info("[generation %s] %s", generation_uid, message)
+        report_stage_safely(
+            stage,
+            message=message,
+            progress=stage_progress,
+            details=details,
+            pipeline_stage=details,
+        )
+
+    def on_diffusion_step(step_idx, timestep, _outputs):
+        now = time.perf_counter()
+        if diffusion_clock['started_at'] is None:
+            diffusion_clock['started_at'] = now
+        if diffusion_clock['last_step_at'] is None:
+            diffusion_clock['last_step_at'] = diffusion_clock['started_at']
+
+        step_number = min(total_diffusion_steps, int(step_idx) + 1)
+        step_seconds = now - diffusion_clock['last_step_at']
+        elapsed_seconds = now - diffusion_clock['started_at']
+        diffusion_clock['last_step_at'] = now
+        eta_seconds = (
+            elapsed_seconds / max(1, step_number)
+            * max(0, total_diffusion_steps - step_number)
+        )
+        diffusion_percent = step_number / total_diffusion_steps * 100.0
+        overall_progress = 31.0 + (diffusion_percent / 100.0 * 43.0)
+
+        try:
+            timestep_value = (
+                float(timestep.detach().float().item())
+                if torch.is_tensor(timestep)
+                else float(timestep)
+            )
+        except (TypeError, ValueError, RuntimeError):
+            timestep_value = str(timestep)
+        timestep_display = (
+            f"{timestep_value:.4f}"
+            if isinstance(timestep_value, (int, float))
+            else timestep_value
+        )
+
+        allocated_gb = 0.0
+        reserved_gb = 0.0
+        if torch.cuda.is_available():
+            allocated_gb = torch.cuda.memory_allocated() / (1024 ** 3)
+            reserved_gb = torch.cuda.memory_reserved() / (1024 ** 3)
+
+        details = {
+            'step': step_number,
+            'total_steps': total_diffusion_steps,
+            'timestep': timestep_value,
+            'diffusion_percent': round(diffusion_percent, 2),
+            'step_seconds': round(step_seconds, 3),
+            'elapsed_seconds': round(elapsed_seconds, 3),
+            'eta_seconds': round(eta_seconds, 3),
+            'vram_allocated_gb': round(allocated_gb, 3),
+            'vram_reserved_gb': round(reserved_gb, 3),
+        }
+        message = (
+            f"Step {step_number:02d}/{total_diffusion_steps:02d} · "
+            f"t={timestep_display} · {step_seconds:.2f}s · "
+            f"ETA {eta_seconds:.1f}s · VRAM {allocated_gb:.2f}/{reserved_gb:.2f} GB"
+        )
+        logger.info("[generation %s] %s", generation_uid, message)
+        report_stage_safely(
+            'diffusion_step',
+            message=message,
+            progress=overall_progress,
+            details=details,
+            diffusion=details,
+        )
+
     if tracking_enabled:
         update_generation_stage(
             save_folder,
             'shape_generation',
-            message=f'Running {steps} diffusion steps at octree {octree_resolution}',
+            message=(
+                f"Launching Hunyuan3D inference · steps={total_diffusion_steps} "
+                f"guidance={guidance_scale} octree={octree_resolution} chunks={num_chunks}"
+            ),
         )
     outputs = i23d_worker(
         image=image,
@@ -674,7 +1026,10 @@ def _gen_shape(
         generator=generator,
         octree_resolution=octree_resolution,
         num_chunks=num_chunks,
-        output_type='mesh'
+        output_type='mesh',
+        callback=on_diffusion_step if tracking_enabled else None,
+        callback_steps=1,
+        stage_callback=on_pipeline_stage if tracking_enabled else None,
     )
     time_meta['shape generation'] = time.time() - start_time
     logger.info("---Shape generation takes %s seconds ---" % (time.time() - start_time))
@@ -885,17 +1240,48 @@ def build_app():
         title = title.replace(':', '-Turbo: Fast ')
 
     title_html = f"""
-    <div style="font-size: 2em; font-weight: bold; text-align: center; margin-bottom: 5px">
-
-    {title}
-    </div>
-    <div align="center">
-    Tencent Hunyuan3D Team
-    </div>
+    <header class="app-hero">
+        <span class="app-hero-mark ui-icon-slot" data-ui-icon="box" aria-hidden="true"></span>
+        <div class="app-hero-copy">
+            <h1>{title}</h1>
+            <p>Tencent Hunyuan3D Team · Local Generation Workspace</p>
+        </div>
+    </header>
     """
     custom_css = """
     .gradio-container {
+        --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --ui-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --ui-bg: var(--body-background-fill);
+        --ui-surface: var(--block-background-fill);
+        --ui-surface-muted: var(--background-fill-secondary);
+        --ui-border: var(--block-border-color);
+        --ui-border-strong: var(--border-color-primary);
+        --ui-text: var(--body-text-color);
+        --ui-muted: var(--body-text-color-subdued);
+        --ui-primary: var(--primary-500);
+        --ui-primary-hover: var(--primary-600);
+        --ui-success: #51cf66;
+        --ui-warning: #f59f00;
+        --ui-danger: #ff6b6b;
+        --ui-space-1: 4px;
+        --ui-space-2: 8px;
+        --ui-space-3: 12px;
+        --ui-space-4: 16px;
+        --ui-space-5: 20px;
+        --ui-space-6: 24px;
+        --ui-radius-sm: 6px;
+        --ui-radius-md: 8px;
+        --ui-radius-lg: 12px;
+        --ui-radius-xl: 16px;
+        --ui-radius-pill: 999px;
+        --ui-control-height: 40px;
+        --ui-panel-header-height: 44px;
+        --ui-stage-height: 690px;
+        --ui-workspace-height: 734px;
+        font-family: var(--ui-font);
         max-width: 1880px !important;
+        padding: 20px 28px 88px !important;
     }
 
     #generation-console-panel {
@@ -1714,6 +2100,481 @@ def build_app():
         }
     }
 
+    /* Unified application shell */
+    .app-hero {
+        align-items: center;
+        display: flex;
+        gap: var(--ui-space-3);
+        justify-content: center;
+        margin: 2px auto var(--ui-space-5);
+        min-height: 54px;
+        text-align: left;
+    }
+
+    .app-hero-mark {
+        align-items: center;
+        background: linear-gradient(145deg, #4263eb, #6d8cff);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: var(--ui-radius-lg);
+        box-shadow: 0 10px 28px rgba(66, 99, 235, 0.24);
+        color: white;
+        display: inline-flex;
+        flex: 0 0 42px;
+        height: 42px;
+        justify-content: center;
+        width: 42px;
+    }
+
+    .app-hero-copy h1 {
+        color: var(--ui-text);
+        font-size: clamp(22px, 1.55vw, 28px);
+        font-weight: 750;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .app-hero-copy p {
+        color: var(--ui-muted);
+        font-size: 12px;
+        line-height: 1.4;
+        margin: 4px 0 0;
+    }
+
+    #workspace-grid {
+        align-items: start;
+        display: grid !important;
+        gap: var(--ui-space-5) !important;
+        grid-template-columns: minmax(340px, 400px) minmax(540px, 1fr) minmax(330px, 400px);
+        width: 100%;
+    }
+
+    #workspace-grid > .column {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    #input-panel {
+        background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-xl);
+        gap: var(--ui-space-3) !important;
+        padding: var(--ui-space-3) !important;
+    }
+
+    #viewport-panel {
+        gap: 0 !important;
+    }
+
+    /* One icon geometry across custom UI and Gradio-native controls. */
+    .ui-icon {
+        display: block;
+        fill: none;
+        flex: 0 0 auto;
+        height: 16px;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.5;
+        width: 16px;
+    }
+
+    .app-hero-mark .ui-icon {
+        height: 22px;
+        width: 22px;
+    }
+
+    .ui-action-icon {
+        height: 17px;
+        margin-right: 2px;
+        width: 17px;
+    }
+
+    #input-panel button svg,
+    #mesh-download-card button svg,
+    footer button svg,
+    footer a svg {
+        height: 16px !important;
+        width: 16px !important;
+    }
+
+    /* Segmented input mode; shared headers for output and settings. */
+    #prompt-mode-tabs .tab-nav {
+        background: var(--ui-surface-muted);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-lg);
+        gap: var(--ui-space-1);
+        padding: var(--ui-space-1);
+    }
+
+    #prompt-mode-tabs button[role="tab"] {
+        background: transparent;
+        border: 1px solid transparent !important;
+        border-radius: var(--ui-radius-md);
+        color: var(--ui-muted);
+        font-size: 13px;
+        font-weight: 650;
+        min-height: var(--ui-control-height);
+        padding: 8px 12px;
+    }
+
+    #prompt-mode-tabs button[role="tab"][aria-selected="true"] {
+        background: var(--ui-primary);
+        border-color: var(--ui-primary) !important;
+        box-shadow: 0 5px 14px rgba(66, 99, 235, 0.22);
+        color: white;
+    }
+
+    #output-tabs,
+    #settings-tabs {
+        min-width: 0;
+    }
+
+    #output-tabs {
+        background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-xl);
+        overflow: hidden;
+        padding: 0 var(--ui-space-3) var(--ui-space-3);
+    }
+
+    #output-tabs .tab-nav,
+    #settings-tabs .tab-nav {
+        align-items: stretch;
+        background: transparent;
+        border-bottom: 1px solid var(--ui-border);
+        gap: var(--ui-space-1);
+        min-height: var(--ui-panel-header-height);
+        padding: 0;
+    }
+
+    #output-tabs .tab-nav button[role="tab"],
+    #settings-tabs .tab-nav button[role="tab"] {
+        background: transparent;
+        border: 0 !important;
+        border-bottom: 2px solid transparent !important;
+        border-radius: 0;
+        color: var(--ui-muted);
+        font-size: 12px;
+        font-weight: 650;
+        min-height: var(--ui-panel-header-height);
+        padding: 0 12px;
+    }
+
+    #output-tabs .tab-nav button[role="tab"][aria-selected="true"],
+    #settings-tabs .tab-nav button[role="tab"][aria-selected="true"] {
+        border-bottom-color: var(--ui-primary) !important;
+        color: var(--ui-primary);
+    }
+
+    /* Upload and download surfaces */
+    .input-mode-guide {
+        background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+        border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border));
+        border-radius: var(--ui-radius-lg);
+        gap: var(--ui-space-3);
+        margin: var(--ui-space-3) 0;
+        min-height: 64px;
+        padding: var(--ui-space-3);
+    }
+
+    .input-mode-number {
+        background: var(--ui-primary);
+        border-radius: var(--ui-radius-md);
+        flex-basis: 36px;
+        font-size: 16px;
+        height: 36px;
+    }
+
+    .input-mode-copy strong {
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .input-mode-copy span {
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .mv-upload-row {
+        display: grid !important;
+        gap: var(--ui-space-3) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mv-upload-row > * {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    #input-panel .ui-upload {
+        background: var(--ui-surface-muted) !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: var(--ui-radius-lg) !important;
+        overflow: hidden;
+    }
+
+    #input-panel .ui-upload:hover {
+        border-color: color-mix(in srgb, var(--ui-primary) 55%, var(--ui-border)) !important;
+    }
+
+    .generate-actions {
+        gap: var(--ui-space-2) !important;
+        margin-top: var(--ui-space-1);
+    }
+
+    #generate-3d-button {
+        align-items: center;
+        border-radius: var(--ui-radius-md) !important;
+        box-shadow: 0 8px 18px rgba(66, 99, 235, 0.2);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 700;
+        gap: var(--ui-space-2);
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    #mesh-download-card {
+        background: var(--ui-surface-muted);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-lg);
+        overflow: hidden;
+    }
+
+    #mesh-download-card .block {
+        border: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    /* Fixed, repeatable form grid */
+    #settings-tabs {
+        margin-top: var(--ui-space-1);
+    }
+
+    #advanced-settings-form {
+        gap: var(--ui-space-3) !important;
+        padding-top: var(--ui-space-3);
+    }
+
+    .ui-control-row {
+        display: grid !important;
+        gap: var(--ui-space-3) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ui-control-row-checks {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    #advanced-settings-form .ui-control {
+        background: var(--ui-surface-muted) !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: var(--ui-radius-lg) !important;
+        box-sizing: border-box;
+        margin: 0 !important;
+        min-height: 82px;
+        min-width: 0 !important;
+        padding: 10px 12px !important;
+        width: 100%;
+    }
+
+    #advanced-settings-form .ui-control-checkbox {
+        align-items: center;
+        display: flex;
+        min-height: var(--ui-control-height);
+        padding: 8px 10px !important;
+    }
+
+    #advanced-settings-form .ui-control label {
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    #advanced-settings-form input[type="number"],
+    #advanced-settings-form input[type="text"] {
+        min-height: 34px;
+    }
+
+    /* Viewer, statistics and console now share one visual system. */
+    #mesh-viewer,
+    #mesh-export-viewer,
+    #mesh-stats {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: var(--ui-radius-lg) !important;
+        margin-top: var(--ui-space-3);
+        overflow: hidden;
+        padding: 0 !important;
+    }
+
+    #mesh-viewer .html-container,
+    #mesh-export-viewer .html-container {
+        padding: 0 !important;
+    }
+
+    #mesh-viewer iframe,
+    #mesh-export-viewer iframe {
+        border-radius: var(--ui-radius-lg);
+        display: block;
+        width: 100%;
+    }
+
+    #generation-console-panel {
+        min-width: 0;
+    }
+
+    .generation-console {
+        border-color: var(--ui-border);
+        border-radius: var(--ui-radius-xl);
+        box-shadow: none;
+        height: var(--ui-workspace-height);
+        min-height: var(--ui-workspace-height);
+    }
+
+    .generation-console-windowbar {
+        gap: var(--ui-space-2);
+        min-height: var(--ui-panel-header-height);
+        padding: 0 var(--ui-space-3);
+    }
+
+    .generation-console-title strong {
+        font-size: 12px;
+    }
+
+    .generation-console-title span,
+    .generation-console-status,
+    .generation-console-mode,
+    .generation-console-progress-meta,
+    .generation-console-footer {
+        font-size: 10px;
+    }
+
+    .generation-console-line {
+        font-size: 10.5px;
+        grid-template-columns: 56px 48px minmax(0, 1fr);
+        line-height: 1.55;
+    }
+
+    /* Modal and footer consume the same radii, spacing and icon scale. */
+    #rtx3090-modal .rtx3090-modal-panel {
+        border-radius: var(--ui-radius-xl);
+        gap: var(--ui-space-3);
+    }
+
+    .rtx3090-profile-card,
+    .rtx-preset-status,
+    .rtx3090-modal-note,
+    .rtx3090-machine-strip {
+        border-radius: var(--ui-radius-lg);
+    }
+
+    #rtx3090-modal-close {
+        border: 1px solid transparent;
+        border-radius: var(--ui-radius-md);
+        font-size: inherit;
+    }
+
+    #rtx3090-modal-close:hover {
+        background: var(--ui-surface-muted);
+        border-color: var(--ui-border);
+    }
+
+    .rtx3090-context-tabs .ui-icon {
+        height: 13px;
+        width: 13px;
+    }
+
+    footer .rtx3090-footer-trigger,
+    footer button,
+    footer a {
+        align-items: center;
+        gap: 5px;
+    }
+
+    footer .ui-icon {
+        color: currentColor;
+        height: 14px;
+        width: 14px;
+    }
+
+    @media (max-width: 1650px) {
+        .gradio-container {
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+        }
+
+        #workspace-grid {
+            gap: var(--ui-space-4) !important;
+            grid-template-columns: minmax(320px, 360px) minmax(500px, 1fr) minmax(310px, 350px);
+        }
+
+        .generation-console {
+            height: var(--ui-workspace-height);
+            min-height: var(--ui-workspace-height);
+        }
+    }
+
+    @media (max-width: 1360px) {
+        #workspace-grid {
+            grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+        }
+
+        #generation-console-panel {
+            grid-column: 1 / -1;
+        }
+
+        .generation-console {
+            height: 520px;
+            min-height: 520px;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .gradio-container {
+            padding: 14px 14px 76px !important;
+        }
+
+        .app-hero {
+            justify-content: flex-start;
+        }
+
+        #workspace-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        #generation-console-panel {
+            grid-column: auto;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .app-hero-mark {
+            display: none;
+        }
+
+        .app-hero-copy h1 {
+            font-size: 20px;
+        }
+
+        .mv-upload-row,
+        .ui-control-row {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        #input-panel {
+            border-radius: var(--ui-radius-lg);
+            padding: 10px !important;
+        }
+
+        #output-tabs .tab-nav button[role="tab"] {
+            font-size: 11px;
+            padding-left: 7px;
+            padding-right: 7px;
+        }
+    }
+
     """
 
     custom_js = r"""
@@ -1721,6 +2582,67 @@ def build_app():
         const modalId = "rtx3090-modal";
         const footerButtonId = "rtx3090-footer-trigger";
         const modal = () => document.getElementById(modalId);
+        const uiIconPaths = {
+            box: '<path d="m3 8 9-5 9 5-9 5-9-5Z"></path><path d="m3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path>',
+            terminal: '<path d="m5 7 5 5-5 5"></path><path d="M12 19h7"></path>',
+            zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"></path>',
+            x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
+            memory: '<rect x="5" y="6" width="14" height="12" rx="2"></rect><path d="M9 10h6v4H9z"></path><path d="M8 3v3M12 3v3M16 3v3M8 18v3M12 18v3M16 18v3"></path>',
+            wand: '<path d="m15 4 5 5L7 22H2v-5L15 4Z"></path><path d="m14 5 5 5"></path><path d="M6 3v4M4 5h4M19 15v4M17 17h4"></path>',
+            code: '<path d="m8 9-3 3 3 3"></path><path d="m16 9 3 3-3 3"></path><path d="m14 5-4 14"></path>',
+            settings: '<path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5"></path><circle cx="16" cy="6" r="2"></circle><circle cx="8" cy="12" r="2"></circle><circle cx="13" cy="18" r="2"></circle>',
+            rotate: '<path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path>',
+            download: '<path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path>',
+        };
+
+        const uiIconMarkup = (name, extraClass = "") => {
+            const paths = uiIconPaths[name];
+            if (!paths) return "";
+            return '<svg class="ui-icon ' + extraClass + '" viewBox="0 0 24 24" aria-hidden="true">'
+                + paths + '</svg>';
+        };
+
+        const installUnifiedIcons = () => {
+            document.querySelectorAll("[data-ui-icon]").forEach((element) => {
+                if (element.dataset.uiIconWired === "true") return;
+                const iconName = element.dataset.uiIcon;
+                if (!uiIconPaths[iconName]) return;
+                element.dataset.uiIconWired = "true";
+                element.innerHTML = uiIconMarkup(iconName);
+            });
+
+            const generateButton = document.getElementById("generate-3d-button");
+            if (generateButton && generateButton.dataset.uiActionIcon !== "true") {
+                generateButton.dataset.uiActionIcon = "true";
+                generateButton.insertAdjacentHTML("afterbegin", uiIconMarkup("wand", "ui-action-icon"));
+            }
+
+            document.querySelectorAll('button.reset-button[data-testid="reset-button"]').forEach((button) => {
+                if (button.dataset.uiIconWired === "true") return;
+                button.dataset.uiIconWired = "true";
+                button.innerHTML = uiIconMarkup("rotate");
+            });
+
+            document.querySelectorAll(".file-preview td.download a").forEach((link) => {
+                if (link.dataset.uiIconWired === "true") return;
+                link.dataset.uiIconWired = "true";
+                link.innerHTML = uiIconMarkup("download");
+            });
+
+            const footerIcons = [
+                ["button.show-api", "code"],
+                ["button.settings", "settings"],
+            ];
+            footerIcons.forEach(([selector, iconName]) => {
+                document.querySelectorAll("footer " + selector).forEach((element) => {
+                    if (element.dataset.uiIconWired === "true") return;
+                    element.dataset.uiIconWired = "true";
+                    element.querySelector("img")?.remove();
+                    element.insertAdjacentHTML("afterbegin", uiIconMarkup(iconName));
+                });
+            });
+        };
+
         const tabRoutes = [
             {slug: "single-view", index: 0},
             {slug: "multi-view", index: 1},
@@ -1762,6 +2684,21 @@ def build_app():
             preprocessing_input: "PREP",
             input_ready: "READY",
             shape_generation: "CUDA",
+            prepare_conditioning: "IMAGE",
+            encode_conditioning: "ENCODE",
+            conditioning_ready: "COND",
+            prepare_timestep_schedule: "SCHED",
+            latents_initialized: "LATENT",
+            diffusion_started: "CUDA",
+            diffusion_step: "STEP",
+            diffusion_completed: "CUDA",
+            vae_decoding: "VAE",
+            volume_decoding: "VOLUME",
+            volume_decoding_progress: "VOLUME",
+            volume_decoding_completed: "VOLUME",
+            surface_extraction: "OCTREE",
+            surface_extraction_completed: "MESH",
+            trimesh_conversion: "MESH",
             extracting_mesh: "MESH",
             mesh_ready: "MESH",
             exporting_glb: "WRITE",
@@ -1801,7 +2738,7 @@ def build_app():
 
             line.append(time, levelElement, messageElement);
             log.appendChild(line);
-            while (log.children.length > 80) log.firstElementChild?.remove();
+            while (log.children.length > 200) log.firstElementChild?.remove();
             log.scrollTop = log.scrollHeight;
         };
 
@@ -1831,6 +2768,18 @@ def build_app():
 
         const renderGenerationManifest = (manifest) => {
             if (!manifest || manifest.generation_uid !== generationConsoleUid) return;
+
+            if (
+                manifest.storage_folder
+                && !generationConsoleSeenEvents.has("__storage__")
+            ) {
+                generationConsoleSeenEvents.add("__storage__");
+                appendGenerationConsoleLine(
+                    "STORE",
+                    "Target: " + manifest.storage_folder,
+                    "muted"
+                );
+            }
 
             if (manifest.params && !generationConsoleParamsRendered) {
                 generationConsoleParamsRendered = true;
@@ -1880,9 +2829,13 @@ def build_app():
                             + " total=" + Number(stats.time?.total || 0).toFixed(2) + "s",
                         "success"
                     );
+                    const storageFolder = String(
+                        manifest.storage_folder || ("/static/" + generationConsoleUid)
+                    ).replace(/[\/]+$/, "");
+                    const meshFilename = String(manifest.outputs?.mesh || "white_mesh.glb");
                     appendGenerationConsoleLine(
                         "OUTPUT",
-                        "hy3dshape/output_folder/webui/" + generationConsoleUid + "/white_mesh.glb",
+                        storageFolder + "/" + meshFilename,
                         "success"
                     );
                 }
@@ -1966,7 +2919,7 @@ def build_app():
             );
             appendGenerationConsoleLine(
                 "STORE",
-                "Target: hy3dshape/output_folder/webui/" + uid,
+                "Target: waiting for generation manifest",
                 "muted"
             );
 
@@ -2095,7 +3048,7 @@ def build_app():
             trigger.type = "button";
             trigger.className = "rtx3090-footer-trigger";
             trigger.setAttribute("aria-haspopup", "dialog");
-            trigger.innerHTML = '<span class="rtx3090-footer-icon">⚡</span><span>RTX 3090 - Cấu hình đề xuất</span>';
+            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="zap"></span><span>RTX 3090 - Cấu hình đề xuất</span>';
             trigger.addEventListener("click", openModal);
 
             const divider = document.createElement("div");
@@ -2122,6 +3075,7 @@ def build_app():
 
         const observer = new MutationObserver(() => {
             installFooterItem();
+            installUnifiedIcons();
             wireModal();
             installTabRouting();
             installGenerationRouting();
@@ -2130,6 +3084,7 @@ def build_app():
         observer.observe(document.body, {childList: true, subtree: true});
 
         installFooterItem();
+        installUnifiedIcons();
         wireModal();
         installTabRouting();
         installGenerationRouting();
@@ -2158,8 +3113,8 @@ def build_app():
     ) as demo:
         gr.HTML(title_html)
 
-        with gr.Row():
-            with gr.Column(scale=3):
+        with gr.Row(elem_id='workspace-grid'):
+            with gr.Column(scale=3, elem_id='input-panel'):
                 input_mode = gr.Textbox(value='single', visible=False, label='Input mode')
                 with gr.Tabs(selected='tab_single_prompt', elem_id='prompt-mode-tabs') as tabs_prompt:
                     with gr.Tab('1 ẢNH · Single View', id='tab_single_prompt') as tab_ip:
@@ -2177,7 +3132,7 @@ def build_app():
                             type='pil',
                             image_mode='RGBA',
                             height=300,
-                            elem_classes='single-image',
+                            elem_classes=['single-image', 'ui-upload'],
                         )
                         caption = gr.State(None)
 #                    with gr.Tab('Text Prompt', id='tab_txt_prompt', visible=HAS_T2I and not MV_MODE) as tab_tp:
@@ -2194,18 +3149,18 @@ def build_app():
                             </div>
                         </div>
                         """)
-                        with gr.Row():
+                        with gr.Row(elem_classes='mv-upload-row'):
                             mv_image_front = gr.Image(label='1 · Mặt trước · Front', type='pil', image_mode='RGBA', height=150,
-                                                      min_width=100, elem_classes='mv-image')
+                                                      min_width=100, elem_classes=['mv-image', 'ui-upload'])
                             mv_image_back = gr.Image(label='2 · Mặt sau · Back', type='pil', image_mode='RGBA', height=150,
-                                                     min_width=100, elem_classes='mv-image')
-                        with gr.Row():
+                                                     min_width=100, elem_classes=['mv-image', 'ui-upload'])
+                        with gr.Row(elem_classes='mv-upload-row'):
                             mv_image_left = gr.Image(label='3 · Bên trái · Left', type='pil', image_mode='RGBA', height=150,
-                                                     min_width=100, elem_classes='mv-image')
+                                                     min_width=100, elem_classes=['mv-image', 'ui-upload'])
                             mv_image_right = gr.Image(label='4 · Bên phải · Right', type='pil', image_mode='RGBA', height=150,
-                                                      min_width=100, elem_classes='mv-image')
+                                                      min_width=100, elem_classes=['mv-image', 'ui-upload'])
 
-                with gr.Row():
+                with gr.Row(elem_classes='generate-actions'):
                     btn = gr.Button(
                         value='Generate 3D · 1 Image',
                         variant='primary',
@@ -2217,7 +3172,7 @@ def build_app():
                                         visible=HAS_TEXTUREGEN,
                                         min_width=100)
 
-                with gr.Group():
+                with gr.Group(elem_id='mesh-download-card'):
                     file_out = gr.File(label="Generated mesh (direct download)", visible=True,
                                        interactive=False)
                     file_out2 = gr.File(label="File", visible=False)
@@ -2227,7 +3182,7 @@ def build_app():
                     else 'tab_export' if HAS_PYMESHLAB
                     else 'tab_advanced_options'
                 )
-                with gr.Tabs(selected=selected_options_tab):
+                with gr.Tabs(selected=selected_options_tab, elem_id='settings-tabs'):
                     with gr.Tab("Options", id='tab_options', visible=TURBO_MODE):
                         gen_mode = gr.Radio(
                             label='Generation Mode',
@@ -2240,17 +3195,19 @@ Fast for very complex cases, Standard seldom use.',
                             info='The resolution for exporting mesh from generated vectset',
                             choices=['Low', 'Standard', 'High'],
                             value='Standard')
-                    with gr.Tab('Advanced Options', id='tab_advanced_options'):
-                        with gr.Row():
+                    with gr.Tab('Advanced Options', id='tab_advanced_options', elem_id='advanced-settings-form'):
+                        with gr.Row(elem_classes=['ui-control-row', 'ui-control-row-checks']):
                             check_box_rembg = gr.Checkbox(
                                 value=not MV_MODE,
                                 label='Remove Background',
                                 visible=HAS_REMBG,
-                                min_width=100)
+                                min_width=100,
+                                elem_classes=['ui-control', 'ui-control-checkbox'])
                             randomize_seed = gr.Checkbox(
                                 label="Randomize seed", 
                                 value=True, 
-                                min_width=100)
+                                min_width=100,
+                                elem_classes=['ui-control', 'ui-control-checkbox'])
                         seed = gr.Slider(
                             label="Seed",
                             minimum=0,
@@ -2258,20 +3215,25 @@ Fast for very complex cases, Standard seldom use.',
                             step=1,
                             value=1234,
                             min_width=100,
+                            elem_classes=['ui-control', 'ui-control-wide'],
                         )
-                        with gr.Row():
+                        with gr.Row(elem_classes='ui-control-row'):
                             num_steps = gr.Slider(maximum=100,
                                                   minimum=1,
                                                   value=5 if 'turbo' in args.subfolder else 30,
-                                                  step=1, label='Inference Steps')
+                                                  step=1, label='Inference Steps',
+                                                  elem_classes='ui-control')
                             octree_resolution = gr.Slider(maximum=512, 
                                                           minimum=16, 
                                                           value=256, 
-                                                          label='Octree Resolution')
-                        with gr.Row():
-                            cfg_scale = gr.Number(value=5.0, label='Guidance Scale', min_width=100)
+                                                          label='Octree Resolution',
+                                                          elem_classes='ui-control')
+                        with gr.Row(elem_classes='ui-control-row'):
+                            cfg_scale = gr.Number(value=5.0, label='Guidance Scale', min_width=100,
+                                                  elem_classes='ui-control')
                             num_chunks = gr.Slider(maximum=5000000, minimum=1000, value=8000,
-                                                   label='Number of Chunks', min_width=100)
+                                                   label='Number of Chunks', min_width=100,
+                                                   elem_classes='ui-control')
                     with gr.Tab("Export", id='tab_export', visible=HAS_PYMESHLAB):
                         with gr.Row():
                             file_type = gr.Dropdown(label='File Type', 
@@ -2288,14 +3250,14 @@ Fast for very complex cases, Standard seldom use.',
                             file_export = gr.DownloadButton(label="Download", variant='primary',
                                                             interactive=False, min_width=100)
 
-            with gr.Column(scale=6):
-                with gr.Tabs(selected='gen_mesh_panel') as tabs_output:
+            with gr.Column(scale=6, elem_id='viewport-panel'):
+                with gr.Tabs(selected='gen_mesh_panel', elem_id='output-tabs') as tabs_output:
                     with gr.Tab('Generated Mesh', id='gen_mesh_panel'):
-                        html_gen_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output')
+                        html_gen_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output', elem_id='mesh-viewer')
                     with gr.Tab('Exporting Mesh', id='export_mesh_panel'):
-                        html_export_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output')
+                        html_export_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output', elem_id='mesh-export-viewer')
                     with gr.Tab('Mesh Statistic', id='stats_panel'):
-                        stats = gr.Json({}, label='Mesh Stats')
+                        stats = gr.Json({}, label='Mesh Stats', elem_id='mesh-stats')
 
             with gr.Column(scale=3, visible=MV_MODE, elem_id='generation-console-panel'):
                 gr.HTML("""
@@ -2309,7 +3271,7 @@ Fast for very complex cases, Standard seldom use.',
                         <span id="generation-console-status" class="generation-console-status">IDLE</span>
                     </header>
                     <div class="generation-console-jobbar">
-                        <span aria-hidden="true">›_</span>
+                        <span class="ui-icon-slot" data-ui-icon="terminal" aria-hidden="true"></span>
                         <span id="generation-console-job" class="generation-console-job">No active generation</span>
                         <span id="generation-console-mode" class="generation-console-mode">WAITING</span>
                     </div>
@@ -2358,7 +3320,7 @@ Fast for very complex cases, Standard seldom use.',
                 gr.HTML("""
                 <div class="rtx3090-modal-header">
                     <div class="rtx3090-header-main">
-                        <span class="rtx3090-header-icon">⚡</span>
+                        <span class="rtx3090-header-icon ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></span>
                         <h2 id="rtx3090-modal-title">RTX 3090 · Cấu hình đề xuất</h2>
                         <span class="rtx3090-header-scope">1 ảnh &amp; 4 ảnh</span>
                     </div>
@@ -2368,7 +3330,7 @@ Fast for very complex cases, Standard seldom use.',
                             Đã kiểm tra
                         </span>
                         <span class="rtx3090-preset-count"><b>2</b> preset</span>
-                        <button id="rtx3090-modal-close" type="button" aria-label="Đóng">×</button>
+                        <button id="rtx3090-modal-close" type="button" aria-label="Đóng" data-ui-icon="x"></button>
                     </div>
                 </div>
                 """)
@@ -2380,8 +3342,8 @@ Fast for very complex cases, Standard seldom use.',
                         <strong>Advanced Options</strong>.
                     </p>
                     <div class="rtx3090-context-tabs">
-                        <span class="active">⚡ RTX 3090</span>
-                        <span>▣ 24 GB VRAM</span>
+                        <span class="active"><i class="ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></i>RTX 3090</span>
+                        <span><i class="ui-icon-slot" data-ui-icon="memory" aria-hidden="true"></i>24 GB VRAM</span>
                         <span>1 ảnh</span>
                         <span>4 ảnh</span>
                         <span>FP16</span>
@@ -2471,6 +3433,31 @@ Fast for very complex cases, Standard seldom use.',
                 gr.update(value='Generate 3D · 4 Images'),
             ),
             outputs=[input_mode, btn],
+            queue=False,
+            api_name=False,
+        )
+
+        demo.load(
+            fn=restore_generation_from_request,
+            outputs=[
+                input_mode,
+                image,
+                mv_image_front,
+                mv_image_back,
+                mv_image_left,
+                mv_image_right,
+                file_out,
+                html_gen_mesh,
+                stats,
+                seed,
+                num_steps,
+                cfg_scale,
+                octree_resolution,
+                check_box_rembg,
+                num_chunks,
+                randomize_seed,
+                btn,
+            ],
             queue=False,
             api_name=False,
         )
@@ -2657,7 +3644,7 @@ if __name__ == '__main__':
     HTML_HEIGHT = 690 if MV_MODE else 650
     HTML_WIDTH = 500
     HTML_OUTPUT_PLACEHOLDER = f"""
-    <div style='height: {650}px; width: 100%; border-radius: 8px; border-color: #e5e7eb; border-style: solid; border-width: 1px; display: flex; justify-content: center; align-items: center;'>
+    <div style='height: {HTML_HEIGHT}px; width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid #30343d; background: #0b0d11; display: flex; justify-content: center; align-items: center;'>
       <div style='text-align: center; font-size: 16px; color: #6b7280;'>
         <p style="color: #8d8d8d;">Welcome to Hunyuan3D!</p>
         <p style="color: #8d8d8d;">No mesh here.</p>
@@ -2767,6 +3754,31 @@ if __name__ == '__main__':
             'multiview': MV_MODE,
             'device': args.device,
         }
+
+    @app.get('/generation-viewer/{generation_uid}', response_class=HTMLResponse)
+    def generation_viewer(generation_uid: str):
+        try:
+            generation_uid = str(uuid.UUID(generation_uid))
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise HTTPException(status_code=404, detail='Generation not found') from exc
+
+        mesh_path = stored_generation_file(
+            os.path.join(SAVE_DIR, generation_uid),
+            'white_mesh.glb',
+        )
+        if not mesh_path:
+            raise HTTPException(status_code=404, detail='Generated mesh not found')
+
+        document = render_model_viewer_document(
+            f'/static/{generation_uid}/white_mesh.glb',
+            HTML_HEIGHT - 10,
+            HTML_WIDTH,
+            textured=False,
+        )
+        return HTMLResponse(
+            document,
+            headers={'Cache-Control': 'no-store'},
+        )
     
     # create a static directory to store the static files
     static_dir = Path(SAVE_DIR).absolute()
