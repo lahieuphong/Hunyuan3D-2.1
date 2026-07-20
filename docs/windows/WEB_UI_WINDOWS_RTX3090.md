@@ -69,23 +69,21 @@ Tab một ảnh yêu cầu đúng một ảnh chính diện. Tab bốn ảnh yê
 
 ## Preset RTX 3090 ngay trên UI
 
-Đầu tab `Advanced Options` có panel `RTX 3090 · Cấu hình đề xuất`, áp dụng
-được cho cả chế độ 1 ảnh và 4 ảnh:
+Ở footer, bấm `RTX 3090 - Cấu hình đề xuất` để mở cửa sổ cấu hình phủ trên giao
+diện theo cùng cách trình bày với cửa sổ `Use via API` của Gradio. Cửa sổ hiển
+thị cấu hình RTX 3090 24 GB đã được kiểm chứng và hai preset áp dụng được cho
+cả chế độ 1 ảnh và 4 ảnh:
 
-Ngay phía trên footer cũng có thanh thao tác nhanh hiển thị đúng GPU/VRAM hiện
-tại cùng hai nút `256 · An toàn` và `384 · Chất lượng cao`. Hai vị trí dùng
-chung callback, nên bấm ở thanh dưới sẽ cập nhật ngay các control trong
-`Advanced Options`.
-
-- `Khôi phục mặc định an toàn`: Steps 30, Guidance 5.0, Octree 256,
+- `Áp dụng · 256 an toàn`: Steps 30, Guidance 5.0, Octree 256,
   Chunks 8000. Dùng cho lần thử đầu với một bộ ảnh mới.
-- `Chất lượng cao · RTX 3090`: Steps 30, Guidance 5.0, Octree 384,
+- `Áp dụng · 384 chất lượng cao`: Steps 30, Guidance 5.0, Octree 384,
   Chunks 8000. Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.
 
-Nút preset cập nhật trực tiếp bốn control tương ứng; đổi tab 1 ảnh/4 ảnh không
-cần áp dụng lại. Seed không ảnh hưởng VRAM: bật `Randomize seed` để thử biến
-thể và tắt nó khi cần tái tạo đúng cùng kết quả. `Number of Chunks` chủ yếu cân
-bằng tốc độ/bộ nhớ, không tăng chất lượng nên giữ 8000.
+Nút preset cập nhật trực tiếp bốn control tương ứng trong `Advanced Options`;
+đổi tab 1 ảnh/4 ảnh không cần áp dụng lại. Có thể đóng cửa sổ bằng nút `×`, bấm
+vào nền tối hoặc phím `Esc`. Seed không ảnh hưởng VRAM: bật `Randomize seed` để
+thử biến thể và tắt nó khi cần tái tạo đúng cùng kết quả. `Number of Chunks`
+chủ yếu cân bằng tốc độ/bộ nhớ, không tăng chất lượng nên giữ 8000.
 
 Preset chất lượng cao đã được chạy lại end-to-end trên chính RTX 3090 hiện tại
 với seed 12345, không OOM:

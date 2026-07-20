@@ -656,54 +656,334 @@ def build_app():
         line-height: 1.4;
     }
 
-    #rtx3090-preset {
-        background: linear-gradient(135deg, rgba(63, 81, 181, 0.13), rgba(33, 150, 243, 0.04));
-        border: 1px solid rgba(99, 130, 255, 0.35);
-        border-radius: 12px;
-        margin-bottom: 12px;
+    footer .rtx3090-footer-trigger {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--body-text-color-subdued);
+        cursor: pointer;
+        display: inline-flex;
+        font: inherit;
+        gap: 5px;
+        padding: 0 2px;
+        white-space: nowrap;
+    }
+
+    footer .rtx3090-footer-trigger:hover {
+        color: var(--body-text-color);
+        text-decoration: underline;
+    }
+
+    footer .rtx3090-footer-icon {
+        color: #748ffc;
+        font-size: 12px;
+    }
+
+    footer .rtx3090-footer-divider {
+        align-items: center;
+        color: var(--body-text-color-subdued);
+        display: inline-flex;
+        margin: 0 9px;
+    }
+
+    body.rtx3090-modal-open {
         overflow: hidden;
     }
 
-    #rtx3090-preset .rtx-preset-intro {
-        align-items: flex-start;
-        display: flex;
-        gap: 11px;
-        padding: 2px 2px 8px;
+    #rtx3090-modal {
+        align-items: stretch;
+        background: rgba(3, 5, 9, 0.72);
+        backdrop-filter: blur(5px);
+        display: none !important;
+        flex-direction: row !important;
+        inset: 0;
+        justify-content: flex-end;
+        margin: 0 !important;
+        max-width: none !important;
+        padding: 0 16px 0 0 !important;
+        position: fixed !important;
+        z-index: 1001;
     }
 
-    .rtx-preset-gpu {
+    #rtx3090-modal.rtx-open {
+        display: flex !important;
+    }
+
+    #rtx3090-modal .rtx3090-modal-panel {
+        background: var(--body-background-fill);
+        border: 1px solid var(--block-border-color);
+        border-radius: 12px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+        flex: 0 0 min(1020px, calc(100vw - 16px));
+        gap: 14px;
+        height: 100vh;
+        max-width: 1020px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 0 22px 24px;
+        width: min(1020px, calc(100vw - 16px));
+    }
+
+    #rtx3090-modal .rtx3090-modal-panel > *,
+    #rtx3090-modal .html-container {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    #rtx3090-modal .html-container {
+        overflow: visible !important;
+    }
+
+    .rtx3090-modal-header {
         align-items: center;
-        background: #4263eb;
-        border-radius: 9px;
-        color: white;
+        background: var(--body-background-fill);
+        border-bottom: 1px solid var(--border-color-primary);
         display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        margin: 0 -22px;
+        min-height: 62px;
+        padding: 12px 18px 12px 22px;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .rtx3090-header-main,
+    .rtx3090-header-actions {
+        align-items: center;
+        display: flex;
+    }
+
+    .rtx3090-header-main {
+        gap: 9px;
+        min-width: 0;
+    }
+
+    .rtx3090-header-icon {
+        align-items: center;
+        color: #ff922b;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: 18px;
+        justify-content: center;
+    }
+
+    .rtx3090-modal-header h2 {
+        color: var(--body-text-color);
+        font-size: 18px;
+        line-height: 1.2;
+        margin: 0;
+        white-space: nowrap;
+    }
+
+    .rtx3090-header-scope {
+        color: var(--primary-500);
+        font-size: 16px;
+        white-space: nowrap;
+    }
+
+    .rtx3090-header-actions {
+        flex: 0 0 auto;
+        gap: 10px;
+    }
+
+    .rtx3090-verified {
+        align-items: center;
+        background: var(--button-secondary-background-fill);
+        border: 1px solid var(--button-secondary-border-color);
+        border-radius: 5px;
+        display: inline-flex;
+        font-size: 12px;
+        gap: 5px;
+        padding: 5px 7px;
+        white-space: nowrap;
+    }
+
+    .rtx3090-verified-dot {
+        background: #ff922b;
+        border-radius: 50%;
+        height: 8px;
+        width: 8px;
+    }
+
+    .rtx3090-preset-count {
+        font-size: 16px;
+        white-space: nowrap;
+    }
+
+    .rtx3090-preset-count b {
+        color: var(--primary-500);
+        font-weight: 500;
+    }
+
+    #rtx3090-modal-close {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--body-text-color);
+        cursor: pointer;
+        display: flex;
+        flex: 0 0 30px;
+        font-size: 26px;
+        font-weight: 700;
+        height: 30px;
+        justify-content: center;
+        line-height: 1;
+        padding: 0;
+        width: 30px;
+    }
+
+    #rtx3090-modal-close:hover {
+        color: var(--primary-500);
+    }
+
+    .rtx3090-api-intro {
+        padding-top: 4px;
+    }
+
+    .rtx3090-api-intro p {
+        color: var(--body-text-color);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0 0 13px;
+    }
+
+    .rtx3090-context-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .rtx3090-context-tabs span {
+        align-items: center;
+        border: 1px solid var(--block-border-color);
+        border-radius: 5px;
+        color: var(--body-text-color-subdued);
+        display: inline-flex;
+        font-size: 11px;
+        gap: 5px;
+        padding: 4px 7px;
+    }
+
+    .rtx3090-context-tabs span.active {
+        border-color: var(--body-text-color);
+        color: var(--body-text-color);
+    }
+
+    .rtx3090-section-heading {
+        align-items: baseline;
+        color: var(--body-text-color);
+        display: flex;
+        font-size: 13px;
+        gap: 5px;
+        line-height: 1.5;
+        margin: 1px 0 -4px;
+    }
+
+    .rtx3090-section-heading span {
+        color: var(--body-text-color-subdued);
+        font-size: 12px;
+    }
+
+    .rtx3090-machine-strip {
+        align-items: center;
+        background: var(--block-background-fill);
+        border: 1px solid var(--block-border-color);
+        border-radius: 8px;
+        display: flex;
+        gap: 11px;
+        padding: 12px 14px;
+    }
+
+    .rtx3090-machine-badge {
+        background: #4263eb;
+        border-radius: 8px;
+        color: white;
         flex: 0 0 auto;
         font-size: 12px;
         font-weight: 800;
-        justify-content: center;
-        min-height: 34px;
-        padding: 0 10px;
+        padding: 8px 10px;
     }
 
-    .rtx-preset-copy strong,
-    .rtx-preset-copy span {
+    .rtx3090-machine-strip strong,
+    .rtx3090-machine-strip span {
         display: block;
     }
 
-    .rtx-preset-copy strong {
+    .rtx3090-machine-strip strong {
         font-size: 13px;
-        margin-bottom: 3px;
+        margin-bottom: 2px;
     }
 
-    .rtx-preset-copy span,
-    .rtx-preset-footnote {
+    .rtx3090-machine-strip span {
         color: var(--body-text-color-subdued);
         font-size: 11px;
         line-height: 1.45;
     }
 
-    .rtx-preset-actions {
-        gap: 8px;
+    .rtx3090-profile-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rtx3090-profile-card {
+        background: var(--block-background-fill);
+        border: 1px solid var(--block-border-color);
+        border-radius: 11px;
+        padding: 14px;
+    }
+
+    .rtx3090-profile-card.quality {
+        border-color: rgba(66, 99, 235, 0.72);
+        box-shadow: inset 3px 0 0 #4263eb;
+    }
+
+    .rtx3090-profile-card.safe {
+        box-shadow: inset 3px 0 0 #2f9e44;
+    }
+
+    .rtx3090-profile-card h3 {
+        font-size: 13px;
+        margin: 0 0 4px;
+    }
+
+    .rtx3090-profile-card p {
+        color: var(--body-text-color-subdued);
+        font-size: 11px;
+        line-height: 1.45;
+        margin: 0 0 11px;
+    }
+
+    .rtx3090-profile-values {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .rtx3090-profile-values span {
+        background: var(--background-fill-secondary);
+        border-radius: 7px;
+        color: var(--body-text-color-subdued);
+        font-size: 10px;
+        padding: 7px 5px;
+        text-align: center;
+    }
+
+    .rtx3090-profile-values b {
+        color: var(--body-text-color);
+        display: block;
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+
+    #rtx3090-modal .rtx-preset-actions {
+        gap: 10px;
+    }
+
+    #rtx3090-modal .rtx-preset-actions button {
+        min-height: 42px;
     }
 
     .rtx-preset-status {
@@ -768,55 +1048,53 @@ def build_app():
         line-height: 1.45;
     }
 
-    #rtx3090-quickbar {
-        align-items: center;
+    .rtx3090-modal-note {
         background: var(--block-background-fill);
         border: 1px solid var(--block-border-color);
-        border-radius: 12px;
-        margin-top: 14px;
-        padding: 8px 10px;
-    }
-
-    #rtx3090-quickbar .column {
-        justify-content: center;
-    }
-
-    .rtx-quickbar-copy {
-        align-items: center;
-        display: flex;
-        gap: 10px;
-    }
-
-    .rtx-quickbar-icon {
-        align-items: center;
-        background: rgba(66, 99, 235, 0.16);
-        border: 1px solid rgba(99, 130, 255, 0.38);
-        border-radius: 9px;
-        color: #748ffc;
-        display: flex;
-        flex: 0 0 34px;
-        font-size: 17px;
-        height: 34px;
-        justify-content: center;
-    }
-
-    .rtx-quickbar-text strong,
-    .rtx-quickbar-text span {
-        display: block;
-    }
-
-    .rtx-quickbar-text strong {
-        font-size: 12px;
-        margin-bottom: 2px;
-    }
-
-    .rtx-quickbar-text span {
+        border-radius: 10px;
         color: var(--body-text-color-subdued);
-        font-size: 10px;
-        line-height: 1.35;
+        font-size: 11px;
+        line-height: 1.5;
+        padding: 11px 13px;
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 720px) {
+        #rtx3090-modal {
+            padding: 0 !important;
+        }
+
+        #rtx3090-modal .rtx3090-modal-panel {
+            border-radius: 0;
+            flex-basis: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            padding-left: 14px;
+            padding-right: 14px;
+            width: 100vw;
+        }
+
+        .rtx3090-modal-header {
+            margin-left: -14px;
+            margin-right: -14px;
+            padding: 16px 14px;
+        }
+
+        .rtx3090-header-scope,
+        .rtx3090-verified,
+        .rtx3090-preset-count {
+            display: none;
+        }
+
+        .rtx3090-modal-header h2 {
+            font-size: 15px;
+            white-space: normal;
+        }
+
+        .rtx3090-profile-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .rtx3090-profile-values,
         .rtx-preset-values {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -824,7 +1102,109 @@ def build_app():
 
     """
 
-    with gr.Blocks(theme=gr.themes.Base(), title=title, analytics_enabled=False, css=custom_css) as demo:
+    custom_js = """
+    () => {
+        const modalId = "rtx3090-modal";
+        const footerButtonId = "rtx3090-footer-trigger";
+        const modal = () => document.getElementById(modalId);
+
+        const setModalOpen = (isOpen) => {
+            const element = modal();
+            if (!element) return;
+            element.classList.toggle("rtx-open", isOpen);
+            element.setAttribute("aria-hidden", String(!isOpen));
+            document.body.classList.toggle("rtx3090-modal-open", isOpen);
+            if (isOpen) {
+                document.getElementById("rtx3090-modal-close")?.focus();
+            }
+        };
+
+        const syncFromUrl = () => {
+            const url = new URL(window.location.href);
+            setModalOpen(url.searchParams.get("view") === "rtx3090");
+        };
+
+        const openModal = () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("view", "rtx3090");
+            window.history.pushState({}, "", url);
+            setModalOpen(true);
+        };
+
+        const closeModal = () => {
+            const url = new URL(window.location.href);
+            if (url.searchParams.get("view") === "rtx3090") {
+                url.searchParams.delete("view");
+                window.history.pushState({}, "", url);
+            }
+            setModalOpen(false);
+        };
+
+        const installFooterItem = () => {
+            const footer = document.querySelector("gradio-app footer") || document.querySelector("footer");
+            if (!footer || document.getElementById(footerButtonId)) return;
+
+            const builtWith = footer.querySelector("a.built-with");
+            const settings = footer.querySelector("button.settings");
+            const anchor = builtWith || settings;
+            if (!anchor) return;
+
+            const trigger = document.createElement("button");
+            trigger.id = footerButtonId;
+            trigger.type = "button";
+            trigger.className = "rtx3090-footer-trigger";
+            trigger.setAttribute("aria-haspopup", "dialog");
+            trigger.innerHTML = '<span class="rtx3090-footer-icon">⚡</span><span>RTX 3090 - Cấu hình đề xuất</span>';
+            trigger.addEventListener("click", openModal);
+
+            const divider = document.createElement("div");
+            divider.className = "divider rtx3090-footer-divider";
+            divider.textContent = "·";
+
+            footer.insertBefore(trigger, anchor);
+            footer.insertBefore(divider, anchor);
+        };
+
+        const wireModal = () => {
+            const element = modal();
+            if (!element || element.dataset.rtxWired === "true") return;
+            element.dataset.rtxWired = "true";
+            element.setAttribute("role", "dialog");
+            element.setAttribute("aria-modal", "true");
+            element.setAttribute("aria-labelledby", "rtx3090-modal-title");
+            element.setAttribute("aria-hidden", "true");
+            element.addEventListener("click", (event) => {
+                if (event.target === element) closeModal();
+            });
+            document.getElementById("rtx3090-modal-close")?.addEventListener("click", closeModal);
+        };
+
+        const observer = new MutationObserver(() => {
+            installFooterItem();
+            wireModal();
+        });
+        observer.observe(document.body, {childList: true, subtree: true});
+
+        installFooterItem();
+        wireModal();
+        syncFromUrl();
+
+        window.addEventListener("popstate", syncFromUrl);
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && modal()?.classList.contains("rtx-open")) {
+                closeModal();
+            }
+        });
+    }
+    """ if MV_MODE and args.device == 'cuda' else "() => {}"
+
+    with gr.Blocks(
+        theme=gr.themes.Base(),
+        title=title,
+        analytics_enabled=False,
+        css=custom_css,
+        js=custom_js,
+    ) as demo:
         gr.HTML(title_html)
 
         with gr.Row():
@@ -905,43 +1285,6 @@ Fast for very complex cases, Standard seldom use.',
                             choices=['Low', 'Standard', 'High'],
                             value='Standard')
                     with gr.Tab('Advanced Options', id='tab_advanced_options'):
-                        with gr.Accordion(
-                            'RTX 3090 · Cấu hình đề xuất',
-                            open=True,
-                            elem_id='rtx3090-preset',
-                            visible=MV_MODE and args.device == 'cuda',
-                        ):
-                            gr.HTML("""
-                            <div class="rtx-preset-intro">
-                                <div class="rtx-preset-gpu">24 GB</div>
-                                <div class="rtx-preset-copy">
-                                    <strong>Một nút tối ưu cho cả 1 ảnh và 4 ảnh</strong>
-                                    <span>
-                                        Giữ Mặc định an toàn cho lần thử đầu. Chọn Chất lượng cao
-                                        khi ảnh đã đúng; preset này tăng chi tiết mesh mà vẫn được
-                                        kiểm chứng không OOM trên máy hiện tại.
-                                    </span>
-                                </div>
-                            </div>
-                            """)
-                            with gr.Row(elem_classes='rtx-preset-actions'):
-                                rtx_quality_preset = gr.Button(
-                                    value='Chất lượng cao · RTX 3090',
-                                    variant='primary',
-                                    min_width=120,
-                                )
-                                rtx_safe_preset = gr.Button(
-                                    value='Khôi phục mặc định an toàn',
-                                    min_width=120,
-                                )
-                            rtx_preset_status = gr.HTML(get_rtx3090_preset('safe')[-1])
-                            gr.HTML("""
-                            <div class="rtx-preset-footnote">
-                                Seed không làm tăng VRAM: bật Randomize để thử biến thể, tắt để
-                                tái tạo đúng kết quả. Chunks 8000 cân bằng tốc độ/bộ nhớ và không
-                                làm tăng độ đẹp. Không đặt Octree 512 làm mặc định.
-                            </div>
-                            """)
                         with gr.Row():
                             check_box_rembg = gr.Checkbox(
                                 value=not MV_MODE,
@@ -1007,34 +1350,111 @@ Fast for very complex cases, Standard seldom use.',
                             gr.Examples(examples=example_is, inputs=[image],
                                         label=None, examples_per_page=18)
 
-        with gr.Row(
-            elem_id='rtx3090-quickbar',
+        with gr.Column(
+            elem_id='rtx3090-modal',
             visible=MV_MODE and args.device == 'cuda',
         ):
-            with gr.Column(scale=7, min_width=300):
+            with gr.Column(elem_classes='rtx3090-modal-panel'):
                 gr.HTML("""
-                <div class="rtx-quickbar-copy">
-                    <div class="rtx-quickbar-icon">⚡</div>
-                    <div class="rtx-quickbar-text">
-                        <strong>Máy hiện tại · RTX 3090 · 24 GB VRAM</strong>
+                <div class="rtx3090-modal-header">
+                    <div class="rtx3090-header-main">
+                        <span class="rtx3090-header-icon">⚡</span>
+                        <h2 id="rtx3090-modal-title">RTX 3090 · Cấu hình đề xuất</h2>
+                        <span class="rtx3090-header-scope">1 ảnh &amp; 4 ảnh</span>
+                    </div>
+                    <div class="rtx3090-header-actions">
+                        <span class="rtx3090-verified">
+                            <i class="rtx3090-verified-dot"></i>
+                            Đã kiểm tra
+                        </span>
+                        <span class="rtx3090-preset-count"><b>2</b> preset</span>
+                        <button id="rtx3090-modal-close" type="button" aria-label="Đóng">×</button>
+                    </div>
+                </div>
+                """)
+                gr.HTML("""
+                <div class="rtx3090-api-intro">
+                    <p>
+                        Chọn một trong các cấu hình dưới đây để tối ưu chất lượng mesh trên
+                        máy hiện tại. Các giá trị sẽ được cập nhật trực tiếp vào
+                        <strong>Advanced Options</strong>.
+                    </p>
+                    <div class="rtx3090-context-tabs">
+                        <span class="active">⚡ RTX 3090</span>
+                        <span>▣ 24 GB VRAM</span>
+                        <span>1 ảnh</span>
+                        <span>4 ảnh</span>
+                        <span>FP16</span>
+                    </div>
+                </div>
+                """)
+                gr.HTML("""
+                <div class="rtx3090-section-heading">
+                    <b>1. Xác nhận cấu hình máy.</b>
+                    <span>Hai preset này dành riêng cho RTX 3090 24 GB đang chạy WebUI.</span>
+                </div>
+                """)
+                gr.HTML("""
+                <div class="rtx3090-machine-strip">
+                    <div class="rtx3090-machine-badge">24 GB</div>
+                    <div>
+                        <strong>NVIDIA GeForce RTX 3090 · CUDA · FP16</strong>
                         <span>
-                            Áp dụng nhanh cho cả 1 ảnh và 4 ảnh. Chi tiết nằm trong
-                            Advanced Options → RTX 3090 · Cấu hình đề xuất.
+                            Hai mức dưới đây đã được kiểm tra end-to-end trên chính máy này,
+                            không gặp lỗi thiếu VRAM với cả đầu vào 1 ảnh và 4 ảnh.
                         </span>
                     </div>
                 </div>
                 """)
-            with gr.Column(scale=2, min_width=160):
-                rtx_quick_safe_preset = gr.Button(
-                    value='256 · An toàn',
-                    min_width=140,
-                )
-            with gr.Column(scale=2, min_width=180):
-                rtx_quick_quality_preset = gr.Button(
-                    value='384 · Chất lượng cao',
-                    variant='primary',
-                    min_width=160,
-                )
+                gr.HTML("""
+                <div class="rtx3090-section-heading">
+                    <b>2. Chọn mức phù hợp rồi bấm Áp dụng.</b>
+                    <span>Thông số bên dưới dùng chung cho cả chế độ 1 ảnh và 4 ảnh.</span>
+                </div>
+                """)
+                gr.HTML("""
+                <div class="rtx3090-profile-grid">
+                    <article class="rtx3090-profile-card safe">
+                        <h3>256 · Mặc định an toàn</h3>
+                        <p>Dùng cho lần chạy đầu hoặc khi cần ưu tiên ổn định và tốc độ.</p>
+                        <div class="rtx3090-profile-values">
+                            <span><b>30</b>Steps</span>
+                            <span><b>5.0</b>Guidance</span>
+                            <span><b>256</b>Octree</span>
+                            <span><b>8000</b>Chunks</span>
+                        </div>
+                    </article>
+                    <article class="rtx3090-profile-card quality">
+                        <h3>384 · Chất lượng cao</h3>
+                        <p>Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.</p>
+                        <div class="rtx3090-profile-values">
+                            <span><b>30</b>Steps</span>
+                            <span><b>5.0</b>Guidance</span>
+                            <span><b>384</b>Octree</span>
+                            <span><b>8000</b>Chunks</span>
+                        </div>
+                    </article>
+                </div>
+                """)
+                with gr.Row(elem_classes='rtx-preset-actions'):
+                    rtx_safe_preset = gr.Button(
+                        value='Áp dụng · 256 an toàn',
+                        min_width=160,
+                    )
+                    rtx_quality_preset = gr.Button(
+                        value='Áp dụng · 384 chất lượng cao',
+                        variant='primary',
+                        min_width=180,
+                    )
+                rtx_preset_status = gr.HTML(get_rtx3090_preset('safe')[-1])
+                gr.HTML("""
+                <div class="rtx3090-modal-note">
+                    <strong>Lưu ý:</strong> Seed không làm tăng VRAM. Bật Randomize để thử biến
+                    thể, tắt để tái tạo đúng kết quả. Chunks 8000 cân bằng tốc độ/bộ nhớ và
+                    không làm mesh đẹp hơn khi tăng quá cao. Không đặt Octree 512 làm mặc định
+                    trên RTX 3090 24 GB.
+                </div>
+                """)
 
         tab_ip.select(
             fn=lambda: (
@@ -1069,18 +1489,6 @@ Fast for very complex cases, Standard seldom use.',
             api_name=False,
         )
         rtx_safe_preset.click(
-            fn=lambda: get_rtx3090_preset('safe'),
-            outputs=rtx_preset_outputs,
-            queue=False,
-            api_name=False,
-        )
-        rtx_quick_quality_preset.click(
-            fn=lambda: get_rtx3090_preset('quality'),
-            outputs=rtx_preset_outputs,
-            queue=False,
-            api_name=False,
-        )
-        rtx_quick_safe_preset.click(
             fn=lambda: get_rtx3090_preset('safe'),
             outputs=rtx_preset_outputs,
             queue=False,
