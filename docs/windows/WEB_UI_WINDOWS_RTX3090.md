@@ -107,11 +107,40 @@ Dependency tối thiểu không cài `rembg`, vì bản này ưu tiên PNG đã 
 
 ## Output và log
 
-Mỗi lượt tạo mesh nằm trong một thư mục UUID tại:
+### Generation Console
+
+Vùng bên phải Web UI là `Generation Console`. Khi nhấn Generate, console theo
+dõi manifest của đúng UUID và hiển thị các bước backend thực tế: kiểm tra input,
+lưu ảnh nguồn, preprocessing, diffusion inference, tách mesh, export GLB và dựng
+preview. Khi hoàn tất, console hiển thị số vertices/faces, tổng thời gian và đường
+dẫn GLB; nếu lỗi, console chuyển sang `FAILED` và hiện nguyên nhân đã ghi trong
+manifest. Đây là tiến trình inference/tạo mô hình 3D, không phải tiến trình train
+trọng số AI.
+
+Khi nhấn Generate, Web UI tạo một UUID mới và thêm vào URL hiện tại:
 
 ```text
-hy3dshape\output_folder\webui\<uuid>\white_mesh.glb
+http://127.0.0.1:8080/?tab=single-view&generation=<uuid>
+http://127.0.0.1:8080/?tab=multi-view&generation=<uuid>
 ```
+
+Khi lượt Generate hoàn tất thành công, UUID trên URL cũng là tên thư mục lưu
+và thư mục có dạng:
+
+```text
+hy3dshape\output_folder\webui\<uuid>\
+├── generation.json
+├── input_front.png
+├── white_mesh.glb
+└── white_mesh.html
+```
+
+Với chế độ bốn ảnh, thư mục có thêm `input_back.png`, `input_left.png` và
+`input_right.png`. `generation.json` lưu trạng thái `processing`, `completed`
+hoặc `failed`, cấu hình inference cùng dữ liệu thời gian, input và output khi có.
+Nếu Generate lỗi, manifest và những input đã lưu được vẫn được giữ để truy vết;
+GLB/HTML có thể chưa tồn tại. Cache Web UI giữ tối đa 200 thư mục generation và
+tự xóa thư mục cũ nhất khi tạo lượt mới.
 
 Log server và PID nằm tại:
 

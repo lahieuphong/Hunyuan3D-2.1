@@ -29,13 +29,16 @@ except Exception as e:
     print(f"Warning: Failed to apply torchvision fix: {e}")
 
 
+import json
 import os
 import random
 import shutil
 import subprocess
 import time
+from datetime import datetime, timezone
 from glob import glob
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import gradio as gr
 import torch
@@ -209,7 +212,174 @@ def get_example_txt_list():
     return txt_list
 
 
-def gen_save_folder(max_size=200):
+def utc_now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+class GenerationUidConflictError(Exception):
+    """Raised when a request tries to reuse an existing generation folder."""
+
+
+def normalize_generation_uid(generation_uid=None):
+    if generation_uid is None or not str(generation_uid).strip():
+        return str(uuid.uuid4())
+    try:
+        return str(uuid.UUID(str(generation_uid).strip()))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise gr.Error("Generation UID không hợp lệ. Hãy tải lại trang và thử lại.") from exc
+
+
+def generation_uid_from_request(request=None):
+    if request is not None:
+        referer = request.headers.get('referer', '')
+        generation_values = parse_qs(urlparse(referer).query).get('generation', [])
+        if generation_values:
+            return normalize_generation_uid(generation_values[0])
+    return normalize_generation_uid()
+
+
+def generation_storage_path(save_folder):
+    try:
+        storage_path = os.path.relpath(save_folder, start=os.getcwd())
+    except ValueError:
+        storage_path = os.path.abspath(save_folder)
+    return storage_path.replace(os.sep, '/')
+
+
+def write_generation_manifest(save_folder, **updates):
+    manifest_path = os.path.join(save_folder, 'generation.json')
+    manifest = {}
+    if os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+                manifest = json.load(manifest_file)
+        except (OSError, json.JSONDecodeError):
+            logger.warning("Could not read generation manifest: %s", manifest_path)
+
+    manifest.update(updates)
+    temp_path = f"{manifest_path}.tmp"
+    with open(temp_path, 'w', encoding='utf-8') as manifest_file:
+        json.dump(
+            manifest,
+            manifest_file,
+            ensure_ascii=False,
+            indent=2,
+            default=lambda value: value.item() if isinstance(value, np.generic) else str(value),
+        )
+    for attempt in range(10):
+        try:
+            os.replace(temp_path, manifest_path)
+            break
+        except PermissionError:
+            if attempt == 9:
+                raise
+            time.sleep(0.01 * (attempt + 1))
+    return manifest_path
+
+
+GENERATION_STAGE_PROGRESS = {
+    'request_received': 3,
+    'validating_input': 8,
+    'input_validated': 15,
+    'input_saved': 22,
+    'preprocessing_input': 30,
+    'input_ready': 38,
+    'shape_generation': 45,
+    'extracting_mesh': 78,
+    'mesh_ready': 85,
+    'exporting_glb': 90,
+    'building_preview': 96,
+    'completed': 100,
+    'failed': 100,
+}
+
+
+GENERATION_STAGE_MESSAGES = {
+    'request_received': 'Generation request accepted',
+    'validating_input': 'Validating input payload',
+    'input_validated': 'Input validation completed',
+    'input_saved': 'Input snapshots saved to source storage',
+    'preprocessing_input': 'Preprocessing input views',
+    'input_ready': 'Input tensor is ready for inference',
+    'shape_generation': 'Running Hunyuan3D diffusion inference',
+    'extracting_mesh': 'Extracting mesh geometry',
+    'mesh_ready': 'Mesh geometry is ready',
+    'exporting_glb': 'Exporting binary GLB',
+    'building_preview': 'Building interactive 3D preview',
+    'completed': 'Generation completed successfully',
+    'failed': 'Generation failed',
+}
+
+
+def update_generation_stage(save_folder, stage, message=None, **updates):
+    manifest_path = os.path.join(save_folder, 'generation.json')
+    manifest = {}
+    if os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+                manifest = json.load(manifest_file)
+        except (OSError, json.JSONDecodeError):
+            logger.warning("Could not read generation stage history: %s", manifest_path)
+
+    updated_at = utc_now_iso()
+    events = list(manifest.get('events', []))
+    events.append({
+        'stage': stage,
+        'message': message or GENERATION_STAGE_MESSAGES.get(stage, stage),
+        'at': updated_at,
+        'progress': GENERATION_STAGE_PROGRESS.get(stage, 0),
+    })
+    updates.update({
+        'stage': stage,
+        'progress': GENERATION_STAGE_PROGRESS.get(stage, 0),
+        'updated_at': updated_at,
+        'events': events,
+    })
+    return write_generation_manifest(save_folder, **updates)
+
+
+def save_generation_inputs(save_folder, image):
+    input_files = {}
+    images = image if isinstance(image, dict) else {'image': image}
+    for view_name, view_image in images.items():
+        if view_image is None or not hasattr(view_image, 'save'):
+            continue
+        safe_view_name = ''.join(
+            character for character in str(view_name).lower()
+            if character.isalnum() or character in ('-', '_')
+        ) or 'image'
+        filename = f"input_{safe_view_name}.png"
+        try:
+            view_image.save(os.path.join(save_folder, filename), format='PNG')
+            input_files[str(view_name)] = filename
+        except Exception as exc:
+            logger.warning("Could not save generation input %s: %s", view_name, exc)
+    return input_files
+
+
+def mark_generation_failed(generation_uid, error):
+    if generation_uid is None:
+        return
+    save_folder = os.path.join(SAVE_DIR, str(generation_uid))
+    if not os.path.isdir(save_folder):
+        return
+    try:
+        update_generation_stage(
+            save_folder,
+            'failed',
+            status='failed',
+            failed_at=utc_now_iso(),
+            error=str(error),
+        )
+    except Exception as manifest_error:
+        logger.warning(
+            "Could not mark generation %s as failed: %s",
+            generation_uid,
+            manifest_error,
+        )
+
+
+def gen_save_folder(max_size=200, generation_uid=None):
     """
     Generate a new save folder inside SAVE_DIR, maintaining a maximum number of folders.
 
@@ -218,17 +388,39 @@ def gen_save_folder(max_size=200):
     Args:
         max_size (int, optional): Maximum number of folders to keep in SAVE_DIR. Defaults to 200.
 
+        generation_uid (str, optional): UUID to use as the folder name. A UUID is
+            generated automatically when omitted.
+
     Returns:
         str: Path to the newly created save folder.
     """
     os.makedirs(SAVE_DIR, exist_ok=True)
-    dirs = [f for f in Path(SAVE_DIR).iterdir() if f.is_dir()]
+    generation_uid = normalize_generation_uid(generation_uid)
+    new_folder = os.path.join(SAVE_DIR, generation_uid)
+    if os.path.exists(new_folder):
+        raise GenerationUidConflictError(
+            f"Generation UID đã tồn tại: {generation_uid}"
+        )
+
+    dirs = []
+    for candidate in Path(SAVE_DIR).iterdir():
+        if not candidate.is_dir():
+            continue
+        try:
+            uuid.UUID(candidate.name)
+        except ValueError:
+            continue
+        dirs.append(candidate)
     if len(dirs) >= max_size:
         oldest_dir = min(dirs, key=lambda x: x.stat().st_ctime)
         shutil.rmtree(oldest_dir)
         print(f"Removed the oldest folder: {oldest_dir}")
-    new_folder = os.path.join(SAVE_DIR, str(uuid.uuid4()))
-    os.makedirs(new_folder, exist_ok=True)
+    try:
+        os.makedirs(new_folder, exist_ok=False)
+    except FileExistsError as exc:
+        raise GenerationUidConflictError(
+            f"Generation UID đã tồn tại: {generation_uid}"
+        ) from exc
     print(f"Created new folder: {new_folder}")
     return new_folder
 
@@ -327,7 +519,34 @@ def _gen_shape(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
+    generation_uid=None,
 ):
+    tracking_enabled = generation_uid is not None and bool(str(generation_uid).strip())
+    save_folder = None
+    generation_created_at = None
+    if tracking_enabled:
+        generation_uid = normalize_generation_uid(generation_uid)
+        save_folder = gen_save_folder(generation_uid=generation_uid)
+        generation_created_at = utc_now_iso()
+        write_generation_manifest(
+            save_folder,
+            schema_version=1,
+            generation_uid=generation_uid,
+            status='processing',
+            stage='request_received',
+            progress=GENERATION_STAGE_PROGRESS['request_received'],
+            created_at=generation_created_at,
+            updated_at=generation_created_at,
+            storage_folder=generation_storage_path(save_folder),
+            events=[{
+                'stage': 'request_received',
+                'message': GENERATION_STAGE_MESSAGES['request_received'],
+                'at': generation_created_at,
+                'progress': GENERATION_STAGE_PROGRESS['request_received'],
+            }],
+        )
+        update_generation_stage(save_folder, 'validating_input')
+
     if not MV_MODE and image is None and caption is None:
         raise gr.Error("Please provide either a caption or an image.")
     if MV_MODE:
@@ -356,11 +575,19 @@ def _gen_shape(
     else:
         input_mode = 'single'
 
+    if tracking_enabled:
+        update_generation_stage(
+            save_folder,
+            'input_validated',
+            input_mode=input_mode,
+        )
+
     seed = int(randomize_seed_fn(seed, randomize_seed))
 
     octree_resolution = int(octree_resolution)
     if caption: print('prompt is', caption)
-    save_folder = gen_save_folder()
+    if save_folder is None:
+        save_folder = gen_save_folder()
     stats = {
         'model': {
             'shapegen': f'{args.model_path}/{args.subfolder}',
@@ -378,6 +605,13 @@ def _gen_shape(
             'num_chunks': num_chunks,
         }
     }
+    if tracking_enabled:
+        stats['generation'] = {
+            'uid': generation_uid,
+            'status': 'processing',
+            'created_at': generation_created_at,
+            'storage_folder': generation_storage_path(save_folder),
+        }
     time_meta = {}
 
     if image is None:
@@ -389,8 +623,20 @@ def _gen_shape(
             Please enable it by `python gradio_app.py --enable_t23d`.")
         time_meta['text2image'] = time.time() - start_time
 
-    # remove disk io to make responding faster, uncomment at your will.
-    # image.save(os.path.join(save_folder, 'input.png'))
+    if tracking_enabled:
+        input_files = save_generation_inputs(save_folder, image)
+        stats['generation']['inputs'] = input_files
+        update_generation_stage(
+            save_folder,
+            'input_saved',
+            model=stats['model'],
+            params=stats['params'],
+            inputs=input_files,
+        )
+
+    if tracking_enabled:
+        update_generation_stage(save_folder, 'preprocessing_input')
+
     if MV_MODE:
         start_time = time.time()
         for k, v in image.items():
@@ -404,6 +650,9 @@ def _gen_shape(
             image = get_background_remover()(image.convert('RGB'))
             time_meta['remove background'] = time.time() - start_time
 
+    if tracking_enabled:
+        update_generation_stage(save_folder, 'input_ready')
+
     # remove disk io to make responding faster, uncomment at your will.
     # image.save(os.path.join(save_folder, 'rembg.png'))
 
@@ -412,6 +661,12 @@ def _gen_shape(
 
     generator = torch.Generator()
     generator = generator.manual_seed(int(seed))
+    if tracking_enabled:
+        update_generation_stage(
+            save_folder,
+            'shape_generation',
+            message=f'Running {steps} diffusion steps at octree {octree_resolution}',
+        )
     outputs = i23d_worker(
         image=image,
         num_inference_steps=steps,
@@ -425,11 +680,21 @@ def _gen_shape(
     logger.info("---Shape generation takes %s seconds ---" % (time.time() - start_time))
 
     tmp_start = time.time()
+    if tracking_enabled:
+        update_generation_stage(save_folder, 'extracting_mesh')
     mesh = export_to_trimesh(outputs)[0]
     time_meta['export to trimesh'] = time.time() - tmp_start
 
     stats['number_of_faces'] = mesh.faces.shape[0]
     stats['number_of_vertices'] = mesh.vertices.shape[0]
+
+    if tracking_enabled:
+        update_generation_stage(
+            save_folder,
+            'mesh_ready',
+            number_of_faces=stats['number_of_faces'],
+            number_of_vertices=stats['number_of_vertices'],
+        )
 
     stats['time'] = time_meta
     main_image = image if not MV_MODE else image.get('front', next(iter(image.values())))
@@ -536,29 +801,69 @@ def shape_generation(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
+    request: gr.Request = None,
 ):
     start_time_0 = time.time()
-    mesh, image, save_folder, stats, seed = _gen_shape(
-        caption=caption,
-        input_mode=input_mode,
-        image=image,
-        mv_image_front=mv_image_front,
-        mv_image_back=mv_image_back,
-        mv_image_left=mv_image_left,
-        mv_image_right=mv_image_right,
-        steps=steps,
-        guidance_scale=guidance_scale,
-        seed=seed,
-        octree_resolution=octree_resolution,
-        check_box_rembg=check_box_rembg,
-        num_chunks=num_chunks,
-        randomize_seed=randomize_seed,
-    )
+    generation_uid = generation_uid_from_request(request)
+    try:
+        result = _gen_shape(
+            caption=caption,
+            input_mode=input_mode,
+            image=image,
+            mv_image_front=mv_image_front,
+            mv_image_back=mv_image_back,
+            mv_image_left=mv_image_left,
+            mv_image_right=mv_image_right,
+            steps=steps,
+            guidance_scale=guidance_scale,
+            seed=seed,
+            octree_resolution=octree_resolution,
+            check_box_rembg=check_box_rembg,
+            num_chunks=num_chunks,
+            randomize_seed=randomize_seed,
+            generation_uid=generation_uid,
+        )
+    except GenerationUidConflictError as exc:
+        raise gr.Error(str(exc)) from exc
+    except Exception as exc:
+        mark_generation_failed(generation_uid, exc)
+        raise
+
+    mesh, image, save_folder, stats, seed = result
     stats['time']['total'] = time.time() - start_time_0
+    completed_at = utc_now_iso()
+    outputs = {
+        'mesh': 'white_mesh.glb',
+        'viewer': 'white_mesh.html',
+    }
+    stats['generation'].update({
+        'status': 'completed',
+        'completed_at': completed_at,
+        'outputs': outputs,
+    })
     mesh.metadata['extras'] = stats
 
-    path = export_mesh(mesh, save_folder, textured=False)
-    model_viewer_html = build_model_viewer_html(save_folder, height=HTML_HEIGHT, width=HTML_WIDTH)
+    try:
+        update_generation_stage(save_folder, 'exporting_glb')
+        path = export_mesh(mesh, save_folder, textured=False)
+        update_generation_stage(save_folder, 'building_preview')
+        model_viewer_html = build_model_viewer_html(
+            save_folder,
+            height=HTML_HEIGHT,
+            width=HTML_WIDTH,
+        )
+        update_generation_stage(
+            save_folder,
+            'completed',
+            status='completed',
+            completed_at=completed_at,
+            outputs=outputs,
+            stats=stats,
+        )
+    except Exception as exc:
+        mark_generation_failed(generation_uid, exc)
+        raise
+
     if args.low_vram_mode:
         torch.cuda.empty_cache()
     return (
@@ -590,8 +895,317 @@ def build_app():
     """
     custom_css = """
     .gradio-container {
-        max-width: 1480px !important;
+        max-width: 1880px !important;
     }
+
+    #generation-console-panel {
+        background: transparent !important;
+        border: 0 !important;
+        min-width: 320px;
+        padding: 0 !important;
+    }
+
+    #generation-console-panel .html-container {
+        height: 100%;
+        overflow: visible;
+        padding: 0;
+    }
+
+    .generation-console {
+        --console-accent: #5c7cfa;
+        --console-border: #30343d;
+        --console-green: #51cf66;
+        --console-muted: #8b93a7;
+        background: #0b0d11;
+        border: 1px solid var(--console-border);
+        border-radius: 10px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+        color: #d8dee9;
+        display: flex;
+        flex-direction: column;
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        height: 690px;
+        min-height: 520px;
+        overflow: hidden;
+    }
+
+    .generation-console-windowbar {
+        align-items: center;
+        background: #151820;
+        border-bottom: 1px solid var(--console-border);
+        display: flex;
+        gap: 11px;
+        min-height: 54px;
+        padding: 0 14px;
+    }
+
+    .generation-console-dots {
+        display: flex;
+        gap: 6px;
+    }
+
+    .generation-console-dots i {
+        border-radius: 999px;
+        display: block;
+        height: 8px;
+        width: 8px;
+    }
+
+    .generation-console-dots i:nth-child(1) { background: #ff6b6b; }
+    .generation-console-dots i:nth-child(2) { background: #ffd43b; }
+    .generation-console-dots i:nth-child(3) { background: #51cf66; }
+
+    .generation-console-title {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .generation-console-title strong,
+    .generation-console-title span {
+        display: block;
+    }
+
+    .generation-console-title strong {
+        color: #f1f3f5;
+        font-family: var(--font);
+        font-size: 13px;
+        line-height: 1.25;
+    }
+
+    .generation-console-title span {
+        color: var(--console-muted);
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        margin-top: 2px;
+    }
+
+    .generation-console-status {
+        align-items: center;
+        background: rgba(139, 147, 167, 0.12);
+        border: 1px solid rgba(139, 147, 167, 0.28);
+        border-radius: 999px;
+        color: #adb5bd;
+        display: inline-flex;
+        font-size: 9px;
+        font-weight: 800;
+        gap: 6px;
+        letter-spacing: 0.06em;
+        padding: 5px 8px;
+    }
+
+    .generation-console-status::before {
+        background: currentColor;
+        border-radius: 999px;
+        content: "";
+        height: 6px;
+        width: 6px;
+    }
+
+    .generation-console[data-state="running"] .generation-console-status {
+        background: rgba(81, 207, 102, 0.1);
+        border-color: rgba(81, 207, 102, 0.32);
+        color: var(--console-green);
+    }
+
+    .generation-console[data-state="running"] .generation-console-status::before {
+        animation: generation-console-pulse 1.2s ease-in-out infinite;
+        box-shadow: 0 0 0 4px rgba(81, 207, 102, 0.1);
+    }
+
+    .generation-console[data-state="completed"] .generation-console-status {
+        background: rgba(81, 207, 102, 0.12);
+        border-color: rgba(81, 207, 102, 0.35);
+        color: var(--console-green);
+    }
+
+    .generation-console[data-state="failed"] .generation-console-status {
+        background: rgba(255, 107, 107, 0.12);
+        border-color: rgba(255, 107, 107, 0.35);
+        color: #ff8787;
+    }
+
+    .generation-console-jobbar {
+        align-items: center;
+        background: #10131a;
+        border-bottom: 1px solid #242832;
+        display: flex;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 14px;
+    }
+
+    .generation-console-jobbar > span:first-child {
+        color: #74c0fc;
+        font-size: 12px;
+    }
+
+    .generation-console-job {
+        color: #aab2c3;
+        flex: 1;
+        font-size: 10px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .generation-console-mode {
+        background: #1a1e27;
+        border: 1px solid #303642;
+        border-radius: 4px;
+        color: #bac8ff;
+        font-size: 9px;
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+
+    .generation-console-log {
+        flex: 1;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 14px 12px 18px;
+        scrollbar-color: #343a46 transparent;
+        scrollbar-width: thin;
+    }
+
+    .generation-console-line {
+        align-items: start;
+        display: grid;
+        font-size: 10px;
+        gap: 7px;
+        grid-template-columns: 54px 44px minmax(0, 1fr);
+        line-height: 1.55;
+        margin-bottom: 7px;
+    }
+
+    .generation-console-time {
+        color: #596273;
+        user-select: none;
+    }
+
+    .generation-console-level {
+        color: #74c0fc;
+        font-weight: 800;
+        user-select: none;
+    }
+
+    .generation-console-message {
+        color: #c7cedb;
+        overflow-wrap: anywhere;
+    }
+
+    .generation-console-line[data-kind="command"] .generation-console-level,
+    .generation-console-line[data-kind="command"] .generation-console-message {
+        color: #b197fc;
+    }
+
+    .generation-console-line[data-kind="success"] .generation-console-level,
+    .generation-console-line[data-kind="success"] .generation-console-message {
+        color: #69db7c;
+    }
+
+    .generation-console-line[data-kind="error"] .generation-console-level,
+    .generation-console-line[data-kind="error"] .generation-console-message {
+        color: #ff8787;
+    }
+
+    .generation-console-line[data-kind="muted"] .generation-console-level,
+    .generation-console-line[data-kind="muted"] .generation-console-message {
+        color: #70798c;
+    }
+
+    .generation-console-progress-wrap {
+        background: #10131a;
+        border-top: 1px solid #242832;
+        padding: 11px 14px 10px;
+    }
+
+    .generation-console-progress-meta {
+        align-items: center;
+        color: #828b9e;
+        display: flex;
+        font-size: 9px;
+        justify-content: space-between;
+        margin-bottom: 7px;
+    }
+
+    .generation-console-progress-track {
+        background: #242832;
+        border-radius: 999px;
+        height: 4px;
+        overflow: hidden;
+    }
+
+    .generation-console-progress-bar {
+        background: linear-gradient(90deg, #4263eb, #748ffc, #4dabf7);
+        border-radius: inherit;
+        height: 100%;
+        position: relative;
+        transition: width 420ms ease;
+        width: 0%;
+    }
+
+    .generation-console[data-state="running"] .generation-console-progress-bar::after {
+        animation: generation-console-scan 1.4s linear infinite;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+        content: "";
+        inset: 0;
+        position: absolute;
+        transform: translateX(-100%);
+    }
+
+    .generation-console[data-state="failed"] .generation-console-progress-bar {
+        background: #fa5252;
+    }
+
+    .generation-console-footer {
+        align-items: center;
+        background: #151820;
+        border-top: 1px solid var(--console-border);
+        color: #6f788b;
+        display: flex;
+        font-size: 9px;
+        justify-content: space-between;
+        min-height: 32px;
+        padding: 0 14px;
+    }
+
+    .generation-console-footer strong {
+        color: #748ffc;
+        font-weight: 700;
+    }
+
+    @keyframes generation-console-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+    }
+
+    @keyframes generation-console-scan {
+        to { transform: translateX(100%); }
+    }
+
+    @media (max-width: 1500px) {
+        .gradio-container {
+            max-width: 100% !important;
+        }
+
+        .generation-console {
+            height: 620px;
+        }
+    }
+
+    @media (max-width: 1080px) {
+        #generation-console-panel {
+            min-width: min(100%, 420px);
+        }
+
+        .generation-console {
+            height: 430px;
+            min-height: 430px;
+        }
+    }
+
     .mv-image button .wrap {
         font-size: 10px;
     }
@@ -1102,11 +1716,336 @@ def build_app():
 
     """
 
-    custom_js = """
+    custom_js = r"""
     () => {
         const modalId = "rtx3090-modal";
         const footerButtonId = "rtx3090-footer-trigger";
         const modal = () => document.getElementById(modalId);
+        const tabRoutes = [
+            {slug: "single-view", index: 0},
+            {slug: "multi-view", index: 1},
+        ];
+        let tabRouteInitialized = false;
+
+        const currentAppUrl = () => {
+            const url = new URL(window.location.href);
+            url.pathname = url.pathname.replace(/\/{2,}/g, "/");
+            return url;
+        };
+
+        const createGenerationUid = () => {
+            if (window.crypto && typeof window.crypto.randomUUID === "function") {
+                return window.crypto.randomUUID();
+            }
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+                /[xy]/g,
+                (character) => {
+                    const randomValue = Math.floor(Math.random() * 16);
+                    const value = character === "x" ? randomValue : (randomValue & 0x3) | 0x8;
+                    return value.toString(16);
+                }
+            );
+        };
+
+        let generationConsoleTimer = null;
+        let generationConsoleUid = null;
+        let generationConsoleStartedAt = null;
+        let generationConsoleSeenEvents = new Set();
+        let generationConsoleParamsRendered = false;
+        let generationConsolePollMisses = 0;
+
+        const generationConsoleStageLevels = {
+            request_received: "QUEUE",
+            validating_input: "CHECK",
+            input_validated: "INPUT",
+            input_saved: "STORE",
+            preprocessing_input: "PREP",
+            input_ready: "READY",
+            shape_generation: "CUDA",
+            extracting_mesh: "MESH",
+            mesh_ready: "MESH",
+            exporting_glb: "WRITE",
+            building_preview: "VIEW",
+            completed: "DONE",
+            failed: "ERROR",
+        };
+
+        const generationConsoleElement = (id) => document.getElementById(id);
+
+        const generationConsoleElapsed = (timestamp = null) => {
+            if (!generationConsoleStartedAt) return "+00.0s";
+            const target = timestamp ? new Date(timestamp).getTime() : Date.now();
+            const elapsed = Math.max(0, (target - generationConsoleStartedAt) / 1000);
+            return "+" + elapsed.toFixed(1).padStart(4, "0") + "s";
+        };
+
+        const appendGenerationConsoleLine = (level, message, kind = "info", timestamp = null) => {
+            const log = generationConsoleElement("generation-console-log");
+            if (!log) return;
+
+            const line = document.createElement("div");
+            line.className = "generation-console-line";
+            line.dataset.kind = kind;
+
+            const time = document.createElement("span");
+            time.className = "generation-console-time";
+            time.textContent = generationConsoleElapsed(timestamp);
+
+            const levelElement = document.createElement("span");
+            levelElement.className = "generation-console-level";
+            levelElement.textContent = level;
+
+            const messageElement = document.createElement("span");
+            messageElement.className = "generation-console-message";
+            messageElement.textContent = message;
+
+            line.append(time, levelElement, messageElement);
+            log.appendChild(line);
+            while (log.children.length > 80) log.firstElementChild?.remove();
+            log.scrollTop = log.scrollHeight;
+        };
+
+        const setGenerationConsoleProgress = (progress, stage) => {
+            const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+            const bar = generationConsoleElement("generation-console-progress");
+            const percent = generationConsoleElement("generation-console-percent");
+            const stageElement = generationConsoleElement("generation-console-stage");
+            if (bar) bar.style.width = safeProgress + "%";
+            if (percent) percent.textContent = Math.round(safeProgress) + "%";
+            if (stageElement && stage) stageElement.textContent = stage;
+        };
+
+        const setGenerationConsoleState = (state, label) => {
+            const root = generationConsoleElement("generation-console");
+            const status = generationConsoleElement("generation-console-status");
+            if (root) root.dataset.state = state;
+            if (status) status.textContent = label;
+        };
+
+        const stopGenerationConsolePolling = () => {
+            if (generationConsoleTimer !== null) {
+                window.clearInterval(generationConsoleTimer);
+                generationConsoleTimer = null;
+            }
+        };
+
+        const renderGenerationManifest = (manifest) => {
+            if (!manifest || manifest.generation_uid !== generationConsoleUid) return;
+
+            if (manifest.params && !generationConsoleParamsRendered) {
+                generationConsoleParamsRendered = true;
+                const params = manifest.params;
+                appendGenerationConsoleLine(
+                    "CONFIG",
+                    "steps=" + params.steps
+                        + " guidance=" + params.guidance_scale
+                        + " octree=" + params.octree_resolution
+                        + " chunks=" + params.num_chunks
+                        + " seed=" + params.seed,
+                    "command"
+                );
+            }
+
+            (manifest.events || []).forEach((event) => {
+                const eventKey = event.stage + "|" + event.at;
+                if (generationConsoleSeenEvents.has(eventKey)) return;
+                generationConsoleSeenEvents.add(eventKey);
+                const kind = event.stage === "completed"
+                    ? "success"
+                    : event.stage === "failed" ? "error" : "info";
+                appendGenerationConsoleLine(
+                    generationConsoleStageLevels[event.stage] || "INFO",
+                    event.message || event.stage,
+                    kind,
+                    event.at
+                );
+            });
+
+            setGenerationConsoleProgress(
+                manifest.progress,
+                (manifest.events || []).at(-1)?.message || manifest.stage
+            );
+
+            const clock = generationConsoleElement("generation-console-clock");
+            if (clock) clock.textContent = "LIVE " + generationConsoleElapsed();
+
+            if (manifest.status === "completed") {
+                const stats = manifest.stats || {};
+                if (!generationConsoleSeenEvents.has("__mesh_stats__")) {
+                    generationConsoleSeenEvents.add("__mesh_stats__");
+                    appendGenerationConsoleLine(
+                        "STATS",
+                        "vertices=" + (stats.number_of_vertices ?? "-")
+                            + " faces=" + (stats.number_of_faces ?? "-")
+                            + " total=" + Number(stats.time?.total || 0).toFixed(2) + "s",
+                        "success"
+                    );
+                    appendGenerationConsoleLine(
+                        "OUTPUT",
+                        "hy3dshape/output_folder/webui/" + generationConsoleUid + "/white_mesh.glb",
+                        "success"
+                    );
+                }
+                setGenerationConsoleState("completed", "COMPLETED");
+                setGenerationConsoleProgress(100, "3D model is ready");
+                if (clock) clock.textContent = "SAVED TO SOURCE";
+                stopGenerationConsolePolling();
+            } else if (manifest.status === "failed") {
+                if (!generationConsoleSeenEvents.has("__error__")) {
+                    generationConsoleSeenEvents.add("__error__");
+                    appendGenerationConsoleLine(
+                        "ERROR",
+                        String(manifest.error || "Unknown generation error").replace(/^'|'$/g, ""),
+                        "error"
+                    );
+                }
+                setGenerationConsoleState("failed", "FAILED");
+                setGenerationConsoleProgress(100, "Generation stopped with an error");
+                if (clock) clock.textContent = "ERROR SAVED TO MANIFEST";
+                stopGenerationConsolePolling();
+            } else {
+                setGenerationConsoleState("running", "RUNNING");
+            }
+        };
+
+        const pollGenerationManifest = async () => {
+            const uid = generationConsoleUid;
+            if (!uid) return;
+            try {
+                const response = await fetch(
+                    "/static/" + encodeURIComponent(uid) + "/generation.json?t=" + Date.now(),
+                    {cache: "no-store"}
+                );
+                if (!response.ok) {
+                    generationConsolePollMisses += 1;
+                    if (generationConsolePollMisses === 4) {
+                        appendGenerationConsoleLine("QUEUE", "Waiting for the backend worker...", "muted");
+                        setGenerationConsoleProgress(2, "Waiting in the Gradio queue");
+                    }
+                    return;
+                }
+                generationConsolePollMisses = 0;
+                renderGenerationManifest(await response.json());
+            } catch (error) {
+                generationConsolePollMisses += 1;
+                if (generationConsolePollMisses === 8) {
+                    appendGenerationConsoleLine("WARN", "Manifest polling will retry automatically", "muted");
+                }
+            }
+        };
+
+        const startGenerationConsole = (uid, resumed = false) => {
+            const root = generationConsoleElement("generation-console");
+            if (!root || !uid) return;
+
+            stopGenerationConsolePolling();
+            generationConsoleUid = uid;
+            generationConsoleStartedAt = Date.now();
+            generationConsoleSeenEvents = new Set();
+            generationConsoleParamsRendered = false;
+            generationConsolePollMisses = 0;
+
+            const log = generationConsoleElement("generation-console-log");
+            if (log) log.replaceChildren();
+            const job = generationConsoleElement("generation-console-job");
+            if (job) job.textContent = "generation/" + uid;
+            const mode = currentAppUrl().searchParams.get("tab") === "multi-view" ? "4-VIEW" : "1-VIEW";
+            const modeElement = generationConsoleElement("generation-console-mode");
+            if (modeElement) modeElement.textContent = mode;
+            const clock = generationConsoleElement("generation-console-clock");
+            if (clock) clock.textContent = "CONNECTING TO MANIFEST";
+
+            setGenerationConsoleState("running", resumed ? "RESTORING" : "STARTING");
+            setGenerationConsoleProgress(1, resumed ? "Restoring generation state" : "Dispatching request");
+            appendGenerationConsoleLine(
+                resumed ? "RESUME" : "$",
+                (resumed ? "restore" : "hunyuan3d.generate")
+                    + " --mode " + mode.toLowerCase()
+                    + " --uid " + uid,
+                "command"
+            );
+            appendGenerationConsoleLine(
+                "STORE",
+                "Target: hy3dshape/output_folder/webui/" + uid,
+                "muted"
+            );
+
+            window.setTimeout(pollGenerationManifest, 120);
+            generationConsoleTimer = window.setInterval(pollGenerationManifest, 700);
+        };
+
+        const syncGenerationConsoleFromUrl = () => {
+            const uid = currentAppUrl().searchParams.get("generation");
+            if (uid && uid !== generationConsoleUid) startGenerationConsole(uid, true);
+        };
+
+        const beginGeneration = () => {
+            const url = currentAppUrl();
+            const uid = createGenerationUid();
+            url.searchParams.set("generation", uid);
+            window.history.pushState({}, "", url);
+            startGenerationConsole(uid);
+        };
+
+        const installGenerationRouting = () => {
+            const buttonRoot = document.getElementById("generate-3d-button");
+            if (!buttonRoot || buttonRoot.dataset.generationRouteWired === "true") return;
+            buttonRoot.dataset.generationRouteWired = "true";
+            buttonRoot.addEventListener("click", beginGeneration, {capture: true});
+        };
+
+        const promptTabButtons = () => Array.from(
+            document.querySelectorAll('#prompt-mode-tabs button[role="tab"]')
+        ).slice(0, tabRoutes.length);
+
+        const syncTabFromUrl = () => {
+            const buttons = promptTabButtons();
+            if (buttons.length !== tabRoutes.length) return false;
+
+            const url = currentAppUrl();
+            const requestedSlug = url.searchParams.get("tab");
+            const route = tabRoutes.find((item) => item.slug === requestedSlug) || tabRoutes[0];
+
+            if (requestedSlug !== route.slug || url.href !== window.location.href) {
+                url.searchParams.set("tab", route.slug);
+                window.history.replaceState({}, "", url);
+            }
+
+            const target = buttons[route.index];
+            if (target.getAttribute("aria-selected") !== "true") {
+                target.click();
+            }
+            return true;
+        };
+
+        const installTabRouting = () => {
+            const buttons = promptTabButtons();
+            if (buttons.length !== tabRoutes.length) return;
+
+            buttons.forEach((button, index) => {
+                if (button.dataset.urlRouteWired === "true") return;
+                button.dataset.urlRouteWired = "true";
+                button.addEventListener("click", () => {
+                    const slug = tabRoutes[index].slug;
+                    const url = currentAppUrl();
+                    if (url.searchParams.get("tab") === slug) {
+                        if (url.href !== window.location.href) {
+                            window.history.replaceState({}, "", url);
+                        }
+                        return;
+                    }
+                    url.searchParams.set("tab", slug);
+                    window.history.pushState({}, "", url);
+                });
+            });
+
+            if (!tabRouteInitialized) {
+                tabRouteInitialized = true;
+                [0, 100, 400].forEach((delay) => {
+                    window.setTimeout(syncTabFromUrl, delay);
+                });
+            }
+        };
 
         const setModalOpen = (isOpen) => {
             const element = modal();
@@ -1120,19 +2059,19 @@ def build_app():
         };
 
         const syncFromUrl = () => {
-            const url = new URL(window.location.href);
+            const url = currentAppUrl();
             setModalOpen(url.searchParams.get("view") === "rtx3090");
         };
 
         const openModal = () => {
-            const url = new URL(window.location.href);
+            const url = currentAppUrl();
             url.searchParams.set("view", "rtx3090");
             window.history.pushState({}, "", url);
             setModalOpen(true);
         };
 
         const closeModal = () => {
-            const url = new URL(window.location.href);
+            const url = currentAppUrl();
             if (url.searchParams.get("view") === "rtx3090") {
                 url.searchParams.delete("view");
                 window.history.pushState({}, "", url);
@@ -1141,7 +2080,9 @@ def build_app():
         };
 
         const installFooterItem = () => {
-            const footer = document.querySelector("gradio-app footer") || document.querySelector("footer");
+            const footer = Array.from(document.querySelectorAll("gradio-app footer, footer")).find(
+                (element) => element.querySelector("button.show-api, a.built-with, button.settings")
+            );
             if (!footer || document.getElementById(footerButtonId)) return;
 
             const builtWith = footer.querySelector("a.built-with");
@@ -1182,14 +2123,24 @@ def build_app():
         const observer = new MutationObserver(() => {
             installFooterItem();
             wireModal();
+            installTabRouting();
+            installGenerationRouting();
+            syncGenerationConsoleFromUrl();
         });
         observer.observe(document.body, {childList: true, subtree: true});
 
         installFooterItem();
         wireModal();
+        installTabRouting();
+        installGenerationRouting();
         syncFromUrl();
+        syncGenerationConsoleFromUrl();
 
-        window.addEventListener("popstate", syncFromUrl);
+        window.addEventListener("popstate", () => {
+            syncFromUrl();
+            syncTabFromUrl();
+            syncGenerationConsoleFromUrl();
+        });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && modal()?.classList.contains("rtx-open")) {
                 closeModal();
@@ -1255,7 +2206,12 @@ def build_app():
                                                       min_width=100, elem_classes='mv-image')
 
                 with gr.Row():
-                    btn = gr.Button(value='Generate 3D · 1 Image', variant='primary', min_width=100)
+                    btn = gr.Button(
+                        value='Generate 3D · 1 Image',
+                        variant='primary',
+                        min_width=100,
+                        elem_id='generate-3d-button',
+                    )
                     btn_all = gr.Button(value='Gen Textured Shape',
                                         variant='primary',
                                         visible=HAS_TEXTUREGEN,
@@ -1340,6 +2296,50 @@ Fast for very complex cases, Standard seldom use.',
                         html_export_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output')
                     with gr.Tab('Mesh Statistic', id='stats_panel'):
                         stats = gr.Json({}, label='Mesh Stats')
+
+            with gr.Column(scale=3, visible=MV_MODE, elem_id='generation-console-panel'):
+                gr.HTML("""
+                <section id="generation-console" class="generation-console" data-state="idle">
+                    <header class="generation-console-windowbar">
+                        <span class="generation-console-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                        <span class="generation-console-title">
+                            <strong>Generation Console</strong>
+                            <span>REAL-TIME INFERENCE PIPELINE</span>
+                        </span>
+                        <span id="generation-console-status" class="generation-console-status">IDLE</span>
+                    </header>
+                    <div class="generation-console-jobbar">
+                        <span aria-hidden="true">›_</span>
+                        <span id="generation-console-job" class="generation-console-job">No active generation</span>
+                        <span id="generation-console-mode" class="generation-console-mode">WAITING</span>
+                    </div>
+                    <div id="generation-console-log" class="generation-console-log" aria-live="polite">
+                        <div class="generation-console-line" data-kind="muted">
+                            <span class="generation-console-time">+00.0s</span>
+                            <span class="generation-console-level">READY</span>
+                            <span class="generation-console-message">Upload input images, then press Generate 3D.</span>
+                        </div>
+                        <div class="generation-console-line" data-kind="muted">
+                            <span class="generation-console-time">+00.0s</span>
+                            <span class="generation-console-level">INFO</span>
+                            <span class="generation-console-message">Console shows generation/inference progress, not model training.</span>
+                        </div>
+                    </div>
+                    <div class="generation-console-progress-wrap">
+                        <div class="generation-console-progress-meta">
+                            <span id="generation-console-stage">Waiting for a generation request</span>
+                            <span id="generation-console-percent">0%</span>
+                        </div>
+                        <div class="generation-console-progress-track">
+                            <div id="generation-console-progress" class="generation-console-progress-bar"></div>
+                        </div>
+                    </div>
+                    <div class="generation-console-footer">
+                        <span><strong>Hunyuan3D-2mv</strong> · CUDA FP16</span>
+                        <span id="generation-console-clock">LOCAL STORAGE READY</span>
+                    </div>
+                </section>
+                """)
 
             with gr.Column(scale=2, visible=not MV_MODE):
                 with gr.Tabs(selected='tab_img_gallery') as gallery:
