@@ -120,26 +120,21 @@ def get_rtx3090_preset(profile):
     is_quality = profile == 'quality'
     profile_name = 'Chất lượng cao' if is_quality else 'Mặc định an toàn'
     profile_class = 'quality' if is_quality else 'safe'
-    detail = (
-        'Octree 384 tăng mật độ bề mặt. Đã chạy thành công trên máy này: '
-        'khoảng 58 giây với 1 ảnh và 77 giây với 4 ảnh.'
-        if is_quality else
-        'Octree 256 là mức khởi đầu ổn định nhất, phù hợp để kiểm tra ảnh đầu vào '
-        'trước khi xuất bản chất lượng cao.'
-    )
     status_html = f"""
-    <div class="rtx-preset-status {profile_class}">
-        <div class="rtx-preset-status-title">
-            <span class="rtx-preset-dot"></span>
-            RTX 3090 · 1 ảnh &amp; 4 ảnh · {profile_name}
+    <div class="rtx-preset-status {profile_class}" data-profile="{profile_class}">
+        <div class="rtx-preset-status-heading">
+            <div class="rtx-preset-status-title">
+                <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="check" aria-hidden="true"></span>
+                <span>RTX 3090 · 1 ảnh &amp; 4 ảnh · {profile_name}</span>
+            </div>
+            <span class="rtx-preset-current">Đang dùng</span>
         </div>
         <div class="rtx-preset-values">
-            <span><b>{preset['steps']}</b> Steps</span>
-            <span><b>{preset['guidance_scale']}</b> Guidance</span>
-            <span><b>{preset['octree_resolution']}</b> Octree</span>
-            <span><b>{preset['num_chunks']}</b> Chunks</span>
+            <span><b>{preset['steps']}</b><small>Steps</small></span>
+            <span><b>{preset['guidance_scale']}</b><small>Guidance</small></span>
+            <span><b>{preset['octree_resolution']}</b><small>Octree</small></span>
+            <span><b>{preset['num_chunks']}</b><small>Chunks</small></span>
         </div>
-        <div class="rtx-preset-detail">{detail}</div>
     </div>
     """
     return (
@@ -532,7 +527,7 @@ def render_model_viewer_document(mesh_src, height, width, textured=False):
         template_html = f.read()
     return (
         template_html
-        .replace('#height#', str(height))
+        .replace('var(--viewer-height, 650px)', f'{height}px')
         .replace('#width#', str(width))
         .replace('#src#', mesh_src)
     )
@@ -558,7 +553,7 @@ def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
 
     rel_path = os.path.relpath(output_html_path, SAVE_DIR).replace(os.sep, '/')
     iframe_tag = f'<iframe src="/static/{rel_path}" \
-height="{height}" width="100%" frameborder="0"></iframe>'
+height="{height}" width="100%" frameborder="0" title="Generated 3D mesh preview" allow="fullscreen" allowfullscreen></iframe>'
     print(f'Find html file {output_html_path}, \
 {os.path.exists(output_html_path)}, relative HTML path is /static/{rel_path}')
 
@@ -593,7 +588,8 @@ def build_stored_model_viewer_html(save_folder, mesh_filename, height=660):
     cache_key = os.stat(mesh_path).st_mtime_ns
     iframe_tag = (
         f'<iframe src="/generation-viewer/{generation_uid}?v={cache_key}" '
-        f'height="{height}" width="100%" frameborder="0"></iframe>'
+        f'height="{height}" width="100%" frameborder="0" title="Generated 3D mesh preview" '
+        f'allow="fullscreen" allowfullscreen></iframe>'
     )
     return f"""
         <div style='height: {height}px; width: 100%; overflow: hidden;'>
@@ -1232,35 +1228,132 @@ def shape_generation(
 def build_app():
     title = 'Hunyuan3D-2: High Resolution Textured 3D Assets Generation'
     if MV_MODE:
-        title = 'Hunyuan3D-2mv: Image to 3D Generation with 1-4 Views'
+        title = 'Hunyuan3D-2mv: Image to 3D Generation with 1–4 Views'
     if 'mini' in args.subfolder:
         title = 'Hunyuan3D-2mini: Strong 0.6B Image to Shape Generator'
 
     if TURBO_MODE:
         title = title.replace(':', '-Turbo: Fast ')
 
+    title_parts = title.split(':', 1)
+    brand_name = title_parts[0]
+    workspace_title = title_parts[1].strip() if len(title_parts) == 2 else title
+    runtime_device = {
+        'cuda': 'CUDA',
+        'cpu': 'CPU',
+        'mps': 'MPS',
+    }.get(str(args.device).lower(), 'LOCAL')
+    runtime_dtype = {
+        'float16': 'FP16',
+        'bfloat16': 'BF16',
+        'float32': 'FP32',
+    }.get(str(getattr(args, 'dtype', 'float16')).lower(), 'FP16')
+    runtime_label = f'{runtime_device} {runtime_dtype}'
+    rtx_profile_action = """
+            <button id="app-rtx-profile" class="app-topbar-button" type="button">
+                <span class="ui-icon-slot" data-ui-icon="memory" aria-hidden="true"></span>
+                <span>RTX 3090</span>
+            </button>
+    """ if MV_MODE and args.device == 'cuda' else ''
+
     title_html = f"""
-    <header class="app-hero">
-        <span class="app-hero-mark ui-icon-slot" data-ui-icon="box" aria-hidden="true"></span>
-        <div class="app-hero-copy">
-            <h1>{title}</h1>
-            <p>Tencent Hunyuan3D Team · Local Generation Workspace</p>
+    <header id="app-topbar" class="app-topbar">
+        <div class="app-brand" aria-label="{brand_name}">
+            <span class="app-brand-mark" aria-hidden="true">
+                <img class="app-standard-logo" src="/favicon.ico" alt="" draggable="false">
+            </span>
+            <strong>{brand_name}</strong>
+            <span class='app-version-badge'>v1.0</span>
         </div>
+        <div class="app-title-block">
+            <span class="app-title-mark" aria-hidden="true">
+                <img class="app-standard-logo" src="/favicon.ico" alt="" draggable="false">
+            </span>
+            <div>
+                <h1>{workspace_title}</h1>
+                <p>Transform images into high-quality 3D assets with AI</p>
+            </div>
+        </div>
+        <nav class="app-topbar-actions" aria-label="Application actions">
+            <button id="app-api-docs" class="app-topbar-button" type="button">
+                <span class="ui-icon-slot" data-ui-icon="code" aria-hidden="true"></span>
+                <span>API Docs</span>
+            </button>
+            <button id="app-theme-settings" class="app-topbar-button app-topbar-icon-button" type="button" aria-label="Settings">
+                <span class="ui-icon-slot" data-ui-icon="settings" aria-hidden="true"></span>
+            </button>
+            {rtx_profile_action}
+        </nav>
     </header>
     """
     custom_css = """
+    /* Shared appearance only; each component keeps its existing scroll behavior. */
+    :root {
+        --ui-scrollbar-size: 9px;
+        --ui-scrollbar-track: #0b1020;
+        --ui-scrollbar-thumb: #5f67ed;
+        --ui-scrollbar-thumb-hover: #7379ff;
+        --ui-scrollbar-thumb-active: #858aff;
+        --ui-scrollbar-radius: 999px;
+    }
+
+    * {
+        scrollbar-color: var(--ui-scrollbar-thumb) var(--ui-scrollbar-track);
+        scrollbar-width: thin;
+    }
+
+    *::-webkit-scrollbar {
+        width: var(--ui-scrollbar-size);
+        height: var(--ui-scrollbar-size);
+    }
+
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-corner {
+        background: var(--ui-scrollbar-track);
+        border-radius: var(--ui-scrollbar-radius);
+        margin: 14px 0;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background: var(--ui-scrollbar-thumb);
+        background-clip: padding-box;
+        border: 2px solid var(--ui-scrollbar-track);
+        border-radius: var(--ui-scrollbar-radius);
+        min-height: 48px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background: var(--ui-scrollbar-thumb-hover);
+        background-clip: padding-box;
+    }
+
+    *::-webkit-scrollbar-thumb:active {
+        background: var(--ui-scrollbar-thumb-active);
+        background-clip: padding-box;
+    }
+
     .gradio-container {
         --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
         --ui-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        --ui-bg: var(--body-background-fill);
-        --ui-surface: var(--block-background-fill);
-        --ui-surface-muted: var(--background-fill-secondary);
-        --ui-border: var(--block-border-color);
-        --ui-border-strong: var(--border-color-primary);
-        --ui-text: var(--body-text-color);
-        --ui-muted: var(--body-text-color-subdued);
-        --ui-primary: var(--primary-500);
-        --ui-primary-hover: var(--primary-600);
+        --body-background-fill: #080b16;
+        --block-background-fill: #101522;
+        --background-fill-secondary: #151b2b;
+        --block-border-color: #252d40;
+        --border-color-primary: #313b53;
+        --body-text-color: #f4f6fb;
+        --body-text-color-subdued: #9099ad;
+        --input-background-fill: #0d1220;
+        --primary-500: #6670ff;
+        --primary-600: #5862f2;
+        --ui-bg: #080b16;
+        --ui-surface: #101522;
+        --ui-surface-muted: #151b2b;
+        --ui-border: #252d40;
+        --ui-border-strong: #313b53;
+        --ui-text: #f4f6fb;
+        --ui-muted: #9099ad;
+        --ui-primary: #6670ff;
+        --ui-primary-hover: #5862f2;
         --ui-success: #51cf66;
         --ui-warning: #f59f00;
         --ui-danger: #ff6b6b;
@@ -1277,11 +1370,11 @@ def build_app():
         --ui-radius-pill: 999px;
         --ui-control-height: 40px;
         --ui-panel-header-height: 44px;
-        --ui-stage-height: 690px;
-        --ui-workspace-height: 734px;
+        --ui-stage-height: 820px;
+        --ui-workspace-height: 900px;
         font-family: var(--ui-font);
-        max-width: 1880px !important;
-        padding: 20px 28px 88px !important;
+        max-width: none !important;
+        padding: 20px 24px 30px !important;
     }
 
     #generation-console-panel {
@@ -1451,8 +1544,6 @@ def build_app():
         overflow-x: hidden;
         overflow-y: auto;
         padding: 14px 12px 18px;
-        scrollbar-color: #343a46 transparent;
-        scrollbar-width: thin;
     }
 
     .generation-console-line {
@@ -1686,67 +1777,124 @@ def build_app():
         margin: 0 9px;
     }
 
+    /* Match Gradio's Settings and API Docs inset frame to the RTX modal. */
+    .api-docs {
+        box-sizing: border-box !important;
+        padding: 16px 18px !important;
+    }
+
+    .api-docs > .api-docs-wrap {
+        border-radius: 18px !important;
+        height: 100%;
+        max-height: 100%;
+    }
+
     body.rtx3090-modal-open {
         overflow: hidden;
     }
 
     #rtx3090-modal {
+        --rtx-accent: #655dff;
+        --rtx-accent-strong: #5267f7;
+        --rtx-border: #2c354a;
+        --rtx-card: rgba(20, 27, 44, 0.92);
+        --rtx-card-muted: rgba(25, 33, 53, 0.94);
+        --rtx-muted: #a8b0c3;
+        --rtx-panel: #0d1321;
         align-items: stretch;
-        background: rgba(3, 5, 9, 0.72);
-        backdrop-filter: blur(5px);
+        backdrop-filter: blur(8px);
+        background: rgba(2, 5, 12, 0.7);
+        box-sizing: border-box;
         display: none !important;
         flex-direction: row !important;
+        height: 100dvh !important;
         inset: 0;
         justify-content: flex-end;
         margin: 0 !important;
         max-width: none !important;
-        padding: 0 16px 0 0 !important;
+        padding: 16px 18px !important;
         position: fixed !important;
-        z-index: 1001;
+        width: 100vw !important;
+        z-index: var(--layer-top, 2147483647);
     }
 
     #rtx3090-modal.rtx-open {
         display: flex !important;
     }
 
-    #rtx3090-modal .rtx3090-modal-panel {
-        background: var(--body-background-fill);
-        border: 1px solid var(--block-border-color);
-        border-radius: 12px;
-        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
-        flex: 0 0 min(1020px, calc(100vw - 16px));
-        gap: 14px;
-        height: 100vh;
-        max-width: 1020px;
+    #rtx3090-modal > .rtx3090-modal-panel {
+        background:
+            radial-gradient(circle at 46% -8%, rgba(83, 91, 220, 0.11), transparent 32%),
+            linear-gradient(180deg, #101625 0%, var(--rtx-panel) 100%);
+        border: 1px solid var(--rtx-border) !important;
+        border-radius: 18px;
+        box-shadow: 0 28px 86px rgba(0, 0, 0, 0.48);
+        box-sizing: border-box;
+        flex: 0 0 min(940px, calc(100vw - 36px)) !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        gap: 0 !important;
+        height: calc(100dvh - 32px);
+        max-height: calc(100dvh - 32px);
+        max-width: min(940px, calc(100vw - 36px)) !important;
         overflow-x: hidden;
         overflow-y: auto;
-        padding: 0 22px 24px;
-        width: min(1020px, calc(100vw - 16px));
+        overscroll-behavior-y: contain;
+        padding: 0 28px 34px;
+        scrollbar-gutter: stable;
+        width: min(940px, calc(100vw - 36px)) !important;
     }
 
-    #rtx3090-modal .rtx3090-modal-panel > *,
-    #rtx3090-modal .html-container {
-        min-width: 0;
+    #rtx3090-modal > .rtx3090-modal-panel > * {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        box-sizing: border-box;
+        flex-shrink: 0 !important;
         max-width: 100%;
+        min-width: 0;
+        padding: 0 !important;
+        width: 100%;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .block > .html-container,
+    #rtx3090-modal > .rtx3090-modal-panel > .block > .html-container.padding {
+        padding: 0 !important;
     }
 
     #rtx3090-modal .html-container {
         overflow: visible !important;
     }
 
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-modal-header-block {
+        background: #101625 !important;
+        margin: 0 -28px !important;
+        max-width: none !important;
+        overflow: visible !important;
+        position: sticky;
+        top: 0;
+        width: calc(100% + 56px) !important;
+        z-index: 5;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel
+    > .rtx3090-modal-header-block > .html-container.padding {
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
     .rtx3090-modal-header {
         align-items: center;
-        background: var(--body-background-fill);
-        border-bottom: 1px solid var(--border-color-primary);
+        background: rgba(16, 22, 37, 0.98);
+        border-bottom: 1px solid var(--rtx-border);
+        box-sizing: border-box;
         display: flex;
         gap: 16px;
         justify-content: space-between;
-        margin: 0 -22px;
-        min-height: 62px;
-        padding: 12px 18px 12px 22px;
-        position: sticky;
-        top: 0;
-        z-index: 2;
+        margin: 0;
+        min-height: 72px;
+        padding: 18px 20px 18px 28px;
+        position: relative;
     }
 
     .rtx3090-header-main,
@@ -1762,24 +1910,31 @@ def build_app():
 
     .rtx3090-header-icon {
         align-items: center;
-        color: #ff922b;
+        color: #f7f8ff;
         display: inline-flex;
         flex: 0 0 auto;
-        font-size: 18px;
         justify-content: center;
     }
 
+    .rtx3090-header-icon .ui-icon {
+        height: 20px;
+        width: 20px;
+    }
+
     .rtx3090-modal-header h2 {
-        color: var(--body-text-color);
-        font-size: 18px;
-        line-height: 1.2;
+        color: #f7f8ff;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.35;
         margin: 0;
         white-space: nowrap;
     }
 
     .rtx3090-header-scope {
-        color: var(--primary-500);
+        color: #837dff;
         font-size: 16px;
+        font-weight: 520;
         white-space: nowrap;
     }
 
@@ -1790,21 +1945,25 @@ def build_app():
 
     .rtx3090-verified {
         align-items: center;
-        background: var(--button-secondary-background-fill);
-        border: 1px solid var(--button-secondary-border-color);
-        border-radius: 5px;
+        background: rgba(35, 187, 109, 0.12);
+        border: 1px solid rgba(42, 211, 124, 0.24);
+        border-radius: 6px;
+        color: #45d58e !important;
         display: inline-flex;
-        font-size: 12px;
+        font-size: 13px;
+        font-weight: 650;
         gap: 5px;
-        padding: 5px 7px;
+        margin-right: 30px;
+        padding: 5px 8px;
         white-space: nowrap;
     }
 
     .rtx3090-verified-dot {
-        background: #ff922b;
+        background: #35d07f;
         border-radius: 50%;
-        height: 8px;
-        width: 8px;
+        box-shadow: 0 0 0 3px rgba(53, 208, 127, 0.12);
+        height: 7px;
+        width: 7px;
     }
 
     .rtx3090-preset-count {
@@ -1813,270 +1972,570 @@ def build_app():
     }
 
     .rtx3090-preset-count b {
-        color: var(--primary-500);
-        font-weight: 500;
+        color: #827cff;
+        font-weight: 700;
     }
 
     #rtx3090-modal-close {
         align-items: center;
         background: transparent;
         border: 0;
-        color: var(--body-text-color);
+        border-left: 1px solid var(--rtx-border);
+        border-radius: 0;
+        box-sizing: border-box;
+        color: #eef0fa;
         cursor: pointer;
         display: flex;
-        flex: 0 0 30px;
-        font-size: 26px;
-        font-weight: 700;
+        flex: 0 0 52px;
         height: 30px;
         justify-content: center;
         line-height: 1;
-        padding: 0;
-        width: 30px;
+        margin: 0 0 0 4px !important;
+        min-width: 52px;
+        padding: 0 0 0 18px;
+        width: 52px;
+    }
+
+    #rtx3090-modal-close .rtx3090-close-icon {
+        color: inherit;
+        display: block;
+        fill: currentColor;
+        flex: 0 0 16px;
+        height: 16px;
+        width: 16px;
     }
 
     #rtx3090-modal-close:hover {
-        color: var(--primary-500);
+        background: transparent;
+        color: #8d88ff;
+    }
+
+    #rtx3090-modal-close:focus-visible {
+        outline: 2px solid var(--color-accent, var(--primary-500));
+        outline-offset: -2px;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-intro-block {
+        margin-top: 11px !important;
     }
 
     .rtx3090-api-intro {
-        padding-top: 4px;
+        padding: 0;
     }
 
     .rtx3090-api-intro p {
-        color: var(--body-text-color);
-        font-size: 13px;
+        color: #d5d9e6;
+        font-size: 15px;
         line-height: 1.5;
-        margin: 0 0 13px;
+        margin: 17px 0 0;
+        max-width: 820px;
+    }
+
+    .rtx3090-api-intro p strong {
+        color: #817aff;
+        font-weight: 700;
     }
 
     .rtx3090-context-tabs {
         display: flex;
         flex-wrap: wrap;
-        gap: 7px;
+        gap: 10px;
+        margin-top: 23px;
     }
 
     .rtx3090-context-tabs span {
         align-items: center;
-        border: 1px solid var(--block-border-color);
-        border-radius: 5px;
-        color: var(--body-text-color-subdued);
+        background: rgba(17, 23, 38, 0.75);
+        border: 1px solid #313a50;
+        border-radius: 7px;
+        color: #c2c8d8;
         display: inline-flex;
-        font-size: 11px;
-        gap: 5px;
-        padding: 4px 7px;
+        font-size: 13px;
+        gap: 7px;
+        min-height: 34px;
+        padding: 6px 12px;
     }
 
     .rtx3090-context-tabs span.active {
-        border-color: var(--body-text-color);
-        color: var(--body-text-color);
+        border-color: #736cff;
+        box-shadow: inset 0 0 0 1px rgba(115, 108, 255, 0.3);
+        color: #f5f6ff;
     }
 
     .rtx3090-section-heading {
-        align-items: baseline;
-        color: var(--body-text-color);
-        display: flex;
-        font-size: 13px;
-        gap: 5px;
+        color: #f4f6fb;
+        display: block;
+        margin: 0;
+    }
+
+    .rtx3090-section-heading b {
+        display: block;
+        font-size: 16px;
+        font-weight: 720;
         line-height: 1.5;
-        margin: 1px 0 -4px;
     }
 
     .rtx3090-section-heading span {
-        color: var(--body-text-color-subdued);
-        font-size: 12px;
+        color: var(--rtx-muted);
+        display: block;
+        font-size: 14px;
+        line-height: 1.5;
+        margin-top: 3px;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-section-one {
+        margin-top: 21px !important;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-machine-block {
+        margin-top: 20px !important;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-section-two {
+        margin-top: 22px !important;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-profiles-block {
+        margin-top: 14px !important;
     }
 
     .rtx3090-machine-strip {
         align-items: center;
-        background: var(--block-background-fill);
-        border: 1px solid var(--block-border-color);
-        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(21, 29, 48, 0.98), rgba(17, 24, 40, 0.96));
+        border: 1px solid var(--rtx-border);
+        border-radius: 13px;
+        box-sizing: border-box;
         display: flex;
-        gap: 11px;
-        padding: 12px 14px;
+        gap: 14px;
+        min-height: 96px;
+        padding: 16px 20px;
     }
 
     .rtx3090-machine-badge {
-        background: #4263eb;
-        border-radius: 8px;
+        background: linear-gradient(145deg, #6258f4, #745eff);
+        border: 1px solid rgba(167, 160, 255, 0.38);
+        border-radius: 10px;
+        box-shadow: 0 8px 22px rgba(78, 67, 222, 0.24);
         color: white;
-        flex: 0 0 auto;
-        font-size: 12px;
+        box-sizing: border-box;
+        flex: 0 0 52px;
+        font-size: 13px;
         font-weight: 800;
-        padding: 8px 10px;
+        padding: 10px 0;
+        text-align: center;
+        width: 52px;
     }
 
-    .rtx3090-machine-strip strong,
-    .rtx3090-machine-strip span {
+    .rtx3090-machine-copy {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .rtx3090-machine-copy strong,
+    .rtx3090-machine-copy span {
         display: block;
     }
 
-    .rtx3090-machine-strip strong {
-        font-size: 13px;
-        margin-bottom: 2px;
+    .rtx3090-machine-copy strong {
+        color: #f5f6fb;
+        font-size: 17px;
+        line-height: 1.4;
+        margin-bottom: 4px;
     }
 
-    .rtx3090-machine-strip span {
-        color: var(--body-text-color-subdued);
-        font-size: 11px;
-        line-height: 1.45;
+    .rtx3090-machine-copy span {
+        color: var(--rtx-muted);
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .rtx3090-machine-check {
+        align-items: center;
+        border: 2px solid #32cf80;
+        border-radius: 50%;
+        color: #32cf80;
+        display: inline-flex !important;
+        flex: 0 0 24px;
+        height: 24px;
+        justify-content: center;
+        width: 24px;
+    }
+
+    .rtx3090-machine-check .ui-icon {
+        height: 14px;
+        stroke-width: 3;
+        width: 14px;
     }
 
     .rtx3090-profile-grid {
         display: grid;
-        gap: 12px;
+        gap: 16px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .rtx3090-profile-card {
-        background: var(--block-background-fill);
-        border: 1px solid var(--block-border-color);
-        border-radius: 11px;
-        padding: 14px;
+        background: linear-gradient(135deg, rgba(24, 28, 38, 0.98), rgba(19, 23, 32, 0.98));
+        border: 1px solid #3a3f4d;
+        border-radius: 13px;
+        box-sizing: border-box;
+        cursor: pointer;
+        min-height: 152px;
+        outline: none;
+        padding: 15px 15px 13px;
+        transition:
+            border-color 160ms ease,
+            box-shadow 160ms ease,
+            background 160ms ease,
+            opacity 160ms ease;
+        user-select: none;
     }
 
-    .rtx3090-profile-card.quality {
-        border-color: rgba(66, 99, 235, 0.72);
-        box-shadow: inset 3px 0 0 #4263eb;
+    .rtx3090-profile-card.is-selected {
+        background: linear-gradient(135deg, rgba(22, 42, 36, 0.98), rgba(17, 30, 29, 0.98));
+        border-color: #45d58e;
+        box-shadow:
+            inset 0 0 0 1px rgba(69, 213, 142, 0.24),
+            0 10px 24px rgba(24, 150, 91, 0.14);
     }
 
-    .rtx3090-profile-card.safe {
-        box-shadow: inset 3px 0 0 #2f9e44;
+    .rtx3090-profile-card:not(.is-selected) {
+        opacity: 0.78;
+    }
+
+    .rtx3090-profile-card:not(.is-selected):hover {
+        border-color: #555b6b;
+        opacity: 0.92;
+    }
+
+    .rtx3090-profile-card:focus-visible {
+        border-color: #8b84ff;
+        box-shadow: 0 0 0 3px rgba(113, 104, 255, 0.24);
+    }
+
+    .rtx3090-profile-card.is-selected:focus-visible {
+        border-color: #58dda0;
+        box-shadow:
+            inset 0 0 0 1px rgba(69, 213, 142, 0.24),
+            0 0 0 3px rgba(53, 208, 127, 0.2);
+    }
+
+    .rtx3090-profile-heading {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
     }
 
     .rtx3090-profile-card h3 {
-        font-size: 13px;
-        margin: 0 0 4px;
+        color: #f4f6fb;
+        font-size: 16px;
+        font-weight: 680;
+        line-height: 1.4;
+        margin: 0;
+    }
+
+    .rtx3090-profile-card.is-selected h3 {
+        color: #ffffff;
+        font-weight: 780;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) h3 {
+        color: #c6cad3;
+    }
+
+    .rtx3090-profile-selector {
+        align-items: center;
+        border: 2px solid #687086;
+        border-radius: 50%;
+        color: #fff;
+        display: inline-flex;
+        flex: 0 0 22px;
+        height: 22px;
+        justify-content: center;
+        width: 22px;
+    }
+
+    .rtx3090-profile-card.is-selected .rtx3090-profile-selector {
+        background: linear-gradient(145deg, #22b96e, #45d58e);
+        border-color: #45d58e;
+        box-shadow: 0 0 0 3px rgba(53, 208, 127, 0.12);
+    }
+
+    .rtx3090-profile-selector::after {
+        content: "";
+    }
+
+    .rtx3090-profile-card.is-selected .rtx3090-profile-selector::after {
+        border-color: #fff;
+        border-style: solid;
+        border-width: 0 2px 2px 0;
+        content: "";
+        height: 8px;
+        transform: rotate(45deg) translate(-1px, -1px);
+        width: 4px;
     }
 
     .rtx3090-profile-card p {
-        color: var(--body-text-color-subdued);
-        font-size: 11px;
-        line-height: 1.45;
-        margin: 0 0 11px;
+        color: var(--rtx-muted);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 5px 0 13px;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) p {
+        color: #8e95a5;
     }
 
     .rtx3090-profile-values {
         display: grid;
-        gap: 6px;
+        gap: 8px;
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .rtx3090-profile-values span {
-        background: var(--background-fill-secondary);
-        border-radius: 7px;
-        color: var(--body-text-color-subdued);
-        font-size: 10px;
+        align-items: center;
+        background: var(--rtx-card-muted);
+        border-radius: 8px;
+        color: var(--rtx-muted);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 56px;
         padding: 7px 5px;
         text-align: center;
     }
 
     .rtx3090-profile-values b {
-        color: var(--body-text-color);
+        color: #f4f6fb;
         display: block;
+        font-size: 14px;
+        line-height: 1.25;
+        margin-bottom: 3px;
+    }
+
+    .rtx3090-profile-values small {
+        color: var(--rtx-muted);
         font-size: 12px;
-        margin-bottom: 2px;
+        line-height: 1.2;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) .rtx3090-profile-values span {
+        background: #1b1f2a;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) .rtx3090-profile-values b {
+        color: #c8ccd6;
     }
 
     #rtx3090-modal .rtx-preset-actions {
-        gap: 10px;
+        gap: 16px;
+        margin-top: 19px !important;
     }
 
     #rtx3090-modal .rtx-preset-actions button {
-        min-height: 42px;
+        background: linear-gradient(135deg, #555761, #474952) !important;
+        border: 1px solid #5d606b !important;
+        border-radius: 8px;
+        box-shadow: none !important;
+        color: #f3f4f8 !important;
+        font-size: 16px;
+        font-weight: 700;
+        min-height: 45px;
+        opacity: 0.78;
+        transition:
+            background 160ms ease,
+            border-color 160ms ease,
+            box-shadow 160ms ease,
+            opacity 160ms ease;
+    }
+
+    #rtx3090-modal .rtx-preset-actions button:hover {
+        border-color: #747784 !important;
+        opacity: 0.94;
+    }
+
+    #rtx3090-modal .rtx-preset-actions button.rtx-preset-action-active {
+        background: linear-gradient(135deg, #12834d 0%, #148850 100%) !important;
+        border-color: #45d58e !important;
+        box-shadow: 0 9px 20px rgba(25, 164, 98, 0.22) !important;
+        opacity: 1;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-status-block {
+        margin-top: 29px !important;
     }
 
     .rtx-preset-status {
-        background: var(--block-background-fill);
-        border: 1px solid var(--block-border-color);
-        border-radius: 10px;
-        margin-top: 8px;
-        padding: 10px 12px;
+        background: linear-gradient(135deg, rgba(21, 29, 48, 0.98), rgba(17, 24, 40, 0.96));
+        border: 1px solid var(--rtx-border);
+        border-radius: 13px;
+        box-sizing: border-box;
+        min-height: 122px;
+        padding: 15px;
     }
 
-    .rtx-preset-status.quality {
-        border-color: rgba(66, 99, 235, 0.72);
-        box-shadow: inset 3px 0 0 #4263eb;
-    }
-
-    .rtx-preset-status.safe {
-        box-shadow: inset 3px 0 0 #2f9e44;
+    .rtx-preset-status-heading {
+        align-items: center;
+        display: flex;
+        gap: 14px;
+        justify-content: space-between;
     }
 
     .rtx-preset-status-title {
         align-items: center;
         display: flex;
-        font-size: 12px;
-        font-weight: 750;
-        gap: 7px;
+        font-size: 14px;
+        font-weight: 720;
+        gap: 9px;
+        line-height: 1.4;
+        min-width: 0;
     }
 
-    .rtx-preset-dot {
-        background: #2f9e44;
+    .rtx-preset-status-check {
+        align-items: center;
+        background: #2abf75;
         border-radius: 50%;
-        box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.15);
-        height: 7px;
-        width: 7px;
+        color: white;
+        display: inline-flex;
+        flex: 0 0 18px;
+        height: 18px;
+        justify-content: center;
+        width: 18px;
+    }
+
+    .rtx-preset-status-check .ui-icon {
+        height: 11px;
+        stroke-width: 3;
+        width: 11px;
+    }
+
+    .rtx-preset-current {
+        background: rgba(117, 126, 151, 0.18);
+        border: 1px solid rgba(144, 153, 178, 0.14);
+        border-radius: 999px;
+        color: #c6ccda !important;
+        flex: 0 0 auto;
+        font-size: 12px;
+        font-weight: 650;
+        line-height: 1;
+        padding: 5px 9px;
     }
 
     .rtx-preset-values {
         display: grid;
-        gap: 6px;
+        gap: 8px;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        margin: 9px 0 7px;
+        margin: 12px 0 0;
     }
 
     .rtx-preset-values span {
-        background: var(--background-fill-secondary);
-        border-radius: 7px;
-        color: var(--body-text-color-subdued);
-        font-size: 10px;
-        padding: 6px 7px;
+        align-items: center;
+        background: var(--rtx-card-muted);
+        border-radius: 8px;
+        color: var(--rtx-muted);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 56px;
+        padding: 7px;
         text-align: center;
     }
 
     .rtx-preset-values b {
-        color: var(--body-text-color);
+        color: #f4f6fb;
         display: block;
-        font-size: 12px;
-        margin-bottom: 1px;
+        font-size: 14px;
+        line-height: 1.25;
+        margin-bottom: 3px;
     }
 
-    .rtx-preset-detail {
-        color: var(--body-text-color-subdued);
-        font-size: 10px;
-        line-height: 1.45;
+    .rtx-preset-values small {
+        color: var(--rtx-muted);
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-note-block {
+        margin-top: 20px !important;
     }
 
     .rtx3090-modal-note {
-        background: var(--block-background-fill);
-        border: 1px solid var(--block-border-color);
-        border-radius: 10px;
-        color: var(--body-text-color-subdued);
-        font-size: 11px;
+        align-items: flex-start;
+        background: linear-gradient(135deg, rgba(19, 27, 45, 0.94), rgba(16, 23, 39, 0.92));
+        border: 1px solid var(--rtx-border);
+        border-radius: 13px;
+        box-sizing: border-box;
+        color: var(--rtx-muted);
+        display: flex;
+        font-size: 14px;
+        gap: 15px;
         line-height: 1.5;
-        padding: 11px 13px;
+        min-height: 100px;
+        padding: 15px 18px;
     }
 
-    @media (max-width: 720px) {
+    .rtx3090-modal-note p {
+        margin: 0;
+    }
+
+    .rtx3090-modal-note strong {
+        color: #f2f4fa;
+    }
+
+    .rtx3090-note-icon {
+        align-items: center;
+        border: 2px solid #766eff;
+        border-radius: 50%;
+        color: #8079ff;
+        display: inline-flex;
+        flex: 0 0 22px;
+        height: 22px;
+        justify-content: center;
+        margin-top: 1px;
+        width: 22px;
+    }
+
+    .rtx3090-note-icon .ui-icon {
+        height: 13px;
+        stroke-width: 2.5;
+        width: 13px;
+    }
+
+    @media (max-width: 900px) {
+        .rtx3090-header-scope,
+        .rtx3090-verified {
+            display: none;
+        }
+
+        .rtx3090-modal-header h2 {
+            font-size: 19px;
+        }
+    }
+
+    @media (max-width: 767px) {
         #rtx3090-modal {
             padding: 0 !important;
         }
 
-        #rtx3090-modal .rtx3090-modal-panel {
-            border-radius: 0;
-            flex-basis: 100vw;
-            height: 100vh;
-            max-width: 100vw;
-            padding-left: 14px;
-            padding-right: 14px;
-            width: 100vw;
+        #rtx3090-modal > .rtx3090-modal-panel {
+            border-radius: 0 !important;
+            flex-basis: 100vw !important;
+            height: 100dvh;
+            max-height: 100dvh;
+            max-width: 100vw !important;
+            padding: 0 18px 28px;
+            width: 100vw !important;
+        }
+
+        #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-modal-header-block {
+            margin-left: -18px !important;
+            margin-right: -18px !important;
+            width: calc(100% + 36px) !important;
         }
 
         .rtx3090-modal-header {
-            margin-left: -14px;
-            margin-right: -14px;
-            padding: 16px 14px;
+            min-height: 64px;
+            padding: 15px 8px 15px 18px;
         }
 
         .rtx3090-header-scope,
@@ -2086,8 +2545,43 @@ def build_app():
         }
 
         .rtx3090-modal-header h2 {
-            font-size: 15px;
+            font-size: 17px;
             white-space: normal;
+        }
+
+        .rtx3090-api-intro p {
+            font-size: 14px;
+        }
+
+        .rtx3090-context-tabs {
+            gap: 7px;
+        }
+
+        .rtx3090-context-tabs span {
+            font-size: 12px;
+            min-height: 32px;
+            padding: 5px 9px;
+        }
+
+        .rtx3090-section-heading b {
+            font-size: 15px;
+        }
+
+        .rtx3090-section-heading span {
+            font-size: 13px;
+        }
+
+        .rtx3090-machine-strip {
+            align-items: flex-start;
+            padding: 15px;
+        }
+
+        .rtx3090-machine-strip strong {
+            font-size: 14px;
+        }
+
+        .rtx3090-machine-check {
+            display: none !important;
         }
 
         .rtx3090-profile-grid {
@@ -2097,6 +2591,18 @@ def build_app():
         .rtx3090-profile-values,
         .rtx-preset-values {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        #rtx3090-modal .rtx-preset-actions {
+            flex-direction: column;
+        }
+
+        .rtx-preset-status-heading {
+            align-items: flex-start;
+        }
+
+        .rtx3090-modal-note {
+            font-size: 13px;
         }
     }
 
@@ -2398,6 +2904,32 @@ def build_app():
     }
 
     /* Viewer, statistics and console now share one visual system. */
+    #output-tabs > .tab-wrapper {
+        align-items: stretch;
+        flex: 0 0 44px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        padding: 0 !important;
+    }
+
+    #output-tabs > .tab-wrapper > .tab-container[role='tablist'] {
+        align-items: stretch;
+        border-bottom: 1px solid var(--ui-border);
+        display: flex !important;
+        min-height: 44px !important;
+        padding: 0 4px !important;
+    }
+
+    #output-tabs > .tab-wrapper > .tab-container[role='tablist'] > button[role='tab'] {
+        font-size: 12px;
+        min-height: 44px !important;
+        padding: 0 14px !important;
+    }
+
+    #output-tabs > .tabitem {
+        padding: 0 !important;
+    }
+
     #mesh-viewer,
     #mesh-export-viewer,
     #mesh-stats {
@@ -2458,27 +2990,15 @@ def build_app():
     }
 
     /* Modal and footer consume the same radii, spacing and icon scale. */
-    #rtx3090-modal .rtx3090-modal-panel {
-        border-radius: var(--ui-radius-xl);
-        gap: var(--ui-space-3);
+    #rtx3090-modal > .rtx3090-modal-panel {
+        gap: 0;
     }
 
     .rtx3090-profile-card,
     .rtx-preset-status,
     .rtx3090-modal-note,
     .rtx3090-machine-strip {
-        border-radius: var(--ui-radius-lg);
-    }
-
-    #rtx3090-modal-close {
-        border: 1px solid transparent;
-        border-radius: var(--ui-radius-md);
-        font-size: inherit;
-    }
-
-    #rtx3090-modal-close:hover {
-        background: var(--ui-surface-muted);
-        border-color: var(--ui-border);
+        border-radius: 13px;
     }
 
     .rtx3090-context-tabs .ui-icon {
@@ -2501,8 +3021,8 @@ def build_app():
 
     @media (max-width: 1650px) {
         .gradio-container {
-            padding-left: 20px !important;
-            padding-right: 20px !important;
+            padding-left: 24px !important;
+            padding-right: 24px !important;
         }
 
         #workspace-grid {
@@ -2575,24 +3095,1894 @@ def build_app():
         }
     }
 
+    /* Target dashboard composition: one navy system across every native block. */
+    html,
+    body {
+        background: #080b16 !important;
+        color-scheme: dark;
+    }
+
+    body::before {
+        background:
+            radial-gradient(circle at 54% -20%, rgba(87, 92, 255, 0.12), transparent 34%),
+            linear-gradient(180deg, #090d19 0%, #070a13 100%);
+        content: "";
+        inset: 0;
+        pointer-events: none;
+        position: fixed;
+        z-index: -1;
+    }
+
+    .gradio-container {
+        background: transparent !important;
+        color: var(--ui-text);
+        min-height: 100vh;
+    }
+
+    .gradio-container main.app {
+        max-width: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .gradio-container .prose,
+    .gradio-container label,
+    .gradio-container span,
+    .gradio-container p {
+        color: inherit;
+    }
+
+    .app-topbar {
+        align-items: center;
+        display: grid;
+        gap: 18px;
+        grid-template-columns:
+            clamp(320px, 19vw, 360px)
+            minmax(600px, 1fr)
+            clamp(384px, 22vw, 420px);
+        margin: 0;
+        min-height: 42px;
+        width: 100%;
+    }
+
+    .gradio-container .block:has(#app-topbar),
+    .gradio-container .html-container:has(#app-topbar) {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    .app-brand,
+    .app-title-block,
+    .app-topbar-actions {
+        align-items: center;
+        display: flex;
+        min-width: 0;
+    }
+
+    .app-brand {
+        gap: 11px;
+    }
+
+    .app-brand strong {
+        color: var(--ui-text);
+        font-size: 20px;
+        font-weight: 760;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+    }
+
+    .app-version-badge {
+        background: rgba(99, 102, 241, 0.14);
+        border: 1px solid rgba(129, 140, 248, 0.42);
+        border-radius: var(--ui-radius-pill);
+        color: #c7cbff !important;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        padding: 6px 8px;
+        white-space: nowrap;
+    }
+
+    .app-brand-mark,
+    .app-title-mark {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        display: inline-flex;
+        flex: 0 0 38px;
+        height: 38px;
+        justify-content: center;
+        width: 38px;
+    }
+
+    .app-brand-mark .app-standard-logo,
+    .app-title-mark .app-standard-logo {
+        display: block;
+        height: 30px;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+        width: 30px;
+    }
+
+    .app-title-block {
+        gap: 12px;
+    }
+
+    .app-title-block h1 {
+        color: var(--ui-text);
+        font-size: clamp(19px, 1.35vw, 24px);
+        font-weight: 740;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-title-block p {
+        color: var(--ui-muted) !important;
+        font-size: 11px;
+        line-height: 1.4;
+        margin: 3px 0 0;
+    }
+
+    .app-topbar-actions {
+        gap: 10px;
+        justify-content: flex-end;
+    }
+
+    .app-topbar-button {
+        align-items: center;
+        background: #111625;
+        border: 1px solid var(--ui-border);
+        border-radius: 9px;
+        box-sizing: border-box;
+        color: #d8dcef;
+        cursor: pointer;
+        display: inline-flex;
+        font-family: var(--ui-font);
+        font-size: 12px;
+        font-weight: 650;
+        gap: 8px;
+        height: 38px;
+        justify-content: center;
+        margin: 0 !important;
+        padding: 0 13px;
+        transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+        white-space: nowrap;
+    }
+
+    .app-topbar-button:hover {
+        background: #171d2d;
+        border-color: #414b69;
+        color: #fff;
+    }
+
+    .app-topbar-icon-button {
+        padding: 0;
+        width: 38px;
+    }
+
+    footer {
+        display: none !important;
+    }
+
+    #workspace-grid {
+        align-items: stretch;
+        gap: 18px !important;
+        grid-template-columns:
+            clamp(320px, 19vw, 360px)
+            minmax(600px, 1fr)
+            clamp(384px, 22vw, 420px);
+    }
+
+    #input-panel,
+    #output-tabs,
+    #generation-console-panel {
+        background: rgba(16, 21, 34, 0.96) !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 18px 52px rgba(0, 0, 0, 0.12);
+        box-sizing: border-box;
+    }
+
+    #input-panel {
+        align-self: start;
+        flex-flow: column nowrap !important;
+        gap: 12px !important;
+        height: var(--ui-workspace-height);
+        max-height: var(--ui-workspace-height);
+        min-height: var(--ui-workspace-height);
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 16px !important;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+    }
+
+    #prompt-mode-tabs,
+    #input-panel > .generate-actions,
+    #settings-tabs {
+        flex-shrink: 0 !important;
+    }
+
+    .panel-heading {
+        align-items: center;
+        color: var(--ui-text);
+        display: flex;
+        font-size: 14px;
+        font-weight: 720;
+        justify-content: space-between;
+        min-height: 26px;
+        padding: 0 4px;
+    }
+
+    .panel-heading span {
+        color: var(--ui-muted) !important;
+        font-size: 10px;
+        font-weight: 550;
+    }
+
+    #prompt-mode-tabs,
+    #prompt-mode-tabs > div,
+    #prompt-mode-tabs .tabitem {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    #prompt-mode-tabs {
+        gap: 0 !important;
+    }
+
+    #prompt-mode-tabs .tab-nav {
+        background: #171c2b;
+        border-color: #222a3d;
+        border-radius: 8px;
+        min-height: 36px;
+        padding: 3px;
+    }
+
+    #prompt-mode-tabs button[role="tab"] {
+        border-radius: 6px;
+        font-size: 11px;
+        min-height: 32px;
+        padding: 5px 8px;
+    }
+
+    #prompt-mode-tabs button[role="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #4f58de, #6b70f7);
+        box-shadow: 0 5px 16px rgba(61, 67, 210, 0.2);
+    }
+
+    .input-mode-guide {
+        background: linear-gradient(135deg, rgba(82, 88, 225, 0.1), rgba(17, 22, 37, 0.82));
+        border-color: #30395a;
+        border-radius: 9px;
+        margin: 10px 0;
+        min-height: 48px;
+        padding: 9px 10px;
+    }
+
+    .input-mode-number {
+        background: rgba(101, 110, 255, 0.16);
+        border: 1px solid rgba(111, 120, 255, 0.42);
+        border-radius: 999px;
+        color: #9198ff;
+        flex-basis: 30px;
+        height: 30px;
+        width: 30px;
+    }
+
+    .input-mode-number .ui-icon {
+        height: 15px;
+        width: 15px;
+    }
+
+    .input-mode-copy strong {
+        font-size: 11px;
+    }
+
+    .input-mode-copy span {
+        color: var(--ui-muted) !important;
+        font-size: 9.5px;
+        line-height: 1.4;
+    }
+
+    .mv-upload-row {
+        gap: 10px !important;
+        width: 100% !important;
+    }
+
+    #input-panel .ui-upload {
+        background: #0d1220 !important;
+        border-color: #283047 !important;
+        border-radius: 9px !important;
+        min-width: 0 !important;
+    }
+
+    #input-panel .ui-upload label {
+        font-size: 11.5px !important;
+        font-weight: 620 !important;
+    }
+
+    .input-upload-meta {
+        align-items: center;
+        border: 1px dashed #2c3449;
+        border-radius: 8px;
+        color: var(--ui-muted);
+        display: flex;
+        font-size: 10px;
+        justify-content: center;
+        margin-top: 9px;
+        min-height: 38px;
+        padding: 7px 10px;
+        text-align: center;
+    }
+
+    #prompt-mode-tabs .tabitem > .column {
+        gap: 8px !important;
+    }
+
+    #prompt-mode-tabs .block:has(.input-mode-guide),
+    #prompt-mode-tabs .block:has(.input-upload-meta) {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    #prompt-mode-tabs .block:has(.input-mode-guide) .html-container,
+    #prompt-mode-tabs .block:has(.input-upload-meta) .html-container {
+        padding: 0 !important;
+    }
+
+    #prompt-mode-tabs .input-mode-guide {
+        margin: 4px 0;
+        min-height: 44px;
+    }
+
+    #prompt-mode-tabs .input-upload-meta {
+        margin-top: 0;
+        min-height: 32px;
+    }
+
+    #generate-3d-button {
+        background: linear-gradient(135deg, #4d4ff0 0%, #6670ff 58%, #7a70ff 100%) !important;
+        border: 1px solid rgba(143, 150, 255, 0.58) !important;
+        border-radius: 9px !important;
+        box-shadow: 0 10px 24px rgba(70, 73, 222, 0.22);
+        min-height: 50px;
+    }
+
+    #settings-tabs,
+    #settings-tabs > div,
+    #settings-tabs .tabitem,
+    #advanced-settings-form,
+    #advanced-settings-form > div {
+        align-self: stretch !important;
+        box-sizing: border-box !important;
+        flex: 1 1 auto !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    #settings-tabs {
+        overflow: visible !important;
+    }
+
+    #settings-tabs .tab-nav {
+        min-height: 40px;
+    }
+
+    #settings-tabs .tab-nav button[role="tab"] {
+        font-size: 11px;
+        min-height: 40px;
+        padding: 0 10px;
+    }
+
+    #advanced-settings-form {
+        gap: 10px !important;
+        overflow: visible !important;
+        padding-top: 10px;
+    }
+
+    .ui-control-row {
+        align-self: stretch !important;
+        display: grid !important;
+        flex: 1 1 auto !important;
+        gap: 8px !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    .ui-control-row > *,
+    #advanced-settings-form .ui-control,
+    #advanced-settings-form .ui-control > div,
+    #advanced-settings-form .ui-control .wrap,
+    #advanced-settings-form .ui-control .slider-container {
+        box-sizing: border-box !important;
+        flex: none !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control {
+        background: #131827 !important;
+        border-color: #262e43 !important;
+        border-radius: 9px !important;
+        min-height: 74px;
+        padding: 9px 10px !important;
+    }
+
+    #advanced-settings-form .ui-control-checkbox {
+        min-height: 38px;
+        padding: 7px 9px !important;
+    }
+
+    #advanced-settings-form .ui-control label,
+    #advanced-settings-form .ui-control .label-wrap {
+        font-size: 11px !important;
+        min-width: 0 !important;
+    }
+
+    #advanced-settings-form input[type="range"] {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    #output-tabs {
+        align-self: start;
+        box-sizing: border-box;
+        gap: 0 !important;
+        min-height: var(--ui-workspace-height);
+        padding: 8px 12px 12px !important;
+    }
+
+    #output-tabs .tab-nav {
+        min-height: 44px;
+        padding: 0 4px;
+    }
+
+    #output-tabs .tab-nav button[role="tab"] {
+        font-size: 11px;
+        min-height: 44px;
+        padding: 0 14px;
+    }
+
+    #mesh-viewer,
+    #mesh-export-viewer,
+    #mesh-stats {
+        margin-top: 12px;
+    }
+
+    #mesh-stats {
+        background: #090e19 !important;
+        border: 1px solid #252d40 !important;
+        border-radius: 11px !important;
+        box-sizing: border-box;
+        height: var(--ui-stage-height) !important;
+        min-height: var(--ui-stage-height) !important;
+        max-height: var(--ui-stage-height) !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+    }
+
+    #mesh-stats .json-holder {
+        box-sizing: border-box;
+        height: calc(100% - 26px) !important;
+        max-height: calc(100% - 26px) !important;
+        min-height: 0;
+        overflow: auto !important;
+        overscroll-behavior: contain;
+        padding: 14px 16px 16px;
+        scrollbar-gutter: stable;
+    }
+
+    #mesh-stats .json-node .line {
+        align-items: center;
+        min-height: 22px;
+    }
+
+    #mesh-stats .json-node button.toggle {
+        align-items: center;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 5px !important;
+        color: #7f89a5 !important;
+        cursor: pointer;
+        display: inline-flex;
+        flex: 0 0 20px;
+        height: 20px;
+        justify-content: center;
+        line-height: 0;
+        margin: 0 5px 0 -2px !important;
+        min-width: 20px !important;
+        padding: 0 !important;
+        transition: background-color 140ms ease, color 140ms ease;
+        width: 20px;
+    }
+
+    /* CSS fallback until the shared SVG icon installer wires dynamic JSON nodes. */
+    #mesh-stats .json-node button.toggle::before {
+        border-bottom: 1.5px solid currentColor;
+        border-right: 1.5px solid currentColor;
+        box-sizing: border-box;
+        content: "" !important;
+        height: 6px;
+        pointer-events: none;
+        transform: rotate(45deg) !important;
+        transition: transform 160ms ease;
+        width: 6px;
+    }
+
+    #mesh-stats .json-node .line.collapsed button.toggle::before {
+        transform: rotate(-45deg);
+    }
+
+    #mesh-stats .json-node button.toggle[data-ui-disclosure-icon-wired="true"]::before {
+        display: none;
+    }
+
+    #mesh-stats .json-node button.toggle .ui-disclosure-icon {
+        height: 14px;
+        pointer-events: none;
+        transform: rotate(0deg);
+        transition: transform 160ms ease;
+        width: 14px;
+    }
+
+    #mesh-stats .json-node .line.collapsed button.toggle .ui-disclosure-icon {
+        transform: rotate(-90deg);
+    }
+
+    #mesh-stats .json-node .line:not(.collapsed) button.toggle {
+        background: rgba(102, 112, 255, 0.08) !important;
+        color: #969cff !important;
+    }
+
+    #mesh-stats .json-node button.toggle:hover {
+        background: rgba(102, 112, 255, 0.14) !important;
+        color: #bcc0ff !important;
+    }
+
+    #mesh-stats .json-node button.toggle:active {
+        background: rgba(102, 112, 255, 0.2) !important;
+    }
+
+    #mesh-stats .json-node button.toggle:focus-visible {
+        background: rgba(102, 112, 255, 0.14) !important;
+        outline: 2px solid #858aff;
+        outline-offset: 1px;
+    }
+
+    #mesh-stats .json-node button.toggle:disabled {
+        cursor: default;
+        opacity: 0.38;
+    }
+
+    #mesh-stats .empty-wrapper {
+        height: 100%;
+        min-height: 0 !important;
+    }
+
+    #mesh-viewer iframe,
+    #mesh-export-viewer iframe {
+        border: 0;
+        border-radius: 11px;
+        height: var(--ui-stage-height);
+    }
+
+    .viewer-empty-state {
+        align-items: center;
+        background:
+            radial-gradient(circle at 50% 44%, rgba(80, 89, 220, 0.1), transparent 34%),
+            #090e19;
+        border: 1px solid #252d40;
+        border-radius: 11px;
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+        width: 100%;
+    }
+
+    .viewer-empty-state::after {
+        background-image:
+            linear-gradient(rgba(90, 103, 148, 0.14) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(90, 103, 148, 0.14) 1px, transparent 1px);
+        background-size: 28px 28px;
+        bottom: -38%;
+        content: "";
+        height: 58%;
+        left: 8%;
+        mask-image: linear-gradient(to bottom, transparent, #000 45%, transparent 100%);
+        opacity: 0.55;
+        perspective: 520px;
+        position: absolute;
+        transform: perspective(420px) rotateX(64deg);
+        width: 84%;
+    }
+
+    .viewer-empty-copy {
+        align-items: center;
+        color: var(--ui-muted);
+        display: flex;
+        flex-direction: column;
+        font-size: 12.5px;
+        gap: 8px;
+        position: relative;
+        text-align: center;
+        z-index: 1;
+    }
+
+    .viewer-empty-mark {
+        align-items: center;
+        background: rgba(102, 112, 255, 0.12);
+        border: 1px solid rgba(102, 112, 255, 0.34);
+        border-radius: 12px;
+        color: #8d94ff;
+        display: inline-flex;
+        height: 42px;
+        justify-content: center;
+        width: 42px;
+    }
+
+    .viewer-empty-copy strong {
+        color: #dfe3f1;
+        font-size: 14px;
+    }
+
+    .viewer-empty-copy p {
+        color: var(--ui-muted) !important;
+        margin: 0;
+    }
+
+    #generation-console-panel {
+        align-self: start;
+        display: flex !important;
+        flex-direction: column;
+        gap: 12px !important;
+        min-height: calc(var(--ui-stage-height) + 80px);
+        padding: 16px !important;
+    }
+
+    #generation-console-panel > .html-container,
+    #generation-console-panel > .form,
+    #generation-console-panel > .block {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        height: auto;
+        margin: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .generation-console {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        height: 420px;
+        min-height: 420px;
+    }
+
+    .generation-console-windowbar {
+        background: transparent;
+        border-bottom: 0;
+        min-height: 36px;
+        padding: 0 2px 8px;
+    }
+
+    .generation-console-dots {
+        display: none;
+    }
+
+    .generation-console-title strong {
+        font-family: var(--ui-font);
+        font-size: 14.5px;
+    }
+
+    .generation-console-title span {
+        font-size: 9px;
+        letter-spacing: 0.07em;
+    }
+
+    .generation-console-progress-wrap {
+        background: transparent;
+        border: 0;
+        padding: 6px 2px 12px;
+    }
+
+    .generation-console-progress-track {
+        background: #232a3e;
+        height: 5px;
+    }
+
+    .generation-console-progress-meta,
+    .generation-console-status,
+    .generation-console-mode,
+    .generation-console-footer {
+        font-size: 10px;
+    }
+
+    .generation-console-time {
+        color: #6f7a91;
+    }
+
+    .generation-console-message {
+        color: #d0d5e2;
+    }
+
+    .generation-console-jobbar {
+        background: #0d1220;
+        border: 1px solid #252d40;
+        border-radius: 8px 8px 0 0;
+        min-height: 36px;
+        padding: 0 10px;
+    }
+
+    .generation-console-log {
+        background: #090e19;
+        border: 1px solid #252d40;
+        border-bottom: 0;
+        border-top: 0;
+        padding: 12px 10px;
+    }
+
+    .generation-console-line {
+        font-size: 10.5px;
+        gap: 6px;
+        grid-template-columns: 52px 46px minmax(0, 1fr);
+        line-height: 1.58;
+        margin-bottom: 7px;
+    }
+
+    .generation-console-footer {
+        background: #0d1220;
+        border: 1px solid #252d40;
+        border-radius: 0 0 8px 8px;
+        min-height: 28px;
+        padding: 0 10px;
+    }
+
+    .generation-details-card,
+    #generation-output-card {
+        background: #131827 !important;
+        border: 1px solid #262e43 !important;
+        border-radius: 10px !important;
+        box-sizing: border-box;
+        overflow: hidden;
+        width: 100%;
+    }
+
+    .generation-details-card {
+        background: linear-gradient(145deg, #151b2c 0%, #111725 100%) !important;
+        border-color: #2d3750 !important;
+        border-radius: 12px !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.025),
+            0 8px 20px rgba(0, 0, 0, 0.1);
+        margin-top: 12px;
+        min-height: 148px;
+        padding: 12px;
+    }
+
+    .generation-details-card .dashboard-card-title {
+        gap: 7px;
+        justify-content: flex-start;
+        margin: 0 0 8px;
+        min-height: 20px;
+        padding: 0 2px;
+    }
+
+    .generation-details-card .dashboard-card-title::before {
+        background: #747cff;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(116, 124, 255, 0.12);
+        content: "";
+        flex: 0 0 6px;
+        height: 6px;
+        width: 6px;
+    }
+
+    .dashboard-card-title {
+        align-items: center;
+        color: var(--ui-text);
+        display: flex;
+        font-family: var(--ui-font);
+        font-size: 12px;
+        font-weight: 700;
+        justify-content: space-between;
+        margin: 0 0 11px;
+    }
+
+    .generation-details-grid {
+        display: grid;
+        gap: 6px 8px;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    }
+
+    .generation-detail {
+        align-items: center;
+        background: linear-gradient(180deg, rgba(13, 19, 34, 0.88), rgba(10, 16, 29, 0.78));
+        border: 1px solid rgba(48, 58, 85, 0.74);
+        border-radius: 7px;
+        box-sizing: border-box;
+        display: flex;
+        font-size: 9.5px;
+        gap: 6px;
+        justify-content: space-between;
+        min-height: 28px;
+        min-width: 0;
+        padding: 5px 7px;
+    }
+
+    .generation-detail span:first-child {
+        color: var(--ui-muted) !important;
+        flex: 0 0 auto;
+    }
+
+    .generation-detail strong {
+        color: #eef1fb;
+        font-family: var(--ui-mono);
+        font-size: 10.5px;
+        font-variant-numeric: tabular-nums;
+        font-weight: 680;
+        max-width: 65%;
+        min-width: 0;
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #generation-info-model {
+        max-width: 72%;
+    }
+
+    #generation-output-card {
+        background: linear-gradient(145deg, #151b2c 0%, #111725 100%) !important;
+        border-color: #2d3750 !important;
+        border-radius: 12px !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.025),
+            0 8px 20px rgba(0, 0, 0, 0.1);
+        flex: 0 0 auto !important;
+        max-height: none;
+        min-height: 110px !important;
+        padding: 12px !important;
+    }
+
+    #generation-output-card > .styler {
+        background: transparent !important;
+        gap: 8px !important;
+        overflow: visible !important;
+    }
+
+    #generation-output-card .dashboard-card-title {
+        gap: 8px;
+        min-height: 20px;
+        margin: 0 !important;
+        padding: 0 2px;
+    }
+
+    #generation-output-card .dashboard-card-title > span:first-child {
+        align-items: center;
+        display: inline-flex;
+        gap: 7px;
+        letter-spacing: 0.01em;
+    }
+
+    #generation-output-card .dashboard-card-title > span:first-child::before {
+        background: #747cff;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(116, 124, 255, 0.12);
+        content: "";
+        flex: 0 0 6px;
+        height: 6px;
+        width: 6px;
+    }
+
+    #generation-output-card .generation-output-heading {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        min-height: 20px !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    #generation-output-card .generation-output-heading > .wrap {
+        display: none !important;
+    }
+
+    #generation-output-card .generation-output-heading .html-container {
+        background: transparent !important;
+        padding: 0 !important;
+    }
+
+    #generation-output-card .generation-output-heading .prose {
+        background: transparent !important;
+    }
+
+    #generation-output-card .generation-output-file {
+        background: linear-gradient(180deg, #0d1322 0%, #0a101d 100%) !important;
+        border: 1px solid #303a55 !important;
+        border-radius: 10px !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+        max-height: none !important;
+        min-height: 54px !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+    }
+
+    #generation-output-card .generation-output-file > label[data-testid='block-label'] {
+        display: none !important;
+    }
+
+    #generation-output-card .generation-output-file .file-preview-holder {
+        height: 52px;
+        max-height: none;
+        overflow: hidden;
+        width: 100%;
+    }
+
+    #generation-output-card .generation-output-file .file-preview {
+        border: 0;
+        font-size: 11px !important;
+        margin: 0 !important;
+        max-height: none;
+        width: 100%;
+    }
+
+    #generation-output-card .generation-output-file .file-preview tbody,
+    #generation-output-card .generation-output-file .file-preview tr {
+        width: 100%;
+    }
+
+    #generation-output-card .generation-output-file .file-preview tr {
+        align-items: center;
+        background: transparent;
+        display: flex;
+        min-height: 52px;
+    }
+
+    #generation-output-card .generation-output-file td.filename {
+        align-items: center;
+        color: #eef1fb;
+        display: flex;
+        flex: 1 1 auto;
+        font-family: var(--ui-mono);
+        font-size: 11px;
+        font-weight: 650;
+        gap: 0;
+        height: 52px;
+        min-width: 0;
+        overflow: hidden;
+        padding: 0 10px !important;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #generation-output-card .generation-output-file td.filename::before {
+        align-items: center;
+        background: rgba(116, 124, 255, 0.11);
+        border: 1px solid rgba(116, 124, 255, 0.28);
+        border-radius: 6px;
+        color: #9ca3ff;
+        content: "3D";
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-family: var(--ui-font);
+        font-size: 8px;
+        font-weight: 800;
+        height: 22px;
+        justify-content: center;
+        letter-spacing: 0.05em;
+        margin-right: 9px;
+        padding: 0 6px;
+    }
+
+    #generation-output-card .generation-output-file td.filename .stem {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #generation-output-card .generation-output-file td.filename .ext {
+        flex: 0 0 auto;
+    }
+
+    #generation-output-card .generation-output-file td.download {
+        align-items: center;
+        display: flex !important;
+        flex: 0 0 auto;
+        height: 52px;
+        justify-content: flex-end;
+        padding: 6px 8px 6px 4px !important;
+        width: auto !important;
+    }
+
+    #generation-output-card .generation-output-file td.download a {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(83, 92, 218, 0.2), rgba(62, 71, 177, 0.13));
+        border: 1px solid #5661ca;
+        border-radius: 8px;
+        box-shadow: 0 5px 13px rgba(36, 43, 128, 0.15);
+        color: #b5baff;
+        display: inline-flex !important;
+        font-family: var(--ui-font);
+        font-size: 10.5px;
+        font-weight: 700;
+        gap: 6px;
+        height: 32px;
+        justify-content: center;
+        min-width: 90px;
+        padding: 0 9px;
+        text-decoration: none;
+        transition:
+            background 150ms ease,
+            border-color 150ms ease,
+            box-shadow 150ms ease,
+            color 150ms ease,
+            transform 150ms ease;
+    }
+
+    #generation-output-card .generation-output-file td.download a:hover {
+        background: linear-gradient(135deg, rgba(100, 110, 244, 0.3), rgba(74, 84, 206, 0.2));
+        border-color: #7780f5;
+        box-shadow: 0 7px 16px rgba(47, 56, 164, 0.22);
+        color: #d4d7ff;
+        transform: translateY(-1px);
+    }
+
+    #generation-output-card .generation-output-file td.download a:focus-visible {
+        outline: 2px solid #858aff;
+        outline-offset: 2px;
+    }
+
+    #generation-output-card .generation-output-file td.download .ui-icon {
+        height: 14px;
+        width: 14px;
+    }
+
+    #generation-output-card .generation-output-file .empty.large {
+        align-items: center;
+        color: #7f899f;
+        display: flex;
+        font-family: var(--ui-font);
+        font-size: 10.5px;
+        justify-content: center;
+        min-height: 56px !important;
+        padding: 10px 12px !important;
+        text-align: center;
+    }
+
+    #generation-output-card .generation-output-file .empty.large::before {
+        content: 'Generated mesh will appear here';
+    }
+
+    #generation-output-card .generation-output-file table {
+        border-spacing: 0 !important;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .generation-output-meta {
+        background: rgba(128, 138, 170, 0.08);
+        border: 1px solid rgba(128, 138, 170, 0.15);
+        border-radius: 999px;
+        color: #9ca5ba !important;
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 1.2;
+        max-width: 70%;
+        min-width: 0;
+        overflow: hidden;
+        padding: 3px 7px;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Left rail v2: compact, target-aligned controls without changing Gradio inputs. */
+    #input-panel > .block:has(.panel-heading) {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        flex-shrink: 0 !important;
+        min-height: 24px !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    #input-panel > .block:has(.panel-heading) .html-container {
+        padding: 0 !important;
+    }
+
+    #input-panel .panel-heading {
+        font-size: 14px;
+        min-height: 24px;
+        padding: 0 2px;
+    }
+
+    #prompt-mode-tabs > .tab-wrapper > .tab-container[role="tablist"] {
+        background: #171c2b;
+        border: 1px solid #222a3d;
+        border-radius: 8px;
+        display: grid !important;
+        gap: 3px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        min-height: 36px;
+        padding: 3px;
+        width: 100%;
+    }
+
+    #prompt-mode-tabs > .tab-wrapper > .tab-container[role="tablist"] > button[role="tab"] {
+        align-items: center;
+        border: 0 !important;
+        border-radius: 6px;
+        display: flex;
+        font-size: 11.5px;
+        justify-content: center;
+        min-height: 30px;
+        padding: 4px 7px;
+        text-align: center;
+        width: 100%;
+    }
+
+    #prompt-mode-tabs .tabitem {
+        padding-top: 10px !important;
+    }
+
+    #prompt-mode-tabs .input-mode-guide {
+        box-sizing: border-box;
+        gap: 10px;
+        margin: 0;
+        min-height: 50px;
+        padding: 8px 10px;
+    }
+
+    #prompt-mode-tabs .input-mode-number {
+        flex-basis: 30px;
+        height: 30px;
+        width: 30px;
+    }
+
+    #prompt-mode-tabs .input-mode-number .ui-icon {
+        height: 14px;
+        width: 14px;
+    }
+
+    #prompt-mode-tabs .input-mode-copy {
+        min-width: 0;
+    }
+
+    #prompt-mode-tabs .input-mode-copy strong {
+        font-size: 11.5px;
+        line-height: 1.25;
+        margin-bottom: 2px;
+    }
+
+    #prompt-mode-tabs .input-mode-copy span {
+        font-size: 10px;
+        line-height: 1.35;
+    }
+
+    #prompt-mode-tabs .tabitem > .column {
+        gap: 8px !important;
+    }
+
+    #prompt-mode-tabs .mv-upload-row {
+        gap: 10px !important;
+    }
+
+    #prompt-mode-tabs .mv-image button .wrap {
+        font-size: 11px;
+        line-height: 1.35;
+    }
+
+    #prompt-mode-tabs .mv-image {
+        min-height: 180px !important;
+    }
+
+    #prompt-mode-tabs .mv-image .icon-wrap {
+        width: 24px;
+    }
+
+    #prompt-mode-tabs .input-upload-meta {
+        margin-top: 0;
+        min-height: 34px;
+    }
+
+    #prompt-mode-tabs .input-upload-meta--stacked {
+        flex-direction: column;
+        gap: 4px;
+        min-height: 58px;
+        padding: 8px 10px;
+    }
+
+    .input-upload-meta-title {
+        align-items: center;
+        color: #c5cbdb;
+        display: flex;
+        font-size: 10.5px;
+        font-weight: 650;
+        gap: 5px;
+        justify-content: center;
+        line-height: 1.2;
+    }
+
+    .input-upload-meta-title .ui-icon {
+        height: 12px;
+        width: 12px;
+    }
+
+    .input-upload-meta-subtitle {
+        color: var(--ui-muted);
+        font-size: 9.5px;
+        line-height: 1.3;
+    }
+
+    .generate-actions {
+        gap: 0 !important;
+        margin-top: 2px;
+    }
+
+    #generate-3d-button {
+        border-radius: 8px !important;
+        font-size: 12.5px;
+        gap: 7px;
+        min-height: 50px;
+    }
+
+    #generate-3d-button .ui-action-icon {
+        height: 14px;
+        width: 14px;
+    }
+
+    .generate-button-copy {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        justify-content: center;
+        line-height: 1.1;
+    }
+
+    .generate-button-copy strong {
+        color: #fff;
+        font-size: 12.5px;
+        font-weight: 700;
+    }
+
+    .generate-button-copy small {
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 10px;
+        font-weight: 520;
+    }
+
+    #settings-tabs,
+    #settings-tabs > div,
+    #settings-tabs .tabitem,
+    #advanced-settings-form,
+    #advanced-settings-form > div {
+        flex: none !important;
+        height: auto !important;
+    }
+
+    #settings-tabs {
+        margin-top: 4px;
+    }
+
+    #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button) {
+        background: #151a28;
+        border: 1px solid #252d40;
+        border-radius: 8px;
+        display: flex;
+        min-height: 38px;
+        padding: 3px;
+        width: 100%;
+    }
+
+    #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button)
+    > #advanced-settings-form-button {
+        align-items: center;
+        border: 0 !important;
+        color: #aeb5c8;
+        display: flex;
+        font-size: 11.5px;
+        justify-content: flex-start;
+        min-height: 30px;
+        padding: 0 8px;
+        width: 100%;
+    }
+
+    #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button)
+    > #advanced-settings-form-button::after {
+        background: transparent !important;
+        border: 0 !important;
+        color: #7e879e;
+        content: "⌄";
+        display: block !important;
+        font-size: 13px;
+        height: auto !important;
+        margin-left: auto;
+        position: static !important;
+        width: auto !important;
+        border-color: #8f99af !important;
+        border-style: solid !important;
+        border-width: 0 1.5px 1.5px 0 !important;
+        content: "" !important;
+        flex: 0 0 6px;
+        height: 6px !important;
+        margin: -3px 3px 0 auto !important;
+        transform: rotate(45deg) !important;
+        width: 6px !important;
+    }
+
+    #advanced-settings-form {
+        padding-top: 8px;
+    }
+
+    #advanced-settings-form > .column {
+        gap: 12px !important;
+    }
+
+    #advanced-settings-form .ui-control-wide {
+        height: auto !important;
+        min-height: 116px !important;
+        overflow: visible !important;
+        padding: 12px !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .head {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .head label,
+    #advanced-settings-form .ui-control-wide .label-wrap {
+        font-size: 11px !important;
+        font-weight: 650 !important;
+    }
+
+    #advanced-settings-form .ui-control-wide input {
+        font-size: 12px !important;
+        font-variant-numeric: tabular-nums;
+    }
+
+    #advanced-settings-form .ui-control-wide .tab-like-container {
+        display: flex !important;
+        height: 36px !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .tab-like-container input {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .tab-like-container button {
+        flex: 0 0 36px !important;
+        min-width: 36px !important;
+        width: 36px !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .slider-container {
+        gap: 10px !important;
+        margin-top: 8px !important;
+    }
+
+    #advanced-settings-form .ui-control-row {
+        display: block !important;
+        flex: none !important;
+    }
+
+    #advanced-settings-form .ui-control-row > .form {
+        display: grid !important;
+        gap: 10px !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .ui-control {
+        height: auto !important;
+        min-height: 88px !important;
+        overflow: visible !important;
+        padding: 11px 12px !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .head {
+        align-items: stretch !important;
+        display: grid !important;
+        gap: 8px !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .head label,
+    #advanced-settings-form .ui-control-row-compact [data-testid="block-info"],
+    #advanced-settings-form .ui-control-row-compact .ui-control > label.block.container {
+        font-size: 11px !important;
+        font-weight: 650 !important;
+        line-height: 1.35 !important;
+        min-width: 0 !important;
+        white-space: normal !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .ui-control > label.block.container {
+        background: transparent !important;
+        border: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        height: auto !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .tab-like-container {
+        display: flex !important;
+        flex: 0 0 36px !important;
+        height: 36px !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .tab-like-container input {
+        flex: 1 1 auto !important;
+        font-size: 12px !important;
+        font-variant-numeric: tabular-nums;
+        min-width: 0 !important;
+        padding: 6px 10px !important;
+        text-align: left !important;
+        width: auto !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .tab-like-container button {
+        flex: 0 0 36px !important;
+        min-width: 36px !important;
+        width: 36px !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+        background: #0d1220 !important;
+        border: 1px solid #30384e !important;
+        border-radius: 5px !important;
+        font-size: 12px !important;
+        font-variant-numeric: tabular-nums;
+        height: 36px !important;
+        min-height: 36px !important;
+        min-width: 0 !important;
+        padding: 6px 10px !important;
+        text-align: left !important;
+        width: 100% !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .slider_input_container {
+        display: none !important;
+    }
+
+    #advanced-settings-form input[type="number"]::-webkit-inner-spin-button,
+    #advanced-settings-form input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    #advanced-settings-form .ui-control-row-checks > .form {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    #advanced-settings-form .ui-control-row-checks .ui-control.hidden {
+        display: none !important;
+    }
+
+    #advanced-settings-form .ui-control-row .ui-control-checkbox {
+        height: auto !important;
+        min-height: 48px !important;
+        padding: 10px 12px !important;
+    }
+
+    #advanced-settings-form .ui-control-row .ui-control-checkbox label,
+    #advanced-settings-form .ui-control-row .ui-control-checkbox label span {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        line-height: 1.25 !important;
+        white-space: normal !important;
+    }
+
+    /* Advanced Options visual polish; native input/reset behavior stays intact. */
+    #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button) {
+        background: linear-gradient(135deg, #171e30 0%, #111827 100%);
+        border: 1px solid #303b59;
+        border-radius: 10px;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.035),
+            0 4px 12px rgba(0, 0, 0, 0.08);
+        min-height: 40px;
+    }
+
+    #advanced-settings-form-button {
+        background: rgba(116, 124, 255, 0.07) !important;
+        border-radius: 7px !important;
+        color: #e6e9f4 !important;
+        font-size: 11.5px !important;
+        font-weight: 650 !important;
+        gap: 9px;
+        letter-spacing: 0.005em;
+        min-height: 32px !important;
+        padding: 0 10px !important;
+        transition: background 150ms ease, color 150ms ease;
+    }
+
+    #advanced-settings-form-button::before {
+        background: #7b83ff;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(123, 131, 255, 0.14);
+        content: "";
+        flex: 0 0 7px;
+        height: 7px;
+        width: 7px;
+    }
+
+    #advanced-settings-form-button:hover {
+        background: rgba(116, 124, 255, 0.1) !important;
+        color: #f3f5ff !important;
+    }
+
+    #advanced-settings-form-button:focus-visible {
+        box-shadow: 0 0 0 2px rgba(116, 124, 255, 0.38);
+        outline: 0;
+    }
+
+    #advanced-settings-form {
+        --advanced-card-bg: linear-gradient(145deg, #151c2d 0%, #101624 100%);
+        --advanced-card-border: #303c5a;
+        --advanced-field-bg: linear-gradient(180deg, #0d1424 0%, #09101d 100%);
+        padding: 10px 8px 0 !important;
+    }
+
+    #advanced-settings-form > .column {
+        gap: 8px !important;
+    }
+
+    #advanced-settings-form > .column > .form,
+    #advanced-settings-form .ui-control-row > .form {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        gap: 8px !important;
+        padding: 0 !important;
+    }
+
+    #advanced-settings-form .ui-control {
+        background: var(--advanced-card-bg) !important;
+        border: 1px solid var(--advanced-card-border) !important;
+        border-radius: 11px !important;
+        box-sizing: border-box !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    #advanced-settings-form .ui-control:hover {
+        border-color: #435174 !important;
+    }
+
+    #advanced-settings-form .ui-control:focus-within {
+        border-color: #6873e3 !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+    }
+
+    #advanced-settings-form .ui-control-wide {
+        min-height: 106px !important;
+        padding: 10px !important;
+    }
+
+    #advanced-settings-form .ui-control-wide [data-testid="block-info"] {
+        font-size: 11px !important;
+        line-height: 1.35 !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .ui-control {
+        min-height: 82px !important;
+        padding: 9px 10px !important;
+    }
+
+    #advanced-settings-form .ui-control-row .ui-control-checkbox {
+        min-height: 42px !important;
+        padding: 8px 10px !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .head,
+    #advanced-settings-form .ui-control-row-compact .head,
+    #advanced-settings-form .ui-control-row-compact .ui-control > label.block.container {
+        gap: 7px !important;
+        margin-bottom: 0 !important;
+    }
+
+    #advanced-settings-form .ui-control [data-testid="block-info"] {
+        margin-bottom: 0 !important;
+    }
+
+    #advanced-settings-form .ui-control .head label,
+    #advanced-settings-form .ui-control [data-testid="block-info"],
+    #advanced-settings-form .ui-control > label.block.container,
+    #advanced-settings-form .ui-control-checkbox label span {
+        color: #e3e7f2 !important;
+        font-size: 11.5px !important;
+        font-weight: 650 !important;
+        letter-spacing: 0.005em;
+        line-height: 1.35 !important;
+    }
+
+    #advanced-settings-form .ui-control input[type="number"] {
+        background: var(--advanced-field-bg) !important;
+        border: 1px solid #364361 !important;
+        border-radius: 7px !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+        box-sizing: border-box;
+        color: #f2f4fb !important;
+        font-size: 12.5px !important;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600 !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        padding: 6px 10px !important;
+        text-align: left !important;
+    }
+
+    #advanced-settings-form .ui-control-wide .tab-like-container,
+    #advanced-settings-form .ui-control-row-compact .tab-like-container {
+        border: 0 !important;
+        border-radius: 7px !important;
+        height: 34px !important;
+        overflow: visible !important;
+    }
+
+    #advanced-settings-form .ui-control-row-compact .tab-like-container {
+        flex: 0 0 34px !important;
+    }
+
+    #advanced-settings-form .ui-control .tab-like-container input[type="number"] {
+        border-radius: 7px 0 0 7px !important;
+    }
+
+    #advanced-settings-form button[data-testid="reset-button"] {
+        background: linear-gradient(180deg, #151d2e 0%, #101726 100%) !important;
+        border: 1px solid #364361 !important;
+        border-left: 0 !important;
+        border-radius: 0 7px 7px 0 !important;
+        box-sizing: border-box;
+        color: #aab3c8 !important;
+        height: 34px !important;
+        margin: 0 !important;
+        min-height: 34px !important;
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+
+    #advanced-settings-form .ui-control-wide button[data-testid="reset-button"],
+    #advanced-settings-form .ui-control-row-compact button[data-testid="reset-button"] {
+        border: 1px solid #364361 !important;
+        border-left: 0 !important;
+        flex: 0 0 34px !important;
+        max-width: 34px !important;
+        min-width: 34px !important;
+        width: 34px !important;
+    }
+
+    #advanced-settings-form button[data-testid="reset-button"]:hover {
+        background: #1a2235 !important;
+        border-color: #5661ca !important;
+        color: #c7ccff !important;
+    }
+
+    #advanced-settings-form button[data-testid="reset-button"]:focus-visible {
+        box-shadow: 0 0 0 2px rgba(116, 124, 255, 0.3);
+        outline: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    #advanced-settings-form button[data-testid="reset-button"] .ui-icon {
+        height: 14px !important;
+        width: 14px !important;
+    }
+
+    #advanced-settings-form .ui-control input[type="number"]:focus {
+        border-color: #6872e8 !important;
+        box-shadow: 0 0 0 2px rgba(104, 114, 232, 0.14) !important;
+        outline: 0;
+    }
+
+    #advanced-settings-form .slider_input_container {
+        --neutral-200: #2c354d;
+        --slider-color: #6872f1;
+        color: #8f99b0;
+        gap: 9px !important;
+    }
+
+    #advanced-settings-form .slider_input_container .min_value,
+    #advanced-settings-form .slider_input_container .max_value {
+        color: #939db4 !important;
+        font-family: var(--ui-mono);
+        font-size: 9.5px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    #advanced-settings-form .slider_input_container input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+    }
+
+    #advanced-settings-form .slider_input_container input[type="range"]::-webkit-slider-thumb {
+        background: #f4f5ff;
+        border: 2px solid #dfe2ff;
+        box-shadow: 0 0 0 3px rgba(104, 114, 241, 0.12), 0 2px 5px rgba(0, 0, 0, 0.24);
+        height: 16px;
+        margin-top: -5px;
+        width: 16px;
+    }
+
+    #advanced-settings-form .slider_input_container input[type="range"]::-moz-range-track,
+    #advanced-settings-form .slider_input_container input[type="range"]::-moz-range-progress {
+        height: 6px;
+    }
+
+    #advanced-settings-form .slider_input_container input[type="range"]::-moz-range-thumb {
+        background: #f4f5ff;
+        border: 2px solid #dfe2ff;
+        box-shadow: 0 0 0 3px rgba(104, 114, 241, 0.12), 0 2px 5px rgba(0, 0, 0, 0.24);
+        height: 16px;
+        width: 16px;
+    }
+
+    #advanced-settings-form .ui-control-checkbox label {
+        align-items: center;
+        cursor: pointer;
+        gap: 9px !important;
+    }
+
+    #advanced-settings-form .ui-control-checkbox input[data-testid="checkbox"] {
+        accent-color: #6872f1;
+        flex: 0 0 16px;
+        height: 16px;
+        width: 16px;
+    }
+
+    @media (max-width: 1400px) {
+        .app-topbar {
+            grid-template-columns: 320px minmax(0, 1fr);
+        }
+
+        .app-topbar-actions {
+            grid-column: 1 / -1;
+            justify-content: flex-start;
+        }
+
+        #workspace-grid {
+            grid-template-columns: 320px minmax(0, 1fr);
+        }
+
+        #generation-console-panel {
+            grid-column: 1 / -1;
+            min-height: auto;
+        }
+
+        .generation-console {
+            height: 430px;
+            min-height: 430px;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .app-topbar,
+        #workspace-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        #input-panel {
+            height: auto;
+            max-height: none;
+            min-height: 0;
+            overflow: visible;
+            scrollbar-gutter: auto;
+        }
+
+        .app-title-block {
+            grid-row: 1;
+        }
+
+        .app-brand {
+            display: none;
+        }
+
+        .app-topbar-actions {
+            grid-column: auto;
+        }
+
+        #generation-console-panel {
+            grid-column: auto;
+        }
+    }
+
+    @media (max-width: 520px) {
+        .gradio-container {
+            padding: 12px !important;
+        }
+
+        .app-title-mark {
+            display: none;
+        }
+
+        .app-title-block h1 {
+            font-size: 18px;
+            white-space: normal;
+        }
+
+        .app-topbar-actions {
+            flex-wrap: wrap;
+        }
+
+        .ui-control-row,
+        .generation-details-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        #advanced-settings-form .ui-control-row > .form {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+    }
+
     """
 
     custom_js = r"""
     () => {
         const modalId = "rtx3090-modal";
         const footerButtonId = "rtx3090-footer-trigger";
+        const presetButtonIds = {
+            safe: "rtx3090-safe-preset",
+            quality: "rtx3090-quality-preset",
+        };
         const modal = () => document.getElementById(modalId);
         const uiIconPaths = {
             box: '<path d="m3 8 9-5 9 5-9 5-9-5Z"></path><path d="m3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path>',
             terminal: '<path d="m5 7 5 5-5 5"></path><path d="M12 19h7"></path>',
             zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"></path>',
             x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
+            check: '<path d="m5 12 4 4L19 6"></path>',
+            info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path>',
             memory: '<rect x="5" y="6" width="14" height="12" rx="2"></rect><path d="M9 10h6v4H9z"></path><path d="M8 3v3M12 3v3M16 3v3M8 18v3M12 18v3M16 18v3"></path>',
             wand: '<path d="m15 4 5 5L7 22H2v-5L15 4Z"></path><path d="m14 5 5 5"></path><path d="M6 3v4M4 5h4M19 15v4M17 17h4"></path>',
             code: '<path d="m8 9-3 3 3 3"></path><path d="m16 9 3 3-3 3"></path><path d="m14 5-4 14"></path>',
             settings: '<path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5"></path><circle cx="16" cy="6" r="2"></circle><circle cx="8" cy="12" r="2"></circle><circle cx="13" cy="18" r="2"></circle>',
             rotate: '<path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path>',
             download: '<path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path>',
+            chevronDown: '<path d="m6 9 6 6 6-6"></path>',
         };
 
         const uiIconMarkup = (name, extraClass = "") => {
@@ -2600,6 +4990,38 @@ def build_app():
             if (!paths) return "";
             return '<svg class="ui-icon ' + extraClass + '" viewBox="0 0 24 24" aria-hidden="true">'
                 + paths + '</svg>';
+        };
+
+        const syncGenerateButtonCopy = (forcedMultiView = null) => {
+            const generateButton = document.getElementById("generate-3d-button");
+            if (!generateButton) return;
+
+            const isMultiView = typeof forcedMultiView === "boolean"
+                ? forcedMultiView
+                : document.querySelector(
+                    '#prompt-mode-tabs button[data-tab-id="tab_mv_prompt"]'
+                )?.getAttribute("aria-selected") === "true";
+            let copy = generateButton.querySelector(".generate-button-copy");
+            if (!copy) {
+                copy = document.createElement("span");
+                copy.className = "generate-button-copy";
+                copy.append(document.createElement("strong"), document.createElement("small"));
+                generateButton.replaceChildren();
+                generateButton.insertAdjacentHTML("afterbegin", uiIconMarkup("wand", "ui-action-icon"));
+                generateButton.append(copy);
+            }
+            const title = copy.querySelector("strong");
+            const subtitle = copy.querySelector("small");
+            const nextSubtitle = isMultiView
+                ? "4 synchronized views"
+                : "1 front image";
+            if (title.textContent !== "Generate 3D") {
+                title.textContent = "Generate 3D";
+            }
+            if (subtitle.textContent !== nextSubtitle) {
+                subtitle.textContent = nextSubtitle;
+            }
+            generateButton.dataset.uiActionIcon = "true";
         };
 
         const installUnifiedIcons = () => {
@@ -2611,11 +5033,7 @@ def build_app():
                 element.innerHTML = uiIconMarkup(iconName);
             });
 
-            const generateButton = document.getElementById("generate-3d-button");
-            if (generateButton && generateButton.dataset.uiActionIcon !== "true") {
-                generateButton.dataset.uiActionIcon = "true";
-                generateButton.insertAdjacentHTML("afterbegin", uiIconMarkup("wand", "ui-action-icon"));
-            }
+            syncGenerateButtonCopy();
 
             document.querySelectorAll('button.reset-button[data-testid="reset-button"]').forEach((button) => {
                 if (button.dataset.uiIconWired === "true") return;
@@ -2623,10 +5041,21 @@ def build_app():
                 button.innerHTML = uiIconMarkup("rotate");
             });
 
+            document.querySelectorAll("#mesh-stats button.toggle").forEach((button) => {
+                if (button.dataset.uiDisclosureIconWired === "true") return;
+                button.dataset.uiDisclosureIconWired = "true";
+                button.innerHTML = uiIconMarkup("chevronDown", "ui-disclosure-icon");
+            });
+
             document.querySelectorAll(".file-preview td.download a").forEach((link) => {
                 if (link.dataset.uiIconWired === "true") return;
+                const filenameCell = link.closest("tr.file")?.querySelector("td.filename");
+                const filename = filenameCell?.getAttribute("aria-label") ?? link.getAttribute("download") ?? "generated mesh";
                 link.dataset.uiIconWired = "true";
-                link.innerHTML = uiIconMarkup("download");
+                link.innerHTML = "Download " + uiIconMarkup("download");
+                link.setAttribute("aria-label", "Download " + filename);
+                link.setAttribute("title", "Download " + filename);
+                if (filenameCell) filenameCell.setAttribute("title", filename);
             });
 
             const footerIcons = [
@@ -2654,6 +5083,7 @@ def build_app():
             url.pathname = url.pathname.replace(/\/{2,}/g, "/");
             return url;
         };
+        let activeGenerationRouteUid = currentAppUrl().searchParams.get("generation");
 
         const createGenerationUid = () => {
             if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -2759,6 +5189,79 @@ def build_app():
             if (status) status.textContent = label;
         };
 
+        const setGenerationDetail = (id, value) => {
+            const element = generationConsoleElement(id);
+            if (element) element.textContent = value ?? "—";
+        };
+
+        const formatGenerationCount = (value) => {
+            const number = Number(value);
+            if (!Number.isFinite(number)) return "—";
+            if (number >= 1000000) return (number / 1000000).toFixed(2).replace(/\.00$/, "") + "M";
+            if (number >= 1000) return (number / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+            return Math.round(number).toLocaleString("en-US");
+        };
+
+        const formatGenerationBytes = (value) => {
+            const bytes = Number(value);
+            if (!Number.isFinite(bytes) || bytes <= 0) return null;
+            if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+            if (bytes >= 1024) return (bytes / 1024).toFixed(1) + " KB";
+            return bytes + " B";
+        };
+
+        const resetGenerationDetails = (mode = "") => {
+            setGenerationDetail("generation-info-model", "—");
+            setGenerationDetail("generation-info-views", mode === "4-VIEW" ? "4" : mode === "1-VIEW" ? "1" : "—");
+            setGenerationDetail("generation-info-time", "—");
+            setGenerationDetail("generation-info-resolution", "—");
+            setGenerationDetail("generation-info-polygons", "—");
+            setGenerationDetail("generation-info-vertices", "—");
+            setGenerationDetail("generation-output-meta", "Awaiting generated mesh");
+        };
+
+        const updateGenerationDetails = (manifest) => {
+            const params = manifest.params || manifest.stats?.params || {};
+            const stats = manifest.stats || {};
+            const rawModel = manifest.model?.shapegen || stats.model?.shapegen || "";
+            const modelName = String(rawModel).split("/").filter(Boolean).at(-1) || "—";
+            const viewCount = Array.isArray(params.views_used)
+                ? params.views_used.length
+                : params.input_mode === "four" ? 4 : params.input_mode ? 1 : "—";
+            const totalSeconds = Number(stats.time?.total);
+            const faces = stats.number_of_faces ?? manifest.number_of_faces;
+            const vertices = stats.number_of_vertices ?? manifest.number_of_vertices;
+
+            setGenerationDetail("generation-info-model", modelName);
+            setGenerationDetail("generation-info-views", String(viewCount));
+            setGenerationDetail(
+                "generation-info-time",
+                Number.isFinite(totalSeconds) ? totalSeconds.toFixed(1) + " s" : "—"
+            );
+            setGenerationDetail("generation-info-resolution", params.octree_resolution ?? "—");
+            setGenerationDetail("generation-info-polygons", formatGenerationCount(faces));
+            setGenerationDetail("generation-info-vertices", formatGenerationCount(vertices));
+
+            const outputMeta = generationConsoleElement("generation-output-meta");
+            if (!outputMeta) return;
+            if (manifest.status !== "completed") {
+                outputMeta.textContent = "Generation in progress";
+                return;
+            }
+
+            const uid = manifest.generation_uid;
+            const meshFilename = String(manifest.outputs?.mesh || "white_mesh.glb");
+            outputMeta.textContent = "GLB · saved to source";
+            fetch(
+                "/static/" + encodeURIComponent(uid) + "/" + encodeURIComponent(meshFilename),
+                {method: "HEAD", cache: "no-store"}
+            ).then((response) => {
+                if (!response.ok || generationConsoleUid !== uid) return;
+                const size = formatGenerationBytes(response.headers.get("content-length"));
+                if (size) outputMeta.textContent = "GLB · " + size + " · saved";
+            }).catch(() => {});
+        };
+
         const stopGenerationConsolePolling = () => {
             if (generationConsoleTimer !== null) {
                 window.clearInterval(generationConsoleTimer);
@@ -2768,6 +5271,8 @@ def build_app():
 
         const renderGenerationManifest = (manifest) => {
             if (!manifest || manifest.generation_uid !== generationConsoleUid) return;
+
+            updateGenerationDetails(manifest);
 
             if (
                 manifest.storage_folder
@@ -2907,6 +5412,7 @@ def build_app():
             if (modeElement) modeElement.textContent = mode;
             const clock = generationConsoleElement("generation-console-clock");
             if (clock) clock.textContent = "CONNECTING TO MANIFEST";
+            resetGenerationDetails(mode);
 
             setGenerationConsoleState("running", resumed ? "RESTORING" : "STARTING");
             setGenerationConsoleProgress(1, resumed ? "Restoring generation state" : "Dispatching request");
@@ -2937,6 +5443,7 @@ def build_app():
             const uid = createGenerationUid();
             url.searchParams.set("generation", uid);
             window.history.pushState({}, "", url);
+            activeGenerationRouteUid = uid;
             startGenerationConsole(uid);
         };
 
@@ -2968,6 +5475,7 @@ def build_app():
             if (target.getAttribute("aria-selected") !== "true") {
                 target.click();
             }
+            window.setTimeout(() => syncGenerateButtonCopy(route.index === 1), 0);
             return true;
         };
 
@@ -2981,6 +5489,7 @@ def build_app():
                 button.addEventListener("click", () => {
                     const slug = tabRoutes[index].slug;
                     const url = currentAppUrl();
+                    window.setTimeout(() => syncGenerateButtonCopy(index === 1), 0);
                     if (url.searchParams.get("tab") === slug) {
                         if (url.href !== window.location.href) {
                             window.history.replaceState({}, "", url);
@@ -3000,39 +5509,133 @@ def build_app():
             }
         };
 
-        const setModalOpen = (isOpen) => {
+        const setModalOpen = (isOpen, shouldFocusClose = false) => {
             const element = modal();
             if (!element) return;
             element.classList.toggle("rtx-open", isOpen);
             element.setAttribute("aria-hidden", String(!isOpen));
             document.body.classList.toggle("rtx3090-modal-open", isOpen);
-            if (isOpen) {
+            if (isOpen && shouldFocusClose) {
                 document.getElementById("rtx3090-modal-close")?.focus();
             }
         };
+
+        const renderPresetSelection = (activeProfile) => {
+            const element = modal();
+            if (!element || !presetButtonIds[activeProfile]) return;
+
+            element.querySelectorAll(".rtx3090-profile-card[data-profile]").forEach((card) => {
+                const isActive = card.dataset.profile === activeProfile;
+                card.classList.toggle("is-selected", isActive);
+                card.setAttribute("aria-pressed", String(isActive));
+            });
+
+            Object.entries(presetButtonIds).forEach(([profile, buttonId]) => {
+                const button = document.getElementById(buttonId);
+                if (!button) return;
+                const isActive = profile === activeProfile;
+                button.classList.toggle("rtx-preset-action-active", isActive);
+                button.setAttribute("aria-pressed", String(isActive));
+            });
+        };
+
+        const syncPresetSelection = () => {
+            const activeProfile = modal()?.querySelector(
+                ".rtx-preset-status[data-profile]"
+            )?.dataset.profile;
+            if (activeProfile) renderPresetSelection(activeProfile);
+        };
+
+        const wirePresetCards = () => {
+            const element = modal();
+            if (!element) return;
+
+            element.querySelectorAll(".rtx3090-profile-card[data-profile]").forEach((card) => {
+                if (card.dataset.rtxPresetWired === "true") return;
+                card.dataset.rtxPresetWired = "true";
+
+                const applyCardPreset = () => {
+                    const profile = card.dataset.profile;
+                    const button = document.getElementById(presetButtonIds[profile]);
+                    if (!button) return;
+                    renderPresetSelection(profile);
+                    button.click();
+                };
+
+                card.addEventListener("click", applyCardPreset);
+                card.addEventListener("keydown", (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    applyCardPreset();
+                });
+            });
+
+            Object.entries(presetButtonIds).forEach(([profile, buttonId]) => {
+                const button = document.getElementById(buttonId);
+                if (!button || button.dataset.rtxPresetWired === "true") return;
+                button.dataset.rtxPresetWired = "true";
+                button.addEventListener("click", () => renderPresetSelection(profile));
+            });
+        };
+
+        let modalOpenedFromApp = false;
 
         const syncFromUrl = () => {
             const url = currentAppUrl();
             setModalOpen(url.searchParams.get("view") === "rtx3090");
         };
 
-        const openModal = () => {
+        const openModal = (event) => {
             const url = currentAppUrl();
+            const shouldFocusClose = Boolean(event?.currentTarget?.matches?.(":focus-visible"));
             url.searchParams.set("view", "rtx3090");
             window.history.pushState({}, "", url);
-            setModalOpen(true);
+            modalOpenedFromApp = true;
+            setModalOpen(true, shouldFocusClose);
         };
 
         const closeModal = () => {
             const url = currentAppUrl();
-            if (url.searchParams.get("view") === "rtx3090") {
-                url.searchParams.delete("view");
-                window.history.pushState({}, "", url);
-            }
             setModalOpen(false);
+            if (url.searchParams.get("view") !== "rtx3090") {
+                modalOpenedFromApp = false;
+                return;
+            }
+            if (modalOpenedFromApp) {
+                modalOpenedFromApp = false;
+                window.history.back();
+                return;
+            }
+            url.searchParams.delete("view");
+            window.history.replaceState({}, "", url);
+        };
+
+        const wireTopbar = () => {
+            const apiButton = document.getElementById("app-api-docs");
+            if (apiButton && apiButton.dataset.uiWired !== "true") {
+                apiButton.dataset.uiWired = "true";
+                apiButton.addEventListener("click", () => {
+                    document.querySelector("footer button.show-api")?.click();
+                });
+            }
+
+            const settingsButton = document.getElementById("app-theme-settings");
+            if (settingsButton && settingsButton.dataset.uiWired !== "true") {
+                settingsButton.dataset.uiWired = "true";
+                settingsButton.addEventListener("click", () => {
+                    document.querySelector("footer button.settings")?.click();
+                });
+            }
+
+            const rtxButton = document.getElementById("app-rtx-profile");
+            if (rtxButton && rtxButton.dataset.uiWired !== "true") {
+                rtxButton.dataset.uiWired = "true";
+                rtxButton.addEventListener("click", openModal);
+            }
         };
 
         const installFooterItem = () => {
+            if (!modal()) return;
             const footer = Array.from(document.querySelectorAll("gradio-app footer, footer")).find(
                 (element) => element.querySelector("button.show-api, a.built-with, button.settings")
             );
@@ -3076,7 +5679,10 @@ def build_app():
         const observer = new MutationObserver(() => {
             installFooterItem();
             installUnifiedIcons();
+            wireTopbar();
             wireModal();
+            wirePresetCards();
+            syncPresetSelection();
             installTabRouting();
             installGenerationRouting();
             syncGenerationConsoleFromUrl();
@@ -3085,13 +5691,21 @@ def build_app():
 
         installFooterItem();
         installUnifiedIcons();
+        wireTopbar();
         wireModal();
+        wirePresetCards();
+        syncPresetSelection();
         installTabRouting();
         installGenerationRouting();
         syncFromUrl();
         syncGenerationConsoleFromUrl();
 
         window.addEventListener("popstate", () => {
+            const nextGenerationUid = currentAppUrl().searchParams.get("generation");
+            if (nextGenerationUid !== activeGenerationRouteUid) {
+                window.location.reload();
+                return;
+            }
             syncFromUrl();
             syncTabFromUrl();
             syncGenerationConsoleFromUrl();
@@ -3102,7 +5716,7 @@ def build_app():
             }
         });
     }
-    """ if MV_MODE and args.device == 'cuda' else "() => {}"
+    """
 
     with gr.Blocks(
         theme=gr.themes.Base(),
@@ -3115,50 +5729,61 @@ def build_app():
 
         with gr.Row(elem_id='workspace-grid'):
             with gr.Column(scale=3, elem_id='input-panel'):
+                gr.HTML('<div class="panel-heading">Input Views</div>')
                 input_mode = gr.Textbox(value='single', visible=False, label='Input mode')
                 with gr.Tabs(selected='tab_single_prompt', elem_id='prompt-mode-tabs') as tabs_prompt:
-                    with gr.Tab('1 ẢNH · Single View', id='tab_single_prompt') as tab_ip:
+                    with gr.Tab('Single View', id='tab_single_prompt') as tab_ip:
                         gr.HTML("""
                         <div class="input-mode-guide">
-                            <div class="input-mode-number">1</div>
+                            <div class="input-mode-number ui-icon-slot" data-ui-icon="box" aria-hidden="true"></div>
                             <div class="input-mode-copy">
-                                <strong>Một ảnh chính diện</strong>
-                                <span>Nhanh và đơn giản. Dùng ảnh Front rõ nét, nền trong suốt.</span>
+                                <strong>Best results with one front view</strong>
+                                <span>Use a sharp subject on a clean or transparent background.</span>
                             </div>
                         </div>
                         """)
                         image = gr.Image(
-                            label='Ảnh chính diện · Front',
+                            label='Front View',
                             type='pil',
                             image_mode='RGBA',
-                            height=300,
+                            height=240,
                             elem_classes=['single-image', 'ui-upload'],
                         )
+                        gr.HTML('<div class="input-upload-meta">PNG or JPG · one front-facing image</div>')
                         caption = gr.State(None)
 #                    with gr.Tab('Text Prompt', id='tab_txt_prompt', visible=HAS_T2I and not MV_MODE) as tab_tp:
 #                        caption = gr.Textbox(label='Text Prompt',
 #                                             placeholder='HunyuanDiT will be used to generate image.',
 #                                             info='Example: A 3D model of a cute cat, white background')
-                    with gr.Tab('4 ẢNH · Multi View', id='tab_mv_prompt', visible=MV_MODE) as tab_mv:
+                    with gr.Tab('Multi View (1–4)', id='tab_mv_prompt', visible=MV_MODE) as tab_mv:
                         gr.HTML("""
                         <div class="input-mode-guide">
-                            <div class="input-mode-number">4</div>
+                            <div class="input-mode-number ui-icon-slot" data-ui-icon="box" aria-hidden="true"></div>
                             <div class="input-mode-copy">
-                                <strong>Bốn hướng đồng bộ</strong>
-                                <span>Đưa đủ Front, Back, Left và Right để hình học nhất quán hơn.</span>
+                                <strong>Best results with four views</strong>
+                                <span>Upload Front, Back, Left and Right views of the same object.</span>
                             </div>
                         </div>
                         """)
                         with gr.Row(elem_classes='mv-upload-row'):
-                            mv_image_front = gr.Image(label='1 · Mặt trước · Front', type='pil', image_mode='RGBA', height=150,
+                            mv_image_front = gr.Image(label='1 · Front', type='pil', image_mode='RGBA', height=180,
                                                       min_width=100, elem_classes=['mv-image', 'ui-upload'])
-                            mv_image_back = gr.Image(label='2 · Mặt sau · Back', type='pil', image_mode='RGBA', height=150,
+                            mv_image_back = gr.Image(label='2 · Back', type='pil', image_mode='RGBA', height=180,
                                                      min_width=100, elem_classes=['mv-image', 'ui-upload'])
                         with gr.Row(elem_classes='mv-upload-row'):
-                            mv_image_left = gr.Image(label='3 · Bên trái · Left', type='pil', image_mode='RGBA', height=150,
+                            mv_image_left = gr.Image(label='3 · Left', type='pil', image_mode='RGBA', height=180,
                                                      min_width=100, elem_classes=['mv-image', 'ui-upload'])
-                            mv_image_right = gr.Image(label='4 · Bên phải · Right', type='pil', image_mode='RGBA', height=150,
+                            mv_image_right = gr.Image(label='4 · Right', type='pil', image_mode='RGBA', height=180,
                                                       min_width=100, elem_classes=['mv-image', 'ui-upload'])
+                        gr.HTML("""
+                        <div class="input-upload-meta input-upload-meta--stacked">
+                            <div class="input-upload-meta-title">
+                                <span class="ui-icon-slot" data-ui-icon="box" aria-hidden="true"></span>
+                                <strong>Four synchronized views</strong>
+                            </div>
+                            <span class="input-upload-meta-subtitle">PNG or JPG · Front, Back, Left and Right</span>
+                        </div>
+                        """)
 
                 with gr.Row(elem_classes='generate-actions'):
                     btn = gr.Button(
@@ -3172,10 +5797,11 @@ def build_app():
                                         visible=HAS_TEXTUREGEN,
                                         min_width=100)
 
-                with gr.Group(elem_id='mesh-download-card'):
-                    file_out = gr.File(label="Generated mesh (direct download)", visible=True,
-                                       interactive=False)
-                    file_out2 = gr.File(label="File", visible=False)
+                if not MV_MODE:
+                    with gr.Group(elem_id='mesh-download-card'):
+                        file_out = gr.File(label="Generated mesh (direct download)", visible=True,
+                                           interactive=False)
+                        file_out2 = gr.File(label="File", visible=False)
 
                 selected_options_tab = (
                     'tab_options' if TURBO_MODE
@@ -3196,18 +5822,6 @@ Fast for very complex cases, Standard seldom use.',
                             choices=['Low', 'Standard', 'High'],
                             value='Standard')
                     with gr.Tab('Advanced Options', id='tab_advanced_options', elem_id='advanced-settings-form'):
-                        with gr.Row(elem_classes=['ui-control-row', 'ui-control-row-checks']):
-                            check_box_rembg = gr.Checkbox(
-                                value=not MV_MODE,
-                                label='Remove Background',
-                                visible=HAS_REMBG,
-                                min_width=100,
-                                elem_classes=['ui-control', 'ui-control-checkbox'])
-                            randomize_seed = gr.Checkbox(
-                                label="Randomize seed", 
-                                value=True, 
-                                min_width=100,
-                                elem_classes=['ui-control', 'ui-control-checkbox'])
                         seed = gr.Slider(
                             label="Seed",
                             minimum=0,
@@ -3217,7 +5831,7 @@ Fast for very complex cases, Standard seldom use.',
                             min_width=100,
                             elem_classes=['ui-control', 'ui-control-wide'],
                         )
-                        with gr.Row(elem_classes='ui-control-row'):
+                        with gr.Row(elem_classes=['ui-control-row', 'ui-control-row-compact']):
                             num_steps = gr.Slider(maximum=100,
                                                   minimum=1,
                                                   value=5 if 'turbo' in args.subfolder else 30,
@@ -3228,12 +5842,24 @@ Fast for very complex cases, Standard seldom use.',
                                                           value=256, 
                                                           label='Octree Resolution',
                                                           elem_classes='ui-control')
-                        with gr.Row(elem_classes='ui-control-row'):
+                        with gr.Row(elem_classes=['ui-control-row', 'ui-control-row-compact']):
                             cfg_scale = gr.Number(value=5.0, label='Guidance Scale', min_width=100,
                                                   elem_classes='ui-control')
                             num_chunks = gr.Slider(maximum=5000000, minimum=1000, value=8000,
                                                    label='Number of Chunks', min_width=100,
                                                    elem_classes='ui-control')
+                        with gr.Row(elem_classes=['ui-control-row', 'ui-control-row-checks']):
+                            check_box_rembg = gr.Checkbox(
+                                value=not MV_MODE,
+                                label='Remove Background',
+                                visible=HAS_REMBG,
+                                min_width=100,
+                                elem_classes=['ui-control', 'ui-control-checkbox'])
+                            randomize_seed = gr.Checkbox(
+                                label="Randomize seed",
+                                value=True,
+                                min_width=100,
+                                elem_classes=['ui-control', 'ui-control-checkbox'])
                     with gr.Tab("Export", id='tab_export', visible=HAS_PYMESHLAB):
                         with gr.Row():
                             file_type = gr.Dropdown(label='File Type', 
@@ -3252,24 +5878,39 @@ Fast for very complex cases, Standard seldom use.',
 
             with gr.Column(scale=6, elem_id='viewport-panel'):
                 with gr.Tabs(selected='gen_mesh_panel', elem_id='output-tabs') as tabs_output:
-                    with gr.Tab('Generated Mesh', id='gen_mesh_panel'):
+                    with gr.Tab('Generation', id='gen_mesh_panel'):
                         html_gen_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output', elem_id='mesh-viewer')
                     with gr.Tab('Exporting Mesh', id='export_mesh_panel'):
                         html_export_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output', elem_id='mesh-export-viewer')
-                    with gr.Tab('Mesh Statistic', id='stats_panel'):
-                        stats = gr.Json({}, label='Mesh Stats', elem_id='mesh-stats')
+                    with gr.Tab('Statistics', id='stats_panel'):
+                        stats = gr.Json(
+                            {},
+                            label='Mesh Stats',
+                            elem_id='mesh-stats',
+                            height=HTML_HEIGHT,
+                            min_height=HTML_HEIGHT,
+                            max_height=HTML_HEIGHT,
+                        )
 
             with gr.Column(scale=3, visible=MV_MODE, elem_id='generation-console-panel'):
-                gr.HTML("""
+                gr.HTML(f"""
                 <section id="generation-console" class="generation-console" data-state="idle">
                     <header class="generation-console-windowbar">
-                        <span class="generation-console-dots" aria-hidden="true"><i></i><i></i><i></i></span>
                         <span class="generation-console-title">
                             <strong>Generation Console</strong>
                             <span>REAL-TIME INFERENCE PIPELINE</span>
                         </span>
                         <span id="generation-console-status" class="generation-console-status">IDLE</span>
                     </header>
+                    <div class="generation-console-progress-wrap">
+                        <div class="generation-console-progress-meta">
+                            <span id="generation-console-stage">Waiting for a generation request</span>
+                            <span id="generation-console-percent">0%</span>
+                        </div>
+                        <div class="generation-console-progress-track">
+                            <div id="generation-console-progress" class="generation-console-progress-bar"></div>
+                        </div>
+                    </div>
                     <div class="generation-console-jobbar">
                         <span class="ui-icon-slot" data-ui-icon="terminal" aria-hidden="true"></span>
                         <span id="generation-console-job" class="generation-console-job">No active generation</span>
@@ -3287,21 +5928,40 @@ Fast for very complex cases, Standard seldom use.',
                             <span class="generation-console-message">Console shows generation/inference progress, not model training.</span>
                         </div>
                     </div>
-                    <div class="generation-console-progress-wrap">
-                        <div class="generation-console-progress-meta">
-                            <span id="generation-console-stage">Waiting for a generation request</span>
-                            <span id="generation-console-percent">0%</span>
-                        </div>
-                        <div class="generation-console-progress-track">
-                            <div id="generation-console-progress" class="generation-console-progress-bar"></div>
-                        </div>
-                    </div>
                     <div class="generation-console-footer">
-                        <span><strong>Hunyuan3D-2mv</strong> · CUDA FP16</span>
+                        <span><strong>Hunyuan3D-2mv</strong> · {runtime_label}</span>
                         <span id="generation-console-clock">LOCAL STORAGE READY</span>
                     </div>
                 </section>
+                <section class="generation-details-card" aria-labelledby="generation-info-title">
+                    <h3 id="generation-info-title" class="dashboard-card-title">Generation Info</h3>
+                    <div class="generation-details-grid">
+                        <div class="generation-detail"><span>Model</span><strong id="generation-info-model">—</strong></div>
+                        <div class="generation-detail"><span>Views</span><strong id="generation-info-views">—</strong></div>
+                        <div class="generation-detail"><span>Time</span><strong id="generation-info-time">—</strong></div>
+                        <div class="generation-detail"><span>Resolution</span><strong id="generation-info-resolution">—</strong></div>
+                        <div class="generation-detail"><span>Polygons</span><strong id="generation-info-polygons">—</strong></div>
+                        <div class="generation-detail"><span>Vertices</span><strong id="generation-info-vertices">—</strong></div>
+                    </div>
+                </section>
                 """)
+
+                if MV_MODE:
+                    with gr.Group(elem_id='generation-output-card'):
+                        gr.HTML("""
+                        <div class="dashboard-card-title">
+                            <span>Outputs</span>
+                            <span id="generation-output-meta" class="generation-output-meta" role="status" aria-live="polite">Awaiting generated mesh</span>
+                        </div>
+                        """, elem_classes='generation-output-heading')
+                        file_out = gr.File(
+                            label="Generated Mesh",
+                            visible=True,
+                            interactive=False,
+                            show_label=False,
+                            elem_classes='generation-output-file',
+                        )
+                        file_out2 = gr.File(label="File", visible=False)
 
             with gr.Column(scale=2, visible=not MV_MODE):
                 with gr.Tabs(selected='tab_img_gallery') as gallery:
@@ -3330,17 +5990,19 @@ Fast for very complex cases, Standard seldom use.',
                             Đã kiểm tra
                         </span>
                         <span class="rtx3090-preset-count"><b>2</b> preset</span>
-                        <button id="rtx3090-modal-close" type="button" aria-label="Đóng" data-ui-icon="x"></button>
+                        <button id="rtx3090-modal-close" type="button" aria-label="Đóng cửa sổ cấu hình">
+                            <svg class="rtx3090-close-icon" width="100%" height="100%" viewBox="0 0 5 5" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill: currentcolor; fill-rule: evenodd; clip-rule: evenodd; stroke-linejoin: round; stroke-miterlimit: 2;" aria-hidden="true" focusable="false">
+                                <g>
+                                    <path d="M3.789,0.09C3.903,-0.024 4.088,-0.024 4.202,0.09L4.817,0.705C4.931,0.819 4.931,1.004 4.817,1.118L1.118,4.817C1.004,4.931 0.819,4.931 0.705,4.817L0.09,4.202C-0.024,4.088 -0.024,3.903 0.09,3.789L3.789,0.09Z"></path>
+                                    <path d="M4.825,3.797C4.934,3.907 4.934,4.084 4.825,4.193L4.193,4.825C4.084,4.934 3.907,4.934 3.797,4.825L0.082,1.11C-0.027,1.001 -0.027,0.823 0.082,0.714L0.714,0.082C0.823,-0.027 1.001,-0.027 1.11,0.082L4.825,3.797Z"></path>
+                                </g>
+                            </svg>
+                        </button>
                     </div>
                 </div>
-                """)
+                """, elem_classes='rtx3090-modal-header-block')
                 gr.HTML("""
                 <div class="rtx3090-api-intro">
-                    <p>
-                        Chọn một trong các cấu hình dưới đây để tối ưu chất lượng mesh trên
-                        máy hiện tại. Các giá trị sẽ được cập nhật trực tiếp vào
-                        <strong>Advanced Options</strong>.
-                    </p>
                     <div class="rtx3090-context-tabs">
                         <span class="active"><i class="ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></i>RTX 3090</span>
                         <span><i class="ui-icon-slot" data-ui-icon="memory" aria-hidden="true"></i>24 GB VRAM</span>
@@ -3348,75 +6010,110 @@ Fast for very complex cases, Standard seldom use.',
                         <span>4 ảnh</span>
                         <span>FP16</span>
                     </div>
+                    <p>
+                        Chọn một trong các cấu hình dưới đây để tối ưu chất lượng mesh trên máy hiện tại.<br>
+                        Các giá trị sẽ được cập nhật trực tiếp vào <strong>Advanced Options</strong>.
+                    </p>
                 </div>
-                """)
+                """, elem_classes='rtx3090-intro-block')
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
                     <b>1. Xác nhận cấu hình máy.</b>
                     <span>Hai preset này dành riêng cho RTX 3090 24 GB đang chạy WebUI.</span>
                 </div>
-                """)
+                """, elem_classes='rtx3090-section-one')
                 gr.HTML("""
                 <div class="rtx3090-machine-strip">
                     <div class="rtx3090-machine-badge">24 GB</div>
-                    <div>
+                    <div class="rtx3090-machine-copy">
                         <strong>NVIDIA GeForce RTX 3090 · CUDA · FP16</strong>
                         <span>
                             Hai mức dưới đây đã được kiểm tra end-to-end trên chính máy này,
                             không gặp lỗi thiếu VRAM với cả đầu vào 1 ảnh và 4 ảnh.
                         </span>
                     </div>
+                    <span class="rtx3090-machine-check ui-icon-slot" data-ui-icon="check" aria-hidden="true"></span>
                 </div>
-                """)
+                """, elem_classes='rtx3090-machine-block')
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
                     <b>2. Chọn mức phù hợp rồi bấm Áp dụng.</b>
                     <span>Thông số bên dưới dùng chung cho cả chế độ 1 ảnh và 4 ảnh.</span>
                 </div>
-                """)
+                """, elem_classes='rtx3090-section-two')
                 gr.HTML("""
                 <div class="rtx3090-profile-grid">
-                    <article class="rtx3090-profile-card safe">
-                        <h3>256 · Mặc định an toàn</h3>
+                    <article
+                        class="rtx3090-profile-card safe is-selected"
+                        data-profile="safe"
+                        role="button"
+                        tabindex="0"
+                        aria-pressed="true"
+                        aria-controls="advanced-settings-form"
+                        aria-label="Chọn và áp dụng preset 256 mặc định an toàn"
+                    >
+                        <div class="rtx3090-profile-heading">
+                            <h3>256 · Mặc định an toàn</h3>
+                            <span class="rtx3090-profile-selector" aria-hidden="true"></span>
+                        </div>
                         <p>Dùng cho lần chạy đầu hoặc khi cần ưu tiên ổn định và tốc độ.</p>
                         <div class="rtx3090-profile-values">
-                            <span><b>30</b>Steps</span>
-                            <span><b>5.0</b>Guidance</span>
-                            <span><b>256</b>Octree</span>
-                            <span><b>8000</b>Chunks</span>
+                            <span><b>30</b><small>Steps</small></span>
+                            <span><b>5.0</b><small>Guidance</small></span>
+                            <span><b>256</b><small>Octree</small></span>
+                            <span><b>8000</b><small>Chunks</small></span>
                         </div>
                     </article>
-                    <article class="rtx3090-profile-card quality">
-                        <h3>384 · Chất lượng cao</h3>
+                    <article
+                        class="rtx3090-profile-card quality"
+                        data-profile="quality"
+                        role="button"
+                        tabindex="0"
+                        aria-pressed="false"
+                        aria-controls="advanced-settings-form"
+                        aria-label="Chọn và áp dụng preset 384 chất lượng cao"
+                    >
+                        <div class="rtx3090-profile-heading">
+                            <h3>384 · Chất lượng cao</h3>
+                            <span class="rtx3090-profile-selector" aria-hidden="true"></span>
+                        </div>
                         <p>Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.</p>
                         <div class="rtx3090-profile-values">
-                            <span><b>30</b>Steps</span>
-                            <span><b>5.0</b>Guidance</span>
-                            <span><b>384</b>Octree</span>
-                            <span><b>8000</b>Chunks</span>
+                            <span><b>30</b><small>Steps</small></span>
+                            <span><b>5.0</b><small>Guidance</small></span>
+                            <span><b>384</b><small>Octree</small></span>
+                            <span><b>8000</b><small>Chunks</small></span>
                         </div>
                     </article>
                 </div>
-                """)
+                """, elem_classes='rtx3090-profiles-block')
                 with gr.Row(elem_classes='rtx-preset-actions'):
                     rtx_safe_preset = gr.Button(
                         value='Áp dụng · 256 an toàn',
                         min_width=160,
+                        elem_id='rtx3090-safe-preset',
                     )
                     rtx_quality_preset = gr.Button(
                         value='Áp dụng · 384 chất lượng cao',
                         variant='primary',
                         min_width=180,
+                        elem_id='rtx3090-quality-preset',
                     )
-                rtx_preset_status = gr.HTML(get_rtx3090_preset('safe')[-1])
+                rtx_preset_status = gr.HTML(
+                    get_rtx3090_preset('safe')[-1],
+                    elem_classes='rtx3090-status-block',
+                )
                 gr.HTML("""
                 <div class="rtx3090-modal-note">
-                    <strong>Lưu ý:</strong> Seed không làm tăng VRAM. Bật Randomize để thử biến
-                    thể, tắt để tái tạo đúng kết quả. Chunks 8000 cân bằng tốc độ/bộ nhớ và
-                    không làm mesh đẹp hơn khi tăng quá cao. Không đặt Octree 512 làm mặc định
-                    trên RTX 3090 24 GB.
+                    <span class="rtx3090-note-icon ui-icon-slot" data-ui-icon="info" aria-hidden="true"></span>
+                    <p>
+                        <strong>Lưu ý:</strong> Seed không làm tăng VRAM. Bật Randomize để thử biến thể,
+                        tắt để tái tạo đúng kết quả.<br>
+                        Chunks 8000 cân bằng tốc độ/bộ nhớ và không làm mesh đẹp hơn khi tăng quá cao.<br>
+                        Không đặt Octree 512 làm mặc định trên RTX 3090 24 GB.
+                    </p>
                 </div>
-                """)
+                """, elem_classes='rtx3090-note-block')
 
         tab_ip.select(
             fn=lambda: (
@@ -3641,13 +6338,14 @@ if __name__ == '__main__':
     MV_MODE = 'mv' in f'{args.model_path}/{args.subfolder}'.lower()
     TURBO_MODE = 'turbo' in args.subfolder
 
-    HTML_HEIGHT = 690 if MV_MODE else 650
+    HTML_HEIGHT = 820 if MV_MODE else 650
     HTML_WIDTH = 500
     HTML_OUTPUT_PLACEHOLDER = f"""
-    <div style='height: {HTML_HEIGHT}px; width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid #30343d; background: #0b0d11; display: flex; justify-content: center; align-items: center;'>
-      <div style='text-align: center; font-size: 16px; color: #6b7280;'>
-        <p style="color: #8d8d8d;">Welcome to Hunyuan3D!</p>
-        <p style="color: #8d8d8d;">No mesh here.</p>
+    <div class='viewer-empty-state' style='height: {HTML_HEIGHT}px;'>
+      <div class='viewer-empty-copy'>
+        <span class='viewer-empty-mark ui-icon-slot' data-ui-icon='box' aria-hidden='true'></span>
+        <strong>3D preview is ready</strong>
+        <p>Upload your input views and generate a mesh to begin.</p>
       </div>
     </div>
     """

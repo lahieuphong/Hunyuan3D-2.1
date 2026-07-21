@@ -69,6 +69,12 @@
             width: 100%;
         }
 
+        #modelviewer {
+            display: block;
+            height: var(--viewer-height, 650px);
+            width: 100%;
+        }
+
     </style>
 </head>
 
@@ -76,7 +82,7 @@
 <div class="centered-container">
     <div class="centered-container">
         <div class="column is-mobile is-centered">
-            <model-viewer id="modelviewer" style="height: #height#px; width: 100%;"
+            <model-viewer id="modelviewer"
                           rotation-per-second="10deg"
                           src="#src#" disable-tap
                           environment-image="neutral"
