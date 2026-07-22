@@ -1,0 +1,10 @@
+{
+  "venvPath": ".",
+  "venv": ".venv-win",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "standard",
+  "extraPaths": [
+    "./hy3dshape",
+    "./hy3dpaint"
+  ]
+}

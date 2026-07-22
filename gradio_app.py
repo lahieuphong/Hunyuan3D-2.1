@@ -38,6 +38,7 @@ import time
 from datetime import datetime, timezone
 from glob import glob
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 import gradio as gr
@@ -51,7 +52,7 @@ import uuid
 import numpy as np
 
 from hy3dshape.utils import logger
-MAX_SEED = 1e7
+MAX_SEED = 10_000_000
 HAS_REMBG = importlib.util.find_spec('rembg') is not None
 HAS_PYMESHLAB = importlib.util.find_spec('pymeshlab') is not None
 ENV = "Local" # "Huggingface"
@@ -73,6 +74,8 @@ RTX3090_PRESETS = {
         'num_chunks': 8000,
     },
 }
+spaces_api: Any
+
 if ENV == 'Huggingface':
     """
     Setup environment for running on Huggingface platform.
@@ -86,7 +89,10 @@ if ENV == 'Huggingface':
         This setup assumes the script is running in the Huggingface environment 
         with the specified directory structure.
     """
-    import os, spaces, subprocess, sys, shlex
+    import shlex
+    # Hugging Face injects this optional module in Spaces deployments.
+    import spaces as hf_spaces  # pyright: ignore[reportMissingImports]
+    spaces_api = hf_spaces
     print("cd /home/user/app/hy3dgen/texgen/differentiable_renderer/ && bash compile_mesh_painter.sh")
     os.system("cd /home/user/app/hy3dgen/texgen/differentiable_renderer/ && bash compile_mesh_painter.sh")
     print('install custom')
@@ -94,17 +100,19 @@ if ENV == 'Huggingface':
                    check=True)
 else:
     """
-    Define a dummy `spaces` module with a GPU decorator class for local environment.
+    Define a dummy Spaces API with a GPU decorator for the local environment.
 
     The GPU decorator is a no-op that simply returns the decorated function unchanged.
-    This allows code that uses the `spaces.GPU` decorator to run without modification locally.
+    This allows code that uses the `spaces_api.GPU` decorator to run without modification locally.
     """
-    class spaces:
+    class _LocalSpaces:
         class GPU:
             def __init__(self, duration=60):
                 self.duration = duration
             def __call__(self, func):
-                return func 
+                return func
+
+    spaces_api = _LocalSpaces()
 
 
 _RMBG_WORKER = None
@@ -498,7 +506,7 @@ def export_mesh(mesh, save_folder, textured=False, type='glb'):
 
 
 
-def quick_convert_with_obj2gltf(obj_path: str, glb_path: str) -> bool:
+def quick_convert_with_obj2gltf(obj_path: str, glb_path: str) -> None:
     from hy3dpaint.convert_utils import create_glb_with_pbr_materials
 
     # 执行转换
@@ -535,11 +543,11 @@ def render_model_viewer_document(mesh_src, height, width, textured=False):
 
 def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
     if textured:
-        related_path = f"./textured_mesh.glb"
-        output_html_path = os.path.join(save_folder, f'textured_mesh.html')
+        related_path = "./textured_mesh.glb"
+        output_html_path = os.path.join(save_folder, 'textured_mesh.html')
     else:
-        related_path = f"./white_mesh.glb"
-        output_html_path = os.path.join(save_folder, f'white_mesh.html')
+        related_path = "./white_mesh.glb"
+        output_html_path = os.path.join(save_folder, 'white_mesh.html')
     offset = 50 if textured else 10
     template_html = render_model_viewer_document(
         related_path,
@@ -598,7 +606,7 @@ def build_stored_model_viewer_html(save_folder, mesh_filename, height=660):
     """
 
 
-def restore_generation_from_request(request: gr.Request = None):
+def restore_generation_from_request(request: gr.Request | None = None):
     """Restore saved inputs, mesh preview and settings from a generation URL."""
     unchanged = tuple(gr.update() for _ in range(17))
     generation_uid = generation_uid_query_from_request(request)
@@ -672,7 +680,7 @@ def restore_generation_from_request(request: gr.Request = None):
         )),
     )
 
-@spaces.GPU(duration=60)
+@spaces_api.GPU(duration=60)
 def _gen_shape(
     caption=None,
     input_mode='single',
@@ -754,7 +762,8 @@ def _gen_shape(
     seed = int(randomize_seed_fn(seed, randomize_seed))
 
     octree_resolution = int(octree_resolution)
-    if caption: print('prompt is', caption)
+    if caption:
+        print('prompt is', caption)
     if save_folder is None:
         save_folder = gen_save_folder()
     stats = {
@@ -765,7 +774,7 @@ def _gen_shape(
         'params': {
             'caption': caption,
             'input_mode': input_mode,
-            'views_used': list(image.keys()) if MV_MODE else ['image'],
+            'views_used': list(image) if isinstance(image, dict) else ['image'],
             'steps': steps,
             'guidance_scale': guidance_scale,
             'seed': seed,
@@ -787,8 +796,8 @@ def _gen_shape(
         start_time = time.time()
         try:
             image = t2i_worker(caption)
-        except Exception as e:
-            raise gr.Error(f"Text to 3D is disable. \
+        except Exception:
+            raise gr.Error("Text to 3D is disable. \
             Please enable it by `python gradio_app.py --enable_t23d`.")
         time_meta['text2image'] = time.time() - start_time
 
@@ -807,13 +816,19 @@ def _gen_shape(
         update_generation_stage(save_folder, 'preprocessing_input')
 
     if MV_MODE:
+        if not isinstance(image, dict):
+            raise gr.Error("Multi-view input must contain named images.")
         start_time = time.time()
         for k, v in image.items():
+            if v is None:
+                raise gr.Error(f"Missing image for the {k} view.")
             if check_box_rembg or v.mode == "RGB":
                 img = get_background_remover()(v.convert('RGB'))
                 image[k] = img
         time_meta['remove background'] = time.time() - start_time
     else:
+        if image is None or isinstance(image, dict):
+            raise gr.Error("Please provide a valid input image.")
         if check_box_rembg or image.mode == "RGB":
             start_time = time.time()
             image = get_background_remover()(image.convert('RGB'))
@@ -830,7 +845,7 @@ def _gen_shape(
 
     generator = torch.Generator()
     generator = generator.manual_seed(int(seed))
-    diffusion_clock = {
+    diffusion_clock: dict[str, float | None] = {
         'started_at': None,
         'last_step_at': None,
     }
@@ -892,9 +907,10 @@ def _gen_shape(
             diffusion_clock['last_step_at'] = now
             message = f"Starting {total_diffusion_steps} real diffusion steps on CUDA"
         elif stage == 'diffusion_completed':
+            started_at = diffusion_clock['started_at']
             sampling_seconds = (
-                now - diffusion_clock['started_at']
-                if diffusion_clock['started_at'] is not None
+                now - started_at
+                if started_at is not None
                 else 0.0
             )
             details['sampling_seconds'] = round(sampling_seconds, 3)
@@ -945,14 +961,18 @@ def _gen_shape(
 
     def on_diffusion_step(step_idx, timestep, _outputs):
         now = time.perf_counter()
-        if diffusion_clock['started_at'] is None:
-            diffusion_clock['started_at'] = now
-        if diffusion_clock['last_step_at'] is None:
-            diffusion_clock['last_step_at'] = diffusion_clock['started_at']
+        started_at = diffusion_clock['started_at']
+        if started_at is None:
+            started_at = now
+            diffusion_clock['started_at'] = started_at
+        last_step_at = diffusion_clock['last_step_at']
+        if last_step_at is None:
+            last_step_at = started_at
+            diffusion_clock['last_step_at'] = last_step_at
 
         step_number = min(total_diffusion_steps, int(step_idx) + 1)
-        step_seconds = now - diffusion_clock['last_step_at']
-        elapsed_seconds = now - diffusion_clock['started_at']
+        step_seconds = now - last_step_at
+        elapsed_seconds = now - started_at
         diffusion_clock['last_step_at'] = now
         eta_seconds = (
             elapsed_seconds / max(1, step_number)
@@ -1051,7 +1071,7 @@ def _gen_shape(
     main_image = image if not MV_MODE else image.get('front', next(iter(image.values())))
     return mesh, main_image, save_folder, stats, seed
 
-@spaces.GPU(duration=60)
+@spaces_api.GPU(duration=60)
 def generation_all(
     caption=None,
     input_mode='single',
@@ -1109,7 +1129,7 @@ def generation_all(
 
     tmp_time = time.time()
 
-    text_path = os.path.join(save_folder, f'textured_mesh.obj')
+    text_path = os.path.join(save_folder, 'textured_mesh.obj')
     path_textured = tex_pipeline(mesh_path=path, image_path=image, output_mesh_path=text_path, save_glb=False)
         
     logger.info("---Texture Generation takes %s seconds ---" % (time.time() - tmp_time))
@@ -1118,7 +1138,7 @@ def generation_all(
     tmp_time = time.time()
     # Convert textured OBJ to GLB using obj2gltf with PBR support
     glb_path_textured = os.path.join(save_folder, 'textured_mesh.glb')
-    conversion_success = quick_convert_with_obj2gltf(path_textured, glb_path_textured)
+    quick_convert_with_obj2gltf(path_textured, glb_path_textured)
 
     logger.info("---Convert textured OBJ to GLB takes %s seconds ---" % (time.time() - tmp_time))
     stats['time']['convert textured OBJ to GLB'] = time.time() - tmp_time
@@ -1136,7 +1156,7 @@ def generation_all(
         seed,
     )
 
-@spaces.GPU(duration=60)
+@spaces_api.GPU(duration=60)
 def shape_generation(
     caption=None,
     input_mode='single',
@@ -1152,7 +1172,7 @@ def shape_generation(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
-    request: gr.Request = None,
+    request: gr.Request | None = None,
 ):
     start_time_0 = time.time()
     generation_uid = generation_uid_from_request(request)
@@ -4835,6 +4855,10 @@ def build_app():
         font-variant-numeric: tabular-nums;
     }
 
+    #advanced-settings-form .ui-control-wide .slider_input_container {
+        transform: translateY(4px);
+    }
+
     #advanced-settings-form .slider_input_container input[type="range"]::-webkit-slider-runnable-track {
         height: 6px;
     }
@@ -5718,8 +5742,11 @@ def build_app():
     }
     """
 
+    file_out = None
+    file_out2 = None
+
     with gr.Blocks(
-        theme=gr.themes.Base(),
+        theme=gr.Theme(),
         title=title,
         analytics_enabled=False,
         css=custom_css,
@@ -5731,7 +5758,7 @@ def build_app():
             with gr.Column(scale=3, elem_id='input-panel'):
                 gr.HTML('<div class="panel-heading">Input Views</div>')
                 input_mode = gr.Textbox(value='single', visible=False, label='Input mode')
-                with gr.Tabs(selected='tab_single_prompt', elem_id='prompt-mode-tabs') as tabs_prompt:
+                with gr.Tabs(selected='tab_single_prompt', elem_id='prompt-mode-tabs'):
                     with gr.Tab('Single View', id='tab_single_prompt') as tab_ip:
                         gr.HTML("""
                         <div class="input-mode-guide">
@@ -5964,10 +5991,10 @@ Fast for very complex cases, Standard seldom use.',
                         file_out2 = gr.File(label="File", visible=False)
 
             with gr.Column(scale=2, visible=not MV_MODE):
-                with gr.Tabs(selected='tab_img_gallery') as gallery:
+                with gr.Tabs(selected='tab_img_gallery'):
                     with gr.Tab('Image to 3D Gallery', 
                                 id='tab_img_gallery', 
-                                visible=not MV_MODE) as tab_gi:
+                                visible=not MV_MODE):
                         with gr.Row():
                             gr.Examples(examples=example_is, inputs=[image],
                                         label=None, examples_per_page=18)
@@ -6114,6 +6141,8 @@ Fast for very complex cases, Standard seldom use.',
                     </p>
                 </div>
                 """, elem_classes='rtx3090-note-block')
+
+        assert file_out is not None and file_out2 is not None
 
         tab_ip.select(
             fn=lambda: (
@@ -6352,7 +6381,7 @@ if __name__ == '__main__':
 
     INPUT_MESH_HTML = """
     <div style='height: 490px; width: 100%; border-radius: 8px; 
-    border-color: #e5e7eb; order-style: solid; border-width: 1px;'>
+    border-color: #e5e7eb; border-style: solid; border-width: 1px;'>
     </div>
     """
     example_is = get_example_img_list()
@@ -6404,7 +6433,8 @@ if __name__ == '__main__':
 
     HAS_T2I = True
     if args.enable_t23d:
-        from hy3dgen.text2image import HunyuanDiTPipeline
+        # Optional dependency required only when --enable_t23d is requested.
+        from hy3dgen.text2image import HunyuanDiTPipeline  # pyright: ignore[reportMissingImports]
 
         t2i_worker = HunyuanDiTPipeline('Tencent-Hunyuan/HunyuanDiT-v1.1-Diffusers-Distilled')
         HAS_T2I = True
@@ -6428,7 +6458,7 @@ if __name__ == '__main__':
         args.model_path,
         subfolder=args.subfolder,
         use_safetensors=args.use_safetensors,
-        variant=args.variant or None,
+        variant=cast(str, args.variant or None),
         device=args.device,
         dtype=pipeline_dtype,
     )
