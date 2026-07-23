@@ -30,6 +30,7 @@ except Exception as e:
 
 
 import json
+import math
 import os
 import random
 import shutil
@@ -46,13 +47,14 @@ import torch
 import trimesh
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import uuid
 import numpy as np
 
 from hy3dshape.utils import logger
-from webui import load_ui_assets, render_topbar
+from webui import load_ui_assets, render_history_modal, render_topbar
+from webui.history import list_generation_history
 
 MAX_SEED = 10_000_000
 HAS_REMBG = importlib.util.find_spec('rembg') is not None
@@ -578,10 +580,17 @@ def stored_generation_file(save_folder, filename):
     """Resolve a manifest filename without allowing it outside its generation folder."""
     if not filename or os.path.basename(str(filename)) != str(filename):
         return None
-    save_folder = os.path.abspath(save_folder)
-    candidate = os.path.abspath(os.path.join(save_folder, str(filename)))
+    raw_save_folder = os.path.abspath(save_folder)
+    raw_candidate = os.path.abspath(os.path.join(raw_save_folder, str(filename)))
+    if os.path.islink(raw_save_folder) or os.path.islink(raw_candidate):
+        return None
+    save_folder = os.path.realpath(raw_save_folder)
+    candidate = os.path.realpath(raw_candidate)
     try:
-        if os.path.commonpath([save_folder, candidate]) != save_folder:
+        if (
+            os.path.commonpath([save_folder, candidate]) != save_folder
+            or os.path.dirname(candidate) != save_folder
+        ):
             return None
     except ValueError:
         return None
@@ -616,23 +625,51 @@ def restore_generation_from_request(request: gr.Request | None = None):
         return unchanged
 
     save_folder = os.path.join(SAVE_DIR, generation_uid)
-    manifest_path = os.path.join(save_folder, 'generation.json')
-    if not os.path.isfile(manifest_path):
+    manifest_path = stored_generation_file(save_folder, 'generation.json')
+    if not manifest_path:
         logger.warning("Saved generation was not found: %s", generation_uid)
         return unchanged
 
     try:
         with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
             manifest = json.load(manifest_file)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         logger.exception("Could not restore generation manifest: %s", manifest_path)
         return unchanged
 
-    params = manifest.get('params') or {}
-    inputs = manifest.get('inputs') or {}
-    outputs = manifest.get('outputs') or {}
-    input_mode = manifest.get('input_mode') or params.get('input_mode') or 'single'
-    input_mode = 'four' if input_mode in {'four', '4-view', 'multi-view'} else 'single'
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get('schema_version') != 1
+        or manifest.get('generation_uid') != generation_uid
+        or not isinstance(manifest.get('events', []), list)
+    ):
+        logger.warning("Saved generation manifest is invalid: %s", manifest_path)
+        return unchanged
+
+    raw_params = manifest.get('params')
+    raw_inputs = manifest.get('inputs')
+    raw_outputs = manifest.get('outputs')
+    raw_stats = manifest.get('stats')
+    params: dict[str, Any] = raw_params if isinstance(raw_params, dict) else {}
+    inputs: dict[str, Any] = raw_inputs if isinstance(raw_inputs, dict) else {}
+    outputs: dict[str, Any] = raw_outputs if isinstance(raw_outputs, dict) else {}
+    stats: dict[str, Any] = raw_stats if isinstance(raw_stats, dict) else {}
+    raw_input_mode = manifest.get('input_mode') or params.get('input_mode') or 'single'
+    input_mode = (
+        'four'
+        if isinstance(raw_input_mode, str)
+        and raw_input_mode in {'four', '4-view', 'multi-view'}
+        else 'single'
+    )
+
+    def numeric_param(name, default):
+        value = params.get(name, default)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return default
+        try:
+            return value if math.isfinite(float(value)) else default
+        except (OverflowError, TypeError, ValueError):
+            return default
 
     def input_path(view_name, fallback_filename):
         return stored_generation_file(
@@ -668,13 +705,13 @@ def restore_generation_from_request(request: gr.Request | None = None):
         right_image if input_mode == 'four' else None,
         mesh_path,
         viewer_html,
-        manifest.get('stats') or {},
-        params.get('seed', 1234),
-        params.get('steps', 30),
-        params.get('guidance_scale', 5.0),
-        params.get('octree_resolution', 256),
-        params.get('check_box_rembg', not MV_MODE),
-        params.get('num_chunks', 8000),
+        stats,
+        numeric_param('seed', 1234),
+        numeric_param('steps', 30),
+        numeric_param('guidance_scale', 5.0),
+        numeric_param('octree_resolution', 256),
+        params.get('check_box_rembg') if isinstance(params.get('check_box_rembg'), bool) else not MV_MODE,
+        numeric_param('num_chunks', 8000),
         False,
         gr.update(value=(
             'Generate 3D · 4 Images' if input_mode == 'four'
@@ -1297,7 +1334,10 @@ def build_app():
             </button>
     """ if MV_MODE and args.device == 'cuda' else ''
 
-    title_html = render_topbar(brand_name, workspace_title, rtx_profile_action)
+    title_html = (
+        render_topbar(brand_name, workspace_title, rtx_profile_action)
+        + render_history_modal()
+    )
     custom_css, custom_js = load_ui_assets()
 
     file_out = None
@@ -2040,6 +2080,13 @@ if __name__ == '__main__':
             'multiview': MV_MODE,
             'device': args.device,
         }
+
+    @app.get('/api/generation-history')
+    def generation_history_api(limit: int = 200):
+        return JSONResponse(
+            list_generation_history(SAVE_DIR, limit=limit),
+            headers={'Cache-Control': 'no-store'},
+        )
 
     @app.get('/generation-viewer/{generation_uid}', response_class=HTMLResponse)
     def generation_viewer(generation_uid: str):

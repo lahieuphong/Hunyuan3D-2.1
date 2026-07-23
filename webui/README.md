@@ -5,6 +5,8 @@
 - `asset_manifest.py` is the single source of truth for CSS cascade and JavaScript composition order.
 - `asset_loader.py` composes the fragments into the two strings consumed by Gradio.
 - `templates.py` owns reusable HTML shell fragments.
+- `history.py` exposes a sanitized, read-only catalog of saved 3D generations.
+- `history_templates.py` owns the History dialog shell; its cards are rendered by the history script fragments.
 - `gradio_app.py` still owns Gradio components, values, and callback wiring so model behavior stays unchanged.
 
 JavaScript fragments intentionally share one lexical scope: the first opens the Gradio arrow function and the last closes it. Validate the composed bundle instead of running a fragment independently.

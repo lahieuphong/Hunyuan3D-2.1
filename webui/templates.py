@@ -30,6 +30,10 @@ def render_topbar(
                 <span class="ui-icon-slot" data-ui-icon="code" aria-hidden="true"></span>
                 <span>API Docs</span>
             </button>
+            <button id="app-generation-history" class="app-topbar-button" type="button" aria-haspopup="dialog" aria-controls="generation-history-modal" aria-expanded="false">
+                <span class="ui-icon-slot" data-ui-icon="history" aria-hidden="true"></span>
+                <span>History</span>
+            </button>
             <button id="app-theme-settings" class="app-topbar-button app-topbar-icon-button" type="button" aria-label="Settings">
                 <span class="ui-icon-slot" data-ui-icon="settings" aria-hidden="true"></span>
             </button>

@@ -14,6 +14,9 @@ STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
     "styles/11-rtx-modal-shell.css",
     "styles/12-rtx-modal-content.css",
     "styles/13-rtx-modal-responsive.css",
+    "styles/14-history-modal-shell.css",
+    "styles/15-history-cards.css",
+    "styles/16-history-responsive.css",
     "styles/20-shell-navigation.css",
     "styles/30-input-forms.css",
     "styles/40-workspace-output.css",
@@ -30,6 +33,8 @@ SCRIPT_FRAGMENTS: Final[tuple[str, ...]] = (
     "scripts/30-generation-console.js",
     "scripts/40-tab-routing.js",
     "scripts/50-preset-modal.js",
+    "scripts/55-history-rendering.js",
+    "scripts/56-history-modal.js",
     "scripts/60-shell-wiring.js",
     "scripts/90-bootstrap.js",
 )

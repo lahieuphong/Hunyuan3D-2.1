@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hunyuan3D-2mv · 3D Model Viewer</title>
     <script src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.1.1/dist/model-viewer.min.js" type="module"></script>
+    <script>
+        if (window.self === window.top) {
+            document.documentElement.classList.add('viewer-standalone');
+        }
+    </script>
     <style>
         :root {
             color-scheme: dark;
@@ -38,6 +44,15 @@
             overflow: hidden;
             position: relative;
             width: 100%;
+        }
+
+        html.viewer-standalone .viewer-shell,
+        .viewer-shell:fullscreen {
+            border: 0;
+            border-radius: 0;
+            height: 100vh;
+            height: 100dvh;
+            width: 100vw;
         }
 
         .viewer-shell::before {

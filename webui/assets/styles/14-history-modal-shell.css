@@ -1,0 +1,169 @@
+
+    body.generation-history-modal-open {
+        overflow: hidden;
+    }
+
+    .generation-history-modal {
+        --history-accent: #6b63ff;
+        --history-border: #2d3650;
+        --history-card: rgba(19, 26, 43, 0.96);
+        --history-muted: #9ba5bb;
+        --history-panel: #0d1321;
+        align-items: stretch;
+        backdrop-filter: blur(8px);
+        background: rgba(2, 5, 12, 0.72);
+        box-sizing: border-box;
+        display: none;
+        height: 100dvh;
+        inset: 0;
+        justify-content: flex-end;
+        padding: 16px 18px;
+        position: fixed;
+        width: 100vw;
+        z-index: var(--layer-top, 2147483647);
+    }
+
+    .generation-history-modal.is-open {
+        display: flex;
+    }
+
+    .generation-history-panel {
+        background:
+            radial-gradient(circle at 46% -8%, rgba(83, 91, 220, 0.13), transparent 34%),
+            linear-gradient(180deg, #101625 0%, var(--history-panel) 100%);
+        border: 1px solid var(--history-border);
+        border-radius: 18px;
+        box-shadow: 0 28px 86px rgba(0, 0, 0, 0.5);
+        box-sizing: border-box;
+        display: flex;
+        flex: 0 0 min(920px, calc(100vw - 36px));
+        flex-direction: column;
+        height: calc(100dvh - 32px);
+        max-height: calc(100dvh - 32px);
+        max-width: min(920px, calc(100vw - 36px));
+        min-width: 0;
+        overflow: hidden;
+        width: min(920px, calc(100vw - 36px));
+    }
+
+    .generation-history-header {
+        align-items: center;
+        background: rgba(16, 22, 37, 0.98);
+        border-bottom: 1px solid var(--history-border);
+        display: flex;
+        flex: 0 0 auto;
+        justify-content: space-between;
+        min-height: 78px;
+        padding: 15px 22px;
+    }
+
+    .generation-history-heading,
+    .generation-history-header-actions {
+        align-items: center;
+        display: flex;
+        min-width: 0;
+    }
+
+    .generation-history-heading {
+        gap: 12px;
+    }
+
+    .generation-history-heading-icon {
+        align-items: center;
+        background: rgba(107, 99, 255, 0.14);
+        border: 1px solid rgba(132, 124, 255, 0.42);
+        border-radius: 10px;
+        color: #aaa5ff;
+        display: inline-flex;
+        flex: 0 0 38px;
+        height: 38px;
+        justify-content: center;
+        width: 38px;
+    }
+
+    .generation-history-heading-icon .ui-icon {
+        height: 20px;
+        width: 20px;
+    }
+
+    .generation-history-heading h2 {
+        color: #f3f5fb;
+        font-size: 19px;
+        font-weight: 760;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .generation-history-heading p {
+        color: var(--history-muted) !important;
+        font-size: 12px;
+        line-height: 1.4;
+        margin: 3px 0 0;
+    }
+
+    .generation-history-header-actions {
+        gap: 9px;
+    }
+
+    .generation-history-count {
+        background: rgba(43, 184, 113, 0.12);
+        border: 1px solid rgba(59, 213, 139, 0.32);
+        border-radius: 8px;
+        color: #6ee7a7 !important;
+        font-size: 11px;
+        font-weight: 720;
+        line-height: 1;
+        padding: 8px 10px;
+        white-space: nowrap;
+    }
+
+    .generation-history-icon-button {
+        align-items: center;
+        background: #141b2c;
+        border: 1px solid #303b55;
+        border-radius: 9px;
+        color: #c9cee0;
+        cursor: pointer;
+        display: inline-flex;
+        height: 36px;
+        justify-content: center;
+        padding: 0;
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+        width: 36px;
+    }
+
+    .generation-history-icon-button:hover {
+        background: #1a2337;
+        border-color: #4b5776;
+        color: #fff;
+    }
+
+    #app-generation-history[aria-expanded="true"] {
+        background: rgba(101, 93, 255, 0.16);
+        border-color: #615aff;
+        color: #fff;
+    }
+
+    .generation-history-icon-button:disabled {
+        cursor: wait;
+        opacity: 0.72;
+    }
+
+    .generation-history-icon-button:focus-visible {
+        outline: 2px solid #837cff;
+        outline-offset: 2px;
+    }
+
+    .generation-history-icon-button .ui-icon {
+        height: 17px;
+        width: 17px;
+    }
+
+    #generation-history-refresh.is-loading .ui-icon {
+        animation: generation-history-spin 800ms linear infinite;
+    }
+
+    @keyframes generation-history-spin {
+        to { transform: rotate(-360deg); }
+    }
