@@ -1,0 +1,94 @@
+
+    .mv-image button .wrap {
+        font-size: 10px;
+    }
+
+    .mv-image .icon-wrap {
+        width: 20px;
+    }
+
+    #prompt-mode-tabs button[role="tab"] {
+        border: 1px solid var(--block-border-color);
+        border-radius: 10px;
+        flex: 1;
+        font-size: 14px;
+        font-weight: 700;
+        min-height: 44px;
+        padding: 10px 14px;
+    }
+
+    #prompt-mode-tabs button[role="tab"][aria-selected="true"] {
+        background: var(--primary-500);
+        border-color: var(--primary-500);
+        color: white;
+    }
+
+    .input-mode-guide {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(63, 81, 181, 0.14), rgba(33, 150, 243, 0.06));
+        border: 1px solid rgba(99, 130, 255, 0.35);
+        border-radius: 12px;
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+    }
+
+    .input-mode-number {
+        align-items: center;
+        background: #4263eb;
+        border-radius: 10px;
+        color: white;
+        display: flex;
+        flex: 0 0 38px;
+        font-size: 18px;
+        font-weight: 800;
+        height: 38px;
+        justify-content: center;
+    }
+
+    .input-mode-copy strong,
+    .input-mode-copy span {
+        display: block;
+    }
+
+    .input-mode-copy strong {
+        font-size: 14px;
+        margin-bottom: 3px;
+    }
+
+    .input-mode-copy span {
+        color: var(--body-text-color-subdued);
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    footer .rtx3090-footer-trigger {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--body-text-color-subdued);
+        cursor: pointer;
+        display: inline-flex;
+        font: inherit;
+        gap: 5px;
+        padding: 0 2px;
+        white-space: nowrap;
+    }
+
+    footer .rtx3090-footer-trigger:hover {
+        color: var(--body-text-color);
+        text-decoration: underline;
+    }
+
+    footer .rtx3090-footer-icon {
+        color: #748ffc;
+        font-size: 12px;
+    }
+
+    footer .rtx3090-footer-divider {
+        align-items: center;
+        color: var(--body-text-color-subdued);
+        display: inline-flex;
+        margin: 0 9px;
+    }

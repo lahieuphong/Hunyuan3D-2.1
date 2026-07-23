@@ -1,0 +1,400 @@
+
+    .rtx3090-machine-strip {
+        align-items: center;
+        background: linear-gradient(135deg, rgba(21, 29, 48, 0.98), rgba(17, 24, 40, 0.96));
+        border: 1px solid var(--rtx-border);
+        border-radius: 13px;
+        box-sizing: border-box;
+        display: flex;
+        gap: 14px;
+        min-height: 96px;
+        padding: 16px 20px;
+    }
+
+    .rtx3090-machine-badge {
+        background: linear-gradient(145deg, #6258f4, #745eff);
+        border: 1px solid rgba(167, 160, 255, 0.38);
+        border-radius: 10px;
+        box-shadow: 0 8px 22px rgba(78, 67, 222, 0.24);
+        color: white;
+        box-sizing: border-box;
+        flex: 0 0 52px;
+        font-size: 13px;
+        font-weight: 800;
+        padding: 10px 0;
+        text-align: center;
+        width: 52px;
+    }
+
+    .rtx3090-machine-copy {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .rtx3090-machine-copy strong,
+    .rtx3090-machine-copy span {
+        display: block;
+    }
+
+    .rtx3090-machine-copy strong {
+        color: #f5f6fb;
+        font-size: 17px;
+        line-height: 1.4;
+        margin-bottom: 4px;
+    }
+
+    .rtx3090-machine-copy span {
+        color: var(--rtx-muted);
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .rtx3090-machine-check {
+        align-items: center;
+        border: 2px solid #32cf80;
+        border-radius: 50%;
+        color: #32cf80;
+        display: inline-flex !important;
+        flex: 0 0 24px;
+        height: 24px;
+        justify-content: center;
+        width: 24px;
+    }
+
+    .rtx3090-machine-check .ui-icon {
+        height: 14px;
+        stroke-width: 3;
+        width: 14px;
+    }
+
+    .rtx3090-profile-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rtx3090-profile-card {
+        background: linear-gradient(135deg, rgba(24, 28, 38, 0.98), rgba(19, 23, 32, 0.98));
+        border: 1px solid #3a3f4d;
+        border-radius: 13px;
+        box-sizing: border-box;
+        cursor: pointer;
+        min-height: 152px;
+        outline: none;
+        padding: 15px 15px 13px;
+        transition:
+            border-color 160ms ease,
+            box-shadow 160ms ease,
+            background 160ms ease,
+            opacity 160ms ease;
+        user-select: none;
+    }
+
+    .rtx3090-profile-card.is-selected {
+        background: linear-gradient(135deg, rgba(22, 42, 36, 0.98), rgba(17, 30, 29, 0.98));
+        border-color: #45d58e;
+        box-shadow:
+            inset 0 0 0 1px rgba(69, 213, 142, 0.24),
+            0 10px 24px rgba(24, 150, 91, 0.14);
+    }
+
+    .rtx3090-profile-card:not(.is-selected) {
+        opacity: 0.78;
+    }
+
+    .rtx3090-profile-card:not(.is-selected):hover {
+        border-color: #555b6b;
+        opacity: 0.92;
+    }
+
+    .rtx3090-profile-card:focus-visible {
+        border-color: #8b84ff;
+        box-shadow: 0 0 0 3px rgba(113, 104, 255, 0.24);
+    }
+
+    .rtx3090-profile-card.is-selected:focus-visible {
+        border-color: #58dda0;
+        box-shadow:
+            inset 0 0 0 1px rgba(69, 213, 142, 0.24),
+            0 0 0 3px rgba(53, 208, 127, 0.2);
+    }
+
+    .rtx3090-profile-heading {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+    }
+
+    .rtx3090-profile-card h3 {
+        color: #f4f6fb;
+        font-size: 16px;
+        font-weight: 680;
+        line-height: 1.4;
+        margin: 0;
+    }
+
+    .rtx3090-profile-card.is-selected h3 {
+        color: #ffffff;
+        font-weight: 780;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) h3 {
+        color: #c6cad3;
+    }
+
+    .rtx3090-profile-selector {
+        align-items: center;
+        border: 2px solid #687086;
+        border-radius: 50%;
+        color: #fff;
+        display: inline-flex;
+        flex: 0 0 22px;
+        height: 22px;
+        justify-content: center;
+        width: 22px;
+    }
+
+    .rtx3090-profile-card.is-selected .rtx3090-profile-selector {
+        background: linear-gradient(145deg, #22b96e, #45d58e);
+        border-color: #45d58e;
+        box-shadow: 0 0 0 3px rgba(53, 208, 127, 0.12);
+    }
+
+    .rtx3090-profile-selector::after {
+        content: "";
+    }
+
+    .rtx3090-profile-card.is-selected .rtx3090-profile-selector::after {
+        border-color: #fff;
+        border-style: solid;
+        border-width: 0 2px 2px 0;
+        content: "";
+        height: 8px;
+        transform: rotate(45deg) translate(-1px, -1px);
+        width: 4px;
+    }
+
+    .rtx3090-profile-card p {
+        color: var(--rtx-muted);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 5px 0 13px;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) p {
+        color: #8e95a5;
+    }
+
+    .rtx3090-profile-values {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .rtx3090-profile-values span {
+        align-items: center;
+        background: var(--rtx-card-muted);
+        border-radius: 8px;
+        color: var(--rtx-muted);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 56px;
+        padding: 7px 5px;
+        text-align: center;
+    }
+
+    .rtx3090-profile-values b {
+        color: #f4f6fb;
+        display: block;
+        font-size: 14px;
+        line-height: 1.25;
+        margin-bottom: 3px;
+    }
+
+    .rtx3090-profile-values small {
+        color: var(--rtx-muted);
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) .rtx3090-profile-values span {
+        background: #1b1f2a;
+    }
+
+    .rtx3090-profile-card:not(.is-selected) .rtx3090-profile-values b {
+        color: #c8ccd6;
+    }
+
+    #rtx3090-modal .rtx-preset-actions {
+        gap: 16px;
+        margin-top: 19px !important;
+    }
+
+    #rtx3090-modal .rtx-preset-actions button {
+        background: linear-gradient(135deg, #555761, #474952) !important;
+        border: 1px solid #5d606b !important;
+        border-radius: 8px;
+        box-shadow: none !important;
+        color: #f3f4f8 !important;
+        font-size: 16px;
+        font-weight: 700;
+        min-height: 45px;
+        opacity: 0.78;
+        transition:
+            background 160ms ease,
+            border-color 160ms ease,
+            box-shadow 160ms ease,
+            opacity 160ms ease;
+    }
+
+    #rtx3090-modal .rtx-preset-actions button:hover {
+        border-color: #747784 !important;
+        opacity: 0.94;
+    }
+
+    #rtx3090-modal .rtx-preset-actions button.rtx-preset-action-active {
+        background: linear-gradient(135deg, #12834d 0%, #148850 100%) !important;
+        border-color: #45d58e !important;
+        box-shadow: 0 9px 20px rgba(25, 164, 98, 0.22) !important;
+        opacity: 1;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-status-block {
+        margin-top: 29px !important;
+    }
+
+    .rtx-preset-status {
+        background: linear-gradient(135deg, rgba(21, 29, 48, 0.98), rgba(17, 24, 40, 0.96));
+        border: 1px solid var(--rtx-border);
+        border-radius: 13px;
+        box-sizing: border-box;
+        min-height: 122px;
+        padding: 15px;
+    }
+
+    .rtx-preset-status-heading {
+        align-items: center;
+        display: flex;
+        gap: 14px;
+        justify-content: space-between;
+    }
+
+    .rtx-preset-status-title {
+        align-items: center;
+        display: flex;
+        font-size: 14px;
+        font-weight: 720;
+        gap: 9px;
+        line-height: 1.4;
+        min-width: 0;
+    }
+
+    .rtx-preset-status-check {
+        align-items: center;
+        background: #2abf75;
+        border-radius: 50%;
+        color: white;
+        display: inline-flex;
+        flex: 0 0 18px;
+        height: 18px;
+        justify-content: center;
+        width: 18px;
+    }
+
+    .rtx-preset-status-check .ui-icon {
+        height: 11px;
+        stroke-width: 3;
+        width: 11px;
+    }
+
+    .rtx-preset-current {
+        background: rgba(117, 126, 151, 0.18);
+        border: 1px solid rgba(144, 153, 178, 0.14);
+        border-radius: 999px;
+        color: #c6ccda !important;
+        flex: 0 0 auto;
+        font-size: 12px;
+        font-weight: 650;
+        line-height: 1;
+        padding: 5px 9px;
+    }
+
+    .rtx-preset-values {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin: 12px 0 0;
+    }
+
+    .rtx-preset-values span {
+        align-items: center;
+        background: var(--rtx-card-muted);
+        border-radius: 8px;
+        color: var(--rtx-muted);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 56px;
+        padding: 7px;
+        text-align: center;
+    }
+
+    .rtx-preset-values b {
+        color: #f4f6fb;
+        display: block;
+        font-size: 14px;
+        line-height: 1.25;
+        margin-bottom: 3px;
+    }
+
+    .rtx-preset-values small {
+        color: var(--rtx-muted);
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-note-block {
+        margin-top: 20px !important;
+    }
+
+    .rtx3090-modal-note {
+        align-items: flex-start;
+        background: linear-gradient(135deg, rgba(19, 27, 45, 0.94), rgba(16, 23, 39, 0.92));
+        border: 1px solid var(--rtx-border);
+        border-radius: 13px;
+        box-sizing: border-box;
+        color: var(--rtx-muted);
+        display: flex;
+        font-size: 14px;
+        gap: 15px;
+        line-height: 1.5;
+        min-height: 100px;
+        padding: 15px 18px;
+    }
+
+    .rtx3090-modal-note p {
+        margin: 0;
+    }
+
+    .rtx3090-modal-note strong {
+        color: #f2f4fa;
+    }
+
+    .rtx3090-note-icon {
+        align-items: center;
+        color: var(--ui-warning);
+        display: inline-flex;
+        flex: 0 0 22px;
+        height: 22px;
+        justify-content: center;
+        margin-top: 1px;
+        width: 22px;
+    }
+
+    .rtx3090-note-icon .ui-icon {
+        height: 22px;
+        stroke-width: 2.2;
+        width: 22px;
+    }

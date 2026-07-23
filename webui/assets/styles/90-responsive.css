@@ -1,0 +1,84 @@
+
+    @media (max-width: 1400px) {
+        .app-topbar {
+            grid-template-columns: 320px minmax(0, 1fr);
+        }
+
+        .app-topbar-actions {
+            grid-column: 1 / -1;
+            justify-content: flex-start;
+        }
+
+        #workspace-grid {
+            grid-template-columns: 320px minmax(0, 1fr);
+        }
+
+        #generation-console-panel {
+            grid-column: 1 / -1;
+            min-height: auto;
+        }
+
+        .generation-console {
+            height: 430px;
+            min-height: 430px;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .app-topbar,
+        #workspace-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        #input-panel {
+            height: auto;
+            max-height: none;
+            min-height: 0;
+            overflow: visible;
+            scrollbar-gutter: auto;
+        }
+
+        .app-title-block {
+            grid-row: 1;
+        }
+
+        .app-brand {
+            display: none;
+        }
+
+        .app-topbar-actions {
+            grid-column: auto;
+        }
+
+        #generation-console-panel {
+            grid-column: auto;
+        }
+    }
+
+    @media (max-width: 520px) {
+        .gradio-container {
+            padding: 12px !important;
+        }
+
+        .app-title-mark {
+            display: none;
+        }
+
+        .app-title-block h1 {
+            font-size: 18px;
+            white-space: normal;
+        }
+
+        .app-topbar-actions {
+            flex-wrap: wrap;
+        }
+
+        .ui-control-row,
+        .generation-details-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        #advanced-settings-form .ui-control-row > .form {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+    }

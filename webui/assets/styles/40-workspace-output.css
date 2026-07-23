@@ -1,0 +1,192 @@
+
+    /* Viewer, statistics and console now share one visual system. */
+    #output-tabs > .tab-wrapper {
+        align-items: stretch;
+        flex: 0 0 44px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        padding: 0 !important;
+    }
+
+    #output-tabs > .tab-wrapper > .tab-container[role='tablist'] {
+        align-items: stretch;
+        border-bottom: 1px solid var(--ui-border);
+        display: flex !important;
+        min-height: 44px !important;
+        padding: 0 4px !important;
+    }
+
+    #output-tabs > .tab-wrapper > .tab-container[role='tablist'] > button[role='tab'] {
+        font-size: 12px;
+        min-height: 44px !important;
+        padding: 0 14px !important;
+    }
+
+    #output-tabs > .tabitem {
+        padding: 0 !important;
+    }
+
+    #mesh-viewer,
+    #mesh-export-viewer,
+    #mesh-stats {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: var(--ui-radius-lg) !important;
+        margin-top: var(--ui-space-3);
+        overflow: hidden;
+        padding: 0 !important;
+    }
+
+    #mesh-viewer .html-container,
+    #mesh-export-viewer .html-container {
+        padding: 0 !important;
+    }
+
+    #mesh-viewer iframe,
+    #mesh-export-viewer iframe {
+        border-radius: var(--ui-radius-lg);
+        display: block;
+        width: 100%;
+    }
+
+    #generation-console-panel {
+        min-width: 0;
+    }
+
+    .generation-console {
+        border-color: var(--ui-border);
+        border-radius: var(--ui-radius-xl);
+        box-shadow: none;
+        height: var(--ui-workspace-height);
+        min-height: var(--ui-workspace-height);
+    }
+
+    .generation-console-windowbar {
+        gap: var(--ui-space-2);
+        min-height: var(--ui-panel-header-height);
+        padding: 0 var(--ui-space-3);
+    }
+
+    .generation-console-title strong {
+        font-size: 12px;
+    }
+
+    .generation-console-title span,
+    .generation-console-status,
+    .generation-console-mode,
+    .generation-console-progress-meta,
+    .generation-console-footer {
+        font-size: 10px;
+    }
+
+    .generation-console-line {
+        font-size: 10.5px;
+        grid-template-columns: 56px 48px minmax(0, 1fr);
+        line-height: 1.55;
+    }
+
+    /* Modal and footer consume the same radii, spacing and icon scale. */
+    #rtx3090-modal > .rtx3090-modal-panel {
+        gap: 0;
+    }
+
+    .rtx3090-profile-card,
+    .rtx-preset-status,
+    .rtx3090-modal-note,
+    .rtx3090-machine-strip {
+        border-radius: 13px;
+    }
+
+    .rtx3090-context-tabs .ui-icon {
+        height: 13px;
+        width: 13px;
+    }
+
+    footer .rtx3090-footer-trigger,
+    footer button,
+    footer a {
+        align-items: center;
+        gap: 5px;
+    }
+
+    footer .ui-icon {
+        color: currentColor;
+        height: 14px;
+        width: 14px;
+    }
+
+    @media (max-width: 1650px) {
+        .gradio-container {
+            padding-left: 24px !important;
+            padding-right: 24px !important;
+        }
+
+        #workspace-grid {
+            gap: var(--ui-space-4) !important;
+            grid-template-columns: minmax(320px, 360px) minmax(500px, 1fr) minmax(310px, 350px);
+        }
+
+        .generation-console {
+            height: var(--ui-workspace-height);
+            min-height: var(--ui-workspace-height);
+        }
+    }
+
+    @media (max-width: 1360px) {
+        #workspace-grid {
+            grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+        }
+
+        #generation-console-panel {
+            grid-column: 1 / -1;
+        }
+
+        .generation-console {
+            height: 520px;
+            min-height: 520px;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .gradio-container {
+            padding: 14px 14px 76px !important;
+        }
+
+        .app-hero {
+            justify-content: flex-start;
+        }
+
+        #workspace-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        #generation-console-panel {
+            grid-column: auto;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .app-hero-mark {
+            display: none;
+        }
+
+        .app-hero-copy h1 {
+            font-size: 20px;
+        }
+
+        .mv-upload-row,
+        .ui-control-row {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        #input-panel {
+            border-radius: var(--ui-radius-lg);
+            padding: 10px !important;
+        }
+
+        #output-tabs .tab-nav button[role="tab"] {
+            font-size: 11px;
+            padding-left: 7px;
+            padding-right: 7px;
+        }
+    }

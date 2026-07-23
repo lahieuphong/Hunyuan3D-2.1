@@ -1,0 +1,396 @@
+
+    /* Shared appearance only; each component keeps its existing scroll behavior. */
+    :root {
+        --ui-scrollbar-size: 9px;
+        --ui-scrollbar-track: #0b1020;
+        --ui-scrollbar-thumb: #5f67ed;
+        --ui-scrollbar-thumb-hover: #7379ff;
+        --ui-scrollbar-thumb-active: #858aff;
+        --ui-scrollbar-radius: 999px;
+    }
+
+    * {
+        scrollbar-color: var(--ui-scrollbar-thumb) var(--ui-scrollbar-track);
+        scrollbar-width: thin;
+    }
+
+    *::-webkit-scrollbar {
+        width: var(--ui-scrollbar-size);
+        height: var(--ui-scrollbar-size);
+    }
+
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-corner {
+        background: var(--ui-scrollbar-track);
+        border-radius: var(--ui-scrollbar-radius);
+        margin: 14px 0;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background: var(--ui-scrollbar-thumb);
+        background-clip: padding-box;
+        border: 2px solid var(--ui-scrollbar-track);
+        border-radius: var(--ui-scrollbar-radius);
+        min-height: 48px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background: var(--ui-scrollbar-thumb-hover);
+        background-clip: padding-box;
+    }
+
+    *::-webkit-scrollbar-thumb:active {
+        background: var(--ui-scrollbar-thumb-active);
+        background-clip: padding-box;
+    }
+
+    .gradio-container {
+        --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --ui-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --body-background-fill: #080b16;
+        --block-background-fill: #101522;
+        --background-fill-secondary: #151b2b;
+        --block-border-color: #252d40;
+        --border-color-primary: #313b53;
+        --body-text-color: #f4f6fb;
+        --body-text-color-subdued: #9099ad;
+        --input-background-fill: #0d1220;
+        --primary-500: #6670ff;
+        --primary-600: #5862f2;
+        --ui-bg: #080b16;
+        --ui-surface: #101522;
+        --ui-surface-muted: #151b2b;
+        --ui-border: #252d40;
+        --ui-border-strong: #313b53;
+        --ui-text: #f4f6fb;
+        --ui-muted: #9099ad;
+        --ui-primary: #6670ff;
+        --ui-primary-hover: #5862f2;
+        --ui-success: #51cf66;
+        --ui-warning: #f59f00;
+        --ui-danger: #ff6b6b;
+        --ui-space-1: 4px;
+        --ui-space-2: 8px;
+        --ui-space-3: 12px;
+        --ui-space-4: 16px;
+        --ui-space-5: 20px;
+        --ui-space-6: 24px;
+        --ui-radius-sm: 6px;
+        --ui-radius-md: 8px;
+        --ui-radius-lg: 12px;
+        --ui-radius-xl: 16px;
+        --ui-radius-pill: 999px;
+        --ui-control-height: 40px;
+        --ui-panel-header-height: 44px;
+        --ui-stage-height: 820px;
+        --ui-workspace-height: 900px;
+        font-family: var(--ui-font);
+        max-width: none !important;
+        padding: 20px 24px 30px !important;
+    }
+
+    #generation-console-panel {
+        background: transparent !important;
+        border: 0 !important;
+        min-width: 320px;
+        padding: 0 !important;
+    }
+
+    #generation-console-panel .html-container {
+        height: 100%;
+        overflow: visible;
+        padding: 0;
+    }
+
+    .generation-console {
+        --console-accent: #5c7cfa;
+        --console-border: #30343d;
+        --console-green: #51cf66;
+        --console-muted: #8b93a7;
+        background: #0b0d11;
+        border: 1px solid var(--console-border);
+        border-radius: 10px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+        color: #d8dee9;
+        display: flex;
+        flex-direction: column;
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        height: 690px;
+        min-height: 520px;
+        overflow: hidden;
+    }
+
+    .generation-console-windowbar {
+        align-items: center;
+        background: #151820;
+        border-bottom: 1px solid var(--console-border);
+        display: flex;
+        gap: 11px;
+        min-height: 54px;
+        padding: 0 14px;
+    }
+
+    .generation-console-dots {
+        display: flex;
+        gap: 6px;
+    }
+
+    .generation-console-dots i {
+        border-radius: 999px;
+        display: block;
+        height: 8px;
+        width: 8px;
+    }
+
+    .generation-console-dots i:nth-child(1) { background: #ff6b6b; }
+    .generation-console-dots i:nth-child(2) { background: #ffd43b; }
+    .generation-console-dots i:nth-child(3) { background: #51cf66; }
+
+    .generation-console-title {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .generation-console-title strong,
+    .generation-console-title span {
+        display: block;
+    }
+
+    .generation-console-title strong {
+        color: #f1f3f5;
+        font-family: var(--font);
+        font-size: 13px;
+        line-height: 1.25;
+    }
+
+    .generation-console-title span {
+        color: var(--console-muted);
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        margin-top: 2px;
+    }
+
+    .generation-console-status {
+        align-items: center;
+        background: rgba(139, 147, 167, 0.12);
+        border: 1px solid rgba(139, 147, 167, 0.28);
+        border-radius: 999px;
+        color: #adb5bd;
+        display: inline-flex;
+        font-size: 9px;
+        font-weight: 800;
+        gap: 6px;
+        letter-spacing: 0.06em;
+        padding: 5px 8px;
+    }
+
+    .generation-console-status::before {
+        background: currentColor;
+        border-radius: 999px;
+        content: "";
+        height: 6px;
+        width: 6px;
+    }
+
+    .generation-console[data-state="running"] .generation-console-status {
+        background: rgba(81, 207, 102, 0.1);
+        border-color: rgba(81, 207, 102, 0.32);
+        color: var(--console-green);
+    }
+
+    .generation-console[data-state="running"] .generation-console-status::before {
+        animation: generation-console-pulse 1.2s ease-in-out infinite;
+        box-shadow: 0 0 0 4px rgba(81, 207, 102, 0.1);
+    }
+
+    .generation-console[data-state="completed"] .generation-console-status {
+        background: rgba(81, 207, 102, 0.12);
+        border-color: rgba(81, 207, 102, 0.35);
+        color: var(--console-green);
+    }
+
+    .generation-console[data-state="failed"] .generation-console-status {
+        background: rgba(255, 107, 107, 0.12);
+        border-color: rgba(255, 107, 107, 0.35);
+        color: #ff8787;
+    }
+
+    .generation-console-jobbar {
+        align-items: center;
+        background: #10131a;
+        border-bottom: 1px solid #242832;
+        display: flex;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 14px;
+    }
+
+    .generation-console-jobbar > span:first-child {
+        color: #74c0fc;
+        font-size: 12px;
+    }
+
+    .generation-console-job {
+        color: #aab2c3;
+        flex: 1;
+        font-size: 10px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .generation-console-mode {
+        background: #1a1e27;
+        border: 1px solid #303642;
+        border-radius: 4px;
+        color: #bac8ff;
+        font-size: 9px;
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+
+    .generation-console-log {
+        flex: 1;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 14px 12px 18px;
+    }
+
+    .generation-console-line {
+        align-items: start;
+        display: grid;
+        font-size: 10px;
+        gap: 7px;
+        grid-template-columns: 54px 44px minmax(0, 1fr);
+        line-height: 1.55;
+        margin-bottom: 7px;
+    }
+
+    .generation-console-time {
+        color: #596273;
+        user-select: none;
+    }
+
+    .generation-console-level {
+        color: #74c0fc;
+        font-weight: 800;
+        user-select: none;
+    }
+
+    .generation-console-message {
+        color: #c7cedb;
+        overflow-wrap: anywhere;
+    }
+
+    .generation-console-line[data-kind="command"] .generation-console-level,
+    .generation-console-line[data-kind="command"] .generation-console-message {
+        color: #b197fc;
+    }
+
+    .generation-console-line[data-kind="success"] .generation-console-level,
+    .generation-console-line[data-kind="success"] .generation-console-message {
+        color: #69db7c;
+    }
+
+    .generation-console-line[data-kind="error"] .generation-console-level,
+    .generation-console-line[data-kind="error"] .generation-console-message {
+        color: #ff8787;
+    }
+
+    .generation-console-line[data-kind="muted"] .generation-console-level,
+    .generation-console-line[data-kind="muted"] .generation-console-message {
+        color: #70798c;
+    }
+
+    .generation-console-progress-wrap {
+        background: #10131a;
+        border-top: 1px solid #242832;
+        padding: 11px 14px 10px;
+    }
+
+    .generation-console-progress-meta {
+        align-items: center;
+        color: #828b9e;
+        display: flex;
+        font-size: 9px;
+        justify-content: space-between;
+        margin-bottom: 7px;
+    }
+
+    .generation-console-progress-track {
+        background: #242832;
+        border-radius: 999px;
+        height: 4px;
+        overflow: hidden;
+    }
+
+    .generation-console-progress-bar {
+        background: linear-gradient(90deg, #4263eb, #748ffc, #4dabf7);
+        border-radius: inherit;
+        height: 100%;
+        position: relative;
+        transition: width 420ms ease;
+        width: 0%;
+    }
+
+    .generation-console[data-state="running"] .generation-console-progress-bar::after {
+        animation: generation-console-scan 1.4s linear infinite;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+        content: "";
+        inset: 0;
+        position: absolute;
+        transform: translateX(-100%);
+    }
+
+    .generation-console[data-state="failed"] .generation-console-progress-bar {
+        background: #fa5252;
+    }
+
+    .generation-console-footer {
+        align-items: center;
+        background: #151820;
+        border-top: 1px solid var(--console-border);
+        color: #6f788b;
+        display: flex;
+        font-size: 9px;
+        justify-content: space-between;
+        min-height: 32px;
+        padding: 0 14px;
+    }
+
+    .generation-console-footer strong {
+        color: #748ffc;
+        font-weight: 700;
+    }
+
+    @keyframes generation-console-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+    }
+
+    @keyframes generation-console-scan {
+        to { transform: translateX(100%); }
+    }
+
+    @media (max-width: 1500px) {
+        .gradio-container {
+            max-width: 100% !important;
+        }
+
+        .generation-console {
+            height: 620px;
+        }
+    }
+
+    @media (max-width: 1080px) {
+        #generation-console-panel {
+            min-width: min(100%, 420px);
+        }
+
+        .generation-console {
+            height: 430px;
+            min-height: 430px;
+        }
+    }

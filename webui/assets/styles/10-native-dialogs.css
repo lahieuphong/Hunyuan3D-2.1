@@ -1,0 +1,35 @@
+
+    /* Match Gradio's Settings and API Docs inset frame to the RTX modal. */
+    .api-docs {
+        box-sizing: border-box !important;
+        padding: 16px 18px !important;
+    }
+
+    .api-docs > .api-docs-wrap {
+        border-radius: 18px !important;
+        height: 100%;
+        max-height: 100%;
+    }
+
+    .api-docs .theme-buttons .settings-theme-content {
+        align-items: center;
+        display: inline-flex;
+        gap: 6px;
+        white-space: nowrap;
+    }
+
+    .api-docs .theme-buttons .settings-theme-icon {
+        height: 13px;
+        stroke-width: 1.75;
+        width: 13px;
+    }
+
+    .api-docs .settings-language-icon {
+        height: 14px;
+        stroke-width: 1.75;
+        width: 14px;
+    }
+
+    body.rtx3090-modal-open {
+        overflow: hidden;
+    }

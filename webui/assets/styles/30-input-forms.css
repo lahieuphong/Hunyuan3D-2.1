@@ -1,0 +1,130 @@
+
+    /* Upload and download surfaces */
+    .input-mode-guide {
+        background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+        border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border));
+        border-radius: var(--ui-radius-lg);
+        gap: var(--ui-space-3);
+        margin: var(--ui-space-3) 0;
+        min-height: 64px;
+        padding: var(--ui-space-3);
+    }
+
+    .input-mode-number {
+        background: var(--ui-primary);
+        border-radius: var(--ui-radius-md);
+        flex-basis: 36px;
+        font-size: 16px;
+        height: 36px;
+    }
+
+    .input-mode-copy strong {
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .input-mode-copy span {
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .mv-upload-row {
+        display: grid !important;
+        gap: var(--ui-space-3) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mv-upload-row > * {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    #input-panel .ui-upload {
+        background: var(--ui-surface-muted) !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: var(--ui-radius-lg) !important;
+        overflow: hidden;
+    }
+
+    #input-panel .ui-upload:hover {
+        border-color: color-mix(in srgb, var(--ui-primary) 55%, var(--ui-border)) !important;
+    }
+
+    .generate-actions {
+        gap: var(--ui-space-2) !important;
+        margin-top: var(--ui-space-1);
+    }
+
+    #generate-3d-button {
+        align-items: center;
+        border-radius: var(--ui-radius-md) !important;
+        box-shadow: 0 8px 18px rgba(66, 99, 235, 0.2);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 700;
+        gap: var(--ui-space-2);
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    #mesh-download-card {
+        background: var(--ui-surface-muted);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-lg);
+        overflow: hidden;
+    }
+
+    #mesh-download-card .block {
+        border: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    /* Fixed, repeatable form grid */
+    #settings-tabs {
+        margin-top: var(--ui-space-1);
+    }
+
+    #advanced-settings-form {
+        gap: var(--ui-space-3) !important;
+        padding-top: var(--ui-space-3);
+    }
+
+    .ui-control-row {
+        display: grid !important;
+        gap: var(--ui-space-3) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ui-control-row-checks {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    #advanced-settings-form .ui-control {
+        background: var(--ui-surface-muted) !important;
+        border: 1px solid var(--ui-border) !important;
+        border-radius: var(--ui-radius-lg) !important;
+        box-sizing: border-box;
+        margin: 0 !important;
+        min-height: 82px;
+        min-width: 0 !important;
+        padding: 10px 12px !important;
+        width: 100%;
+    }
+
+    #advanced-settings-form .ui-control-checkbox {
+        align-items: center;
+        display: flex;
+        min-height: var(--ui-control-height);
+        padding: 8px 10px !important;
+    }
+
+    #advanced-settings-form .ui-control label {
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    #advanced-settings-form input[type="number"],
+    #advanced-settings-form input[type="text"] {
+        min-height: 34px;
+    }

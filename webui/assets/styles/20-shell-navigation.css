@@ -1,0 +1,167 @@
+
+    /* Unified application shell */
+    .app-hero {
+        align-items: center;
+        display: flex;
+        gap: var(--ui-space-3);
+        justify-content: center;
+        margin: 2px auto var(--ui-space-5);
+        min-height: 54px;
+        text-align: left;
+    }
+
+    .app-hero-mark {
+        align-items: center;
+        background: linear-gradient(145deg, #4263eb, #6d8cff);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: var(--ui-radius-lg);
+        box-shadow: 0 10px 28px rgba(66, 99, 235, 0.24);
+        color: white;
+        display: inline-flex;
+        flex: 0 0 42px;
+        height: 42px;
+        justify-content: center;
+        width: 42px;
+    }
+
+    .app-hero-copy h1 {
+        color: var(--ui-text);
+        font-size: clamp(22px, 1.55vw, 28px);
+        font-weight: 750;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .app-hero-copy p {
+        color: var(--ui-muted);
+        font-size: 12px;
+        line-height: 1.4;
+        margin: 4px 0 0;
+    }
+
+    #workspace-grid {
+        align-items: start;
+        display: grid !important;
+        gap: var(--ui-space-5) !important;
+        grid-template-columns: minmax(340px, 400px) minmax(540px, 1fr) minmax(330px, 400px);
+        width: 100%;
+    }
+
+    #workspace-grid > .column {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    #input-panel {
+        background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-xl);
+        gap: var(--ui-space-3) !important;
+        padding: var(--ui-space-3) !important;
+    }
+
+    #viewport-panel {
+        gap: 0 !important;
+    }
+
+    /* One icon geometry across custom UI and Gradio-native controls. */
+    .ui-icon {
+        display: block;
+        fill: none;
+        flex: 0 0 auto;
+        height: 16px;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.5;
+        width: 16px;
+    }
+
+    .app-hero-mark .ui-icon {
+        height: 22px;
+        width: 22px;
+    }
+
+    .ui-action-icon {
+        height: 17px;
+        margin-right: 2px;
+        width: 17px;
+    }
+
+    #input-panel button svg,
+    #mesh-download-card button svg,
+    footer button svg,
+    footer a svg {
+        height: 16px !important;
+        width: 16px !important;
+    }
+
+    /* Segmented input mode; shared headers for output and settings. */
+    #prompt-mode-tabs .tab-nav {
+        background: var(--ui-surface-muted);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-lg);
+        gap: var(--ui-space-1);
+        padding: var(--ui-space-1);
+    }
+
+    #prompt-mode-tabs button[role="tab"] {
+        background: transparent;
+        border: 1px solid transparent !important;
+        border-radius: var(--ui-radius-md);
+        color: var(--ui-muted);
+        font-size: 13px;
+        font-weight: 650;
+        min-height: var(--ui-control-height);
+        padding: 8px 12px;
+    }
+
+    #prompt-mode-tabs button[role="tab"][aria-selected="true"] {
+        background: var(--ui-primary);
+        border-color: var(--ui-primary) !important;
+        box-shadow: 0 5px 14px rgba(66, 99, 235, 0.22);
+        color: white;
+    }
+
+    #output-tabs,
+    #settings-tabs {
+        min-width: 0;
+    }
+
+    #output-tabs {
+        background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+        border: 1px solid var(--ui-border);
+        border-radius: var(--ui-radius-xl);
+        overflow: hidden;
+        padding: 0 var(--ui-space-3) var(--ui-space-3);
+    }
+
+    #output-tabs .tab-nav,
+    #settings-tabs .tab-nav {
+        align-items: stretch;
+        background: transparent;
+        border-bottom: 1px solid var(--ui-border);
+        gap: var(--ui-space-1);
+        min-height: var(--ui-panel-header-height);
+        padding: 0;
+    }
+
+    #output-tabs .tab-nav button[role="tab"],
+    #settings-tabs .tab-nav button[role="tab"] {
+        background: transparent;
+        border: 0 !important;
+        border-bottom: 2px solid transparent !important;
+        border-radius: 0;
+        color: var(--ui-muted);
+        font-size: 12px;
+        font-weight: 650;
+        min-height: var(--ui-panel-header-height);
+        padding: 0 12px;
+    }
+
+    #output-tabs .tab-nav button[role="tab"][aria-selected="true"],
+    #settings-tabs .tab-nav button[role="tab"][aria-selected="true"] {
+        border-bottom-color: var(--ui-primary) !important;
+        color: var(--ui-primary);
+    }

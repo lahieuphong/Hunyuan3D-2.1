@@ -1,0 +1,105 @@
+
+    @media (max-width: 900px) {
+        .rtx3090-header-scope,
+        .rtx3090-verified {
+            display: none;
+        }
+
+        .rtx3090-modal-header h2 {
+            font-size: 19px;
+        }
+    }
+
+    @media (max-width: 767px) {
+        #rtx3090-modal {
+            padding: 0 !important;
+        }
+
+        #rtx3090-modal > .rtx3090-modal-panel {
+            border-radius: 0 !important;
+            flex-basis: 100vw !important;
+            height: 100dvh;
+            max-height: 100dvh;
+            max-width: 100vw !important;
+            padding: 0 18px 28px;
+            width: 100vw !important;
+        }
+
+        #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-modal-header-block {
+            margin-left: -18px !important;
+            margin-right: -18px !important;
+            width: calc(100% + 36px) !important;
+        }
+
+        .rtx3090-modal-header {
+            min-height: 64px;
+            padding: 15px 8px 15px 18px;
+        }
+
+        .rtx3090-header-scope,
+        .rtx3090-verified,
+        .rtx3090-preset-count {
+            display: none;
+        }
+
+        .rtx3090-modal-header h2 {
+            font-size: 17px;
+            white-space: normal;
+        }
+
+        .rtx3090-api-intro p {
+            font-size: 14px;
+        }
+
+        .rtx3090-context-tabs {
+            gap: 7px;
+        }
+
+        .rtx3090-context-tabs span {
+            font-size: 12px;
+            min-height: 32px;
+            padding: 5px 9px;
+        }
+
+        .rtx3090-section-heading b {
+            font-size: 15px;
+        }
+
+        .rtx3090-section-heading span {
+            font-size: 13px;
+        }
+
+        .rtx3090-machine-strip {
+            align-items: flex-start;
+            padding: 15px;
+        }
+
+        .rtx3090-machine-strip strong {
+            font-size: 14px;
+        }
+
+        .rtx3090-machine-check {
+            display: none !important;
+        }
+
+        .rtx3090-profile-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .rtx3090-profile-values,
+        .rtx-preset-values {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        #rtx3090-modal .rtx-preset-actions {
+            flex-direction: column;
+        }
+
+        .rtx-preset-status-heading {
+            align-items: flex-start;
+        }
+
+        .rtx3090-modal-note {
+            font-size: 13px;
+        }
+    }
