@@ -189,7 +189,7 @@
         border-left: 1px solid var(--rtx-border);
         border-radius: 0;
         box-sizing: border-box;
-        color: #eef0fa;
+        color: var(--body-text-color, #f4f6fb);
         cursor: pointer;
         display: flex;
         flex: 0 0 52px;
@@ -199,6 +199,7 @@
         margin: 0 0 0 4px !important;
         min-width: 52px;
         padding: 0 0 0 18px;
+        transition: color 150ms ease;
         width: 52px;
     }
 
@@ -208,12 +209,33 @@
         fill: currentColor;
         flex: 0 0 16px;
         height: 16px;
+        transition: color 150ms ease, fill 150ms ease;
         width: 16px;
+    }
+
+    #rtx3090-modal-close .rtx3090-close-icon path {
+        fill: currentColor;
+        transition: fill 150ms ease;
     }
 
     #rtx3090-modal-close:hover {
         background: transparent;
-        color: #8d88ff;
+        border-left-color: var(--rtx-border);
+        box-shadow: none;
+        color: var(--ui-close-icon-hover, #5c7cfa);
+    }
+
+    #rtx3090-modal-close:hover .rtx3090-close-icon,
+    #rtx3090-modal-close:hover .rtx3090-close-icon path,
+    #rtx3090-modal-close:active .rtx3090-close-icon,
+    #rtx3090-modal-close:active .rtx3090-close-icon path {
+        color: var(--ui-close-icon-hover, #5c7cfa) !important;
+        fill: var(--ui-close-icon-hover, #5c7cfa) !important;
+    }
+
+    #rtx3090-modal-close:active {
+        background: transparent;
+        color: var(--ui-close-icon-hover, #5c7cfa);
     }
 
     #rtx3090-modal-close:focus-visible {

@@ -160,6 +160,61 @@
         width: 17px;
     }
 
+    #generation-history-close {
+        background: transparent;
+        border: 0;
+        border-left: 1px solid #303b55;
+        border-radius: 0;
+        box-sizing: border-box;
+        color: var(--body-text-color, #f4f6fb);
+        flex: 0 0 52px;
+        height: 30px;
+        margin: 0 0 0 4px;
+        min-width: 52px;
+        padding: 0 0 0 18px;
+        transition: color 150ms ease;
+        width: 52px;
+    }
+
+    #generation-history-close .generation-history-close-icon {
+        color: inherit;
+        display: block;
+        fill: currentColor;
+        flex: 0 0 16px;
+        height: 16px;
+        transition: color 150ms ease, fill 150ms ease;
+        width: 16px;
+    }
+
+    #generation-history-close .generation-history-close-icon path {
+        fill: currentColor;
+        transition: fill 150ms ease;
+    }
+
+    #generation-history-close:hover {
+        background: transparent;
+        border-left-color: #303b55;
+        box-shadow: none;
+        color: var(--ui-close-icon-hover, #5c7cfa);
+    }
+
+    #generation-history-close:hover .generation-history-close-icon,
+    #generation-history-close:hover .generation-history-close-icon path,
+    #generation-history-close:active .generation-history-close-icon,
+    #generation-history-close:active .generation-history-close-icon path {
+        color: var(--ui-close-icon-hover, #5c7cfa) !important;
+        fill: var(--ui-close-icon-hover, #5c7cfa) !important;
+    }
+
+    #generation-history-close:active {
+        background: transparent;
+        color: var(--ui-close-icon-hover, #5c7cfa);
+    }
+
+    #generation-history-close:focus-visible {
+        outline-offset: -2px;
+    }
+
     #generation-history-refresh.is-loading .ui-icon {
         animation: generation-history-spin 800ms linear infinite;
     }
