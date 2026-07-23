@@ -19,6 +19,7 @@ STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
     "styles/16-history-responsive.css",
     "styles/20-shell-navigation.css",
     "styles/30-input-forms.css",
+    "styles/35-upload-previews.css",
     "styles/40-workspace-output.css",
     "styles/50-dashboard-theme.css",
     "styles/60-results-console.css",
@@ -29,6 +30,7 @@ STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
 SCRIPT_FRAGMENTS: Final[tuple[str, ...]] = (
     "scripts/00-context.js",
     "scripts/10-icons.js",
+    "scripts/15-upload-previews.js",
     "scripts/20-url-state.js",
     "scripts/30-generation-console.js",
     "scripts/40-tab-routing.js",

@@ -1372,6 +1372,7 @@ def build_app():
                             type='pil',
                             image_mode='RGBA',
                             height=240,
+                            interactive=False,
                             elem_classes=['single-image', 'ui-upload'],
                         )
                         gr.HTML('<div class="input-upload-meta">PNG or JPG · one front-facing image</div>')
@@ -1392,14 +1393,18 @@ def build_app():
                         """)
                         with gr.Row(elem_classes='mv-upload-row'):
                             mv_image_front = gr.Image(label='1 · Front', type='pil', image_mode='RGBA', height=180,
-                                                      min_width=100, elem_classes=['mv-image', 'ui-upload'])
+                                                      min_width=100, interactive=False, elem_id='mv-image-front',
+                                                      elem_classes=['mv-image', 'ui-upload'])
                             mv_image_back = gr.Image(label='2 · Back', type='pil', image_mode='RGBA', height=180,
-                                                     min_width=100, elem_classes=['mv-image', 'ui-upload'])
+                                                     min_width=100, interactive=False, elem_id='mv-image-back',
+                                                     elem_classes=['mv-image', 'ui-upload'])
                         with gr.Row(elem_classes='mv-upload-row'):
                             mv_image_left = gr.Image(label='3 · Left', type='pil', image_mode='RGBA', height=180,
-                                                     min_width=100, elem_classes=['mv-image', 'ui-upload'])
+                                                     min_width=100, interactive=False, elem_id='mv-image-left',
+                                                     elem_classes=['mv-image', 'ui-upload'])
                             mv_image_right = gr.Image(label='4 · Right', type='pil', image_mode='RGBA', height=180,
-                                                      min_width=100, elem_classes=['mv-image', 'ui-upload'])
+                                                      min_width=100, interactive=False, elem_id='mv-image-right',
+                                                      elem_classes=['mv-image', 'ui-upload'])
                         gr.HTML("""
                         <div class="input-upload-meta input-upload-meta--stacked">
                             <div class="input-upload-meta-title">
@@ -1761,7 +1766,7 @@ Fast for very complex cases, Standard seldom use.',
             api_name=False,
         )
 
-        demo.load(
+        restore_event = demo.load(
             fn=restore_generation_from_request,
             outputs=[
                 input_mode,
@@ -1783,6 +1788,19 @@ Fast for very complex cases, Standard seldom use.',
                 btn,
             ],
             queue=False,
+            api_name=False,
+        )
+        restore_event.then(
+            fn=lambda: tuple(gr.update(interactive=True) for _ in range(5)),
+            outputs=[
+                image,
+                mv_image_front,
+                mv_image_back,
+                mv_image_left,
+                mv_image_right,
+            ],
+            queue=False,
+            show_progress='hidden',
             api_name=False,
         )
 

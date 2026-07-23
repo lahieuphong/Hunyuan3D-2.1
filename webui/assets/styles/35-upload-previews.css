@@ -1,0 +1,112 @@
+
+    /* Keep multi-view thumbnails visible while Gradio replaces its native
+       preview with upload progress. This layer never changes component data. */
+    :where(
+        #mv-image-front,
+        #mv-image-back,
+        #mv-image-left,
+        #mv-image-right
+    ) [data-testid="image"],
+    :where(
+        #mv-image-front,
+        #mv-image-back,
+        #mv-image-left,
+        #mv-image-right
+    ) .upload-container {
+        position: relative;
+    }
+
+    :where(
+        #mv-image-front,
+        #mv-image-back,
+        #mv-image-left,
+        #mv-image-right
+    ) .upload-container {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .mv-upload-local-preview {
+        background: #0d1220;
+        display: block;
+        height: 100%;
+        inset: 0;
+        object-fit: scale-down;
+        pointer-events: none;
+        position: absolute;
+        width: 100%;
+        z-index: 2;
+    }
+
+    .mv-image:is(
+        .is-uploading-preview,
+        .is-upload-preview-error
+    ) > .wrap.default.full,
+    .mv-image > .wrap.default.full.mv-native-upload-status-suppressed {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+
+    .mv-upload-preview-status {
+        align-items: center;
+        background: rgba(10, 15, 27, 0.86);
+        border: 1px solid rgba(116, 124, 255, 0.4);
+        border-radius: 999px;
+        bottom: 7px;
+        color: #d7dbff;
+        display: inline-flex;
+        font-size: 9px;
+        font-weight: 650;
+        gap: 5px;
+        left: 50%;
+        line-height: 1;
+        max-width: calc(100% - 14px);
+        min-height: 22px;
+        padding: 5px 8px;
+        pointer-events: none;
+        position: absolute;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        z-index: 3;
+    }
+
+    .mv-upload-preview-status::before {
+        animation: mv-upload-preview-spin 750ms linear infinite;
+        border: 1.5px solid rgba(179, 184, 255, 0.34);
+        border-radius: 50%;
+        border-top-color: #8b84ff;
+        content: "";
+        flex: 0 0 9px;
+        height: 9px;
+        width: 9px;
+    }
+
+    .mv-image.is-upload-preview-error .mv-upload-preview-status {
+        background: rgba(50, 18, 29, 0.92);
+        border-color: rgba(255, 111, 143, 0.5);
+        color: #ffc2d0;
+    }
+
+    .mv-image.is-upload-preview-error .mv-upload-preview-status::before {
+        animation: none;
+        border: 0;
+        color: #ff7897;
+        content: "!";
+        display: grid;
+        font-size: 10px;
+        font-weight: 800;
+        place-items: center;
+    }
+
+    @keyframes mv-upload-preview-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .mv-upload-preview-status::before {
+            animation: none;
+        }
+    }

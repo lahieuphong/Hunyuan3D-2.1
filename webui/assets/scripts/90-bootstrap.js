@@ -2,6 +2,7 @@
         const observer = new MutationObserver(() => {
             installFooterItem();
             installUnifiedIcons();
+            installStableUploadPreviews();
             wireTopbar();
             wireModal();
             wirePresetCards();
@@ -16,6 +17,7 @@
 
         installFooterItem();
         installUnifiedIcons();
+        installStableUploadPreviews();
         wireTopbar();
         wireModal();
         wirePresetCards();
