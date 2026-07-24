@@ -1,0 +1,79 @@
+
+    :root {
+        --ui-theme-transition-duration: 180ms;
+        --ui-theme-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .api-docs .theme-buttons .theme-button,
+    .api-docs .theme-buttons .theme-button > button,
+    .api-docs .theme-buttons .settings-theme-content,
+    .api-docs .theme-buttons .settings-theme-icon {
+        transition:
+            background-color var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            border-color var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            color var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            opacity var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            transform var(--ui-theme-transition-duration) var(--ui-theme-transition-easing);
+    }
+
+    .api-docs .theme-buttons .theme-button > button:focus-visible {
+        border-radius: var(--radius-sm);
+        outline: 2px solid var(--border-color-accent);
+        outline-offset: 3px;
+    }
+
+    .api-docs .theme-buttons .settings-theme-content {
+        transform: translateZ(0);
+    }
+
+    .api-docs .theme-buttons .theme-button:active .settings-theme-content {
+        transform: scale(0.97);
+    }
+
+    html.ui-theme-transition::view-transition-group(root),
+    html.ui-theme-transition::view-transition-old(root),
+    html.ui-theme-transition::view-transition-new(root) {
+        animation-duration: var(--ui-theme-transition-duration);
+        animation-timing-function: var(--ui-theme-transition-easing);
+    }
+
+    html.ui-theme-transition::view-transition-old(root),
+    html.ui-theme-transition::view-transition-new(root) {
+        mix-blend-mode: normal;
+    }
+
+    html.ui-theme-transition-fallback body,
+    html.ui-theme-transition-fallback .gradio-container,
+    html.ui-theme-transition-fallback .api-docs,
+    html.ui-theme-transition-fallback .api-docs-wrap,
+    html.ui-theme-transition-fallback .api-docs .banner-wrap,
+    html.ui-theme-transition-fallback .api-docs button,
+    html.ui-theme-transition-fallback .api-docs input {
+        transition:
+            background-color var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            border-color var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            box-shadow var(--ui-theme-transition-duration) var(--ui-theme-transition-easing),
+            color var(--ui-theme-transition-duration) var(--ui-theme-transition-easing) !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html.ui-theme-transition::view-transition-group(root),
+        html.ui-theme-transition::view-transition-old(root),
+        html.ui-theme-transition::view-transition-new(root) {
+            animation-duration: 1ms;
+        }
+
+        .api-docs .theme-buttons .theme-button,
+        .api-docs .theme-buttons .theme-button > button,
+        .api-docs .theme-buttons .settings-theme-content,
+        .api-docs .theme-buttons .settings-theme-icon,
+        html.ui-theme-transition-fallback body,
+        html.ui-theme-transition-fallback .gradio-container,
+        html.ui-theme-transition-fallback .api-docs,
+        html.ui-theme-transition-fallback .api-docs-wrap,
+        html.ui-theme-transition-fallback .api-docs .banner-wrap,
+        html.ui-theme-transition-fallback .api-docs button,
+        html.ui-theme-transition-fallback .api-docs input {
+            transition: none !important;
+        }
+    }

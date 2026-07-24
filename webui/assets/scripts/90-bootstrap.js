@@ -2,6 +2,7 @@
         const observer = new MutationObserver(() => {
             installFooterItem();
             installUnifiedIcons();
+            installSmoothThemeSwitching();
             installStableUploadPreviews();
             wireTopbar();
             wireModal();
@@ -17,6 +18,7 @@
 
         installFooterItem();
         installUnifiedIcons();
+        installSmoothThemeSwitching();
         installStableUploadPreviews();
         wireTopbar();
         wireModal();
@@ -39,6 +41,7 @@
             syncGenerationHistoryFromUrl();
             syncTabFromUrl();
             syncGenerationConsoleFromUrl();
+            syncSmoothThemeFromUrl(false);
         });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && generationHistoryModal()?.classList.contains("is-open")) {

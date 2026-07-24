@@ -10,6 +10,7 @@ from typing import Final
 STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
     "styles/00-foundation.css",
     "styles/05-input-tabs-footer.css",
+    "styles/09-theme-switching.css",
     "styles/10-native-dialogs.css",
     "styles/11-rtx-modal-shell.css",
     "styles/12-rtx-modal-content.css",
@@ -24,6 +25,7 @@ STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
     "styles/50-dashboard-theme.css",
     "styles/60-results-console.css",
     "styles/70-left-rail-settings.css",
+    "styles/80-light-theme.css",
     "styles/90-responsive.css",
 )
 
@@ -32,6 +34,7 @@ SCRIPT_FRAGMENTS: Final[tuple[str, ...]] = (
     "scripts/10-icons.js",
     "scripts/15-upload-previews.js",
     "scripts/20-url-state.js",
+    "scripts/25-theme-switching.js",
     "scripts/30-generation-console.js",
     "scripts/40-tab-routing.js",
     "scripts/50-preset-modal.js",

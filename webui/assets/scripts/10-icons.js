@@ -83,9 +83,12 @@
             document.querySelectorAll(
                 ".api-docs .theme-buttons .theme-button > button"
             ).forEach((button, index) => {
-                if (button.dataset.uiIconWired === "true") return;
                 const [iconName, label] = settingsThemeIcons[index] ?? [];
                 if (!iconName || !label) return;
+                button.dataset.uiThemeMode = label.toLowerCase();
+                button.setAttribute("aria-label", label + " theme");
+                button.type = "button";
+                if (button.dataset.uiIconWired === "true") return;
                 button.dataset.uiIconWired = "true";
                 button.innerHTML = (
                     '<span class="settings-theme-content">'

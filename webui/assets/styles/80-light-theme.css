@@ -1,0 +1,633 @@
+    /*
+     * Light presentation only. Gradio resolves the active theme by toggling
+     * body.dark; all component dimensions and behaviors remain unchanged.
+     */
+    html:has(body:not(.dark)),
+    body:not(.dark) {
+        --ui-scrollbar-track: #e7ecf4;
+        --ui-scrollbar-thumb: #737de7;
+        --ui-scrollbar-thumb-hover: #606be2;
+        --ui-scrollbar-thumb-active: #4f5cd8;
+        --body-background-fill: #f2f5fa;
+        --background-fill-primary: #ffffff;
+        --background-fill-secondary: #f6f8fc;
+        --block-background-fill: #ffffff;
+        --block-border-color: #d8e0ec;
+        --border-color-primary: #c7d1e0;
+        --body-text-color: #172136;
+        --body-text-color-subdued: #637089;
+        --input-background-fill: #ffffff;
+        --input-background-fill-focus: #ffffff;
+        --input-border-color: #c7d1e0;
+        background: #f2f5fa !important;
+        color-scheme: light;
+    }
+
+    body:not(.dark)::before {
+        background:
+            radial-gradient(circle at 54% -18%, rgba(92, 103, 242, 0.1), transparent 35%),
+            linear-gradient(180deg, #f8faff 0%, #eef2f7 100%);
+    }
+
+    body:not(.dark),
+    body:not(.dark) .gradio-container {
+        --body-background-fill: #f2f5fa;
+        --background-fill-primary: #ffffff;
+        --background-fill-secondary: #f6f8fc;
+        --block-background-fill: #ffffff;
+        --block-border-color: #d8e0ec;
+        --block-label-background-fill: #f6f8fc;
+        --block-label-text-color: #344159;
+        --border-color-accent: #5865f2;
+        --border-color-primary: #c7d1e0;
+        --body-text-color: #172136;
+        --body-text-color-subdued: #637089;
+        --button-secondary-background-fill: #ffffff;
+        --button-secondary-background-fill-hover: #f1f4fa;
+        --button-secondary-border-color: #c7d1e0;
+        --button-secondary-text-color: #26324a;
+        --input-background-fill: #ffffff;
+        --input-background-fill-focus: #ffffff;
+        --input-border-color: #c7d1e0;
+        --input-placeholder-color: #68748b;
+        --primary-500: #5865f2;
+        --primary-600: #4856e8;
+        --ui-bg: #f2f5fa;
+        --ui-surface: #ffffff;
+        --ui-surface-muted: #f6f8fc;
+        --ui-border: #d8e0ec;
+        --ui-border-strong: #c4cfdf;
+        --ui-text: #172136;
+        --ui-muted: #637089;
+        --ui-primary: #5865f2;
+        --ui-primary-hover: #4856e8;
+        --ui-close-icon-hover: #4f6fe8;
+        color: var(--ui-text);
+    }
+
+    /* Gradio-native Settings and API documentation drawers. */
+    body:not(.dark) .api-docs {
+        color: var(--ui-text);
+    }
+
+    body:not(.dark) .api-docs > .api-docs-wrap {
+        background: #ffffff !important;
+        border: 1px solid #d8e0ec;
+        box-shadow: 0 28px 80px rgba(31, 42, 68, 0.2);
+        color: var(--ui-text) !important;
+    }
+
+    body:not(.dark) .api-docs .banner-wrap {
+        background: #ffffff;
+        border-color: #d8e0ec !important;
+    }
+
+    body:not(.dark) .api-docs .theme-buttons .theme-button {
+        background: #ffffff !important;
+        border-color: #c7d1e0 !important;
+        color: #637089 !important;
+    }
+
+    body:not(.dark) .api-docs .theme-buttons .theme-button:hover {
+        background: #f6f8fc !important;
+        border-color: #aeb9cc !important;
+        color: #26324a !important;
+    }
+
+    body:not(.dark) .api-docs .theme-buttons .theme-button.current-theme {
+        background: #eef0ff !important;
+        border-color: #6670ff !important;
+        box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.08);
+        color: #3441a8 !important;
+    }
+
+    body:not(.dark) .api-docs input,
+    body:not(.dark) .api-docs select {
+        background: #ffffff !important;
+        border-color: #c7d1e0 !important;
+        color: #172136 !important;
+    }
+
+    /*
+     * Gradio scopes ordinary custom selectors through its container at
+     * runtime. Mirror that stable scope (without its versioned class) so
+     * light overrides reliably win the dark-first component declarations.
+     */
+    /* Application header and primary workspace shells. */
+    body:not(.dark) .gradio-container.gradio-container .contain .app-version-badge {
+        background: #eef0ff;
+        border-color: #c4c9ff;
+        color: #4753c7 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .app-topbar-button {
+        background: rgba(255, 255, 255, 0.92);
+        border-color: #d3dbe8;
+        box-shadow: 0 4px 12px rgba(31, 42, 68, 0.05);
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .app-topbar-button:hover {
+        background: #ffffff;
+        border-color: #aeb9cc;
+        box-shadow: 0 7px 16px rgba(31, 42, 68, 0.09);
+        color: #172136;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #app-generation-history[aria-expanded="true"] {
+        background: #eef0ff;
+        border-color: #6670ff;
+        color: #3441a8;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #input-panel,
+    body:not(.dark) .gradio-container.gradio-container .contain #output-tabs,
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-console-panel {
+        background: rgba(255, 255, 255, 0.96) !important;
+        border-color: #d8e0ec !important;
+        box-shadow: 0 18px 46px rgba(31, 42, 68, 0.09);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #output-tabs .tab-nav,
+    body:not(.dark) .gradio-container.gradio-container .contain #settings-tabs .tab-nav {
+        border-color: #d8e0ec;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #output-tabs .tab-nav button[role="tab"],
+    body:not(.dark) .gradio-container.gradio-container .contain #settings-tabs .tab-nav button[role="tab"] {
+        color: #637089;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #output-tabs .tab-nav button[role="tab"][aria-selected="true"],
+    body:not(.dark) .gradio-container.gradio-container .contain #settings-tabs .tab-nav button[role="tab"][aria-selected="true"] {
+        color: #4d5bdd;
+    }
+
+    /* Input mode, upload cards and helper panels. */
+    body:not(.dark) .gradio-container.gradio-container .contain #prompt-mode-tabs > .tab-wrapper > .tab-container[role="tablist"] {
+        background: #eef2f7;
+        border-color: #d8e0ec;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #prompt-mode-tabs button[role="tab"] {
+        color: #637089;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #prompt-mode-tabs button[role="tab"]:hover:not([aria-selected="true"]) {
+        background: rgba(255, 255, 255, 0.7);
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #prompt-mode-tabs button[role="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #4f5bd5, #5660d8);
+        color: #ffffff;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .input-mode-guide {
+        background: linear-gradient(135deg, #f0f2ff, #f8f9fd);
+        border-color: #cbd0fa;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .input-mode-number {
+        background: #e5e8ff;
+        border-color: #b9c0ff;
+        color: #4f5bd5;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #input-panel .ui-upload {
+        background: #f7f9fc !important;
+        border-color: #d6deeb !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #input-panel .ui-upload:hover {
+        border-color: #9da8ea !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #input-panel .ui-upload .upload-container,
+    body:not(.dark) .gradio-container.gradio-container .contain #input-panel .ui-upload [data-testid="image"],
+    body:not(.dark) .gradio-container.gradio-container .contain .mv-upload-local-preview {
+        background: #f1f4f9 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .input-upload-meta {
+        background: #fafbfd;
+        border-color: #cdd6e4;
+        color: #637089;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .input-upload-meta-title {
+        color: #344159;
+    }
+
+    /* Advanced options keep their existing dimensions and native inputs. */
+    body:not(.dark) .gradio-container.gradio-container .contain #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button) {
+        background: linear-gradient(135deg, #f4f6fb 0%, #edf1f7 100%);
+        border-color: #d5ddea;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.86),
+            0 4px 12px rgba(31, 42, 68, 0.05);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form-button {
+        background: rgba(88, 101, 242, 0.06) !important;
+        color: #26324a !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form-button:hover {
+        background: rgba(88, 101, 242, 0.1) !important;
+        color: #172136 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form {
+        --advanced-card-bg: linear-gradient(145deg, #ffffff 0%, #f6f8fc 100%);
+        --advanced-card-border: #d5ddea;
+        --advanced-field-bg: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control {
+        background: var(--advanced-card-bg) !important;
+        border-color: var(--advanced-card-border) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control:hover {
+        border-color: #b9c4d6 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control:focus-within {
+        border-color: #7883ea !important;
+        box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.08) !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control .head label,
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control [data-testid="block-info"],
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control > label.block.container,
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control-checkbox label span {
+        color: #26324a !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .ui-control input[type="number"] {
+        background: var(--advanced-field-bg) !important;
+        border-color: #c7d1e0 !important;
+        box-shadow: inset 0 1px 1px rgba(31, 42, 68, 0.035) !important;
+        color: #172136 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form button[data-testid="reset-button"] {
+        background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%) !important;
+        border-color: #c7d1e0 !important;
+        color: #637089 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form button[data-testid="reset-button"]:hover {
+        background: #e8edf5 !important;
+        border-color: #8d99da !important;
+        color: #4552c4 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .slider_input_container {
+        --neutral-200: #dbe2ee;
+        --slider-color: #5865f2;
+        color: #637089;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .slider_input_container .min_value,
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .slider_input_container .max_value {
+        color: #637089 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .slider_input_container input[type="range"]::-webkit-slider-thumb {
+        background: #ffffff;
+        border-color: #5865f2;
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1), 0 2px 5px rgba(31, 42, 68, 0.18);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form .slider_input_container input[type="range"]::-moz-range-thumb {
+        background: #ffffff;
+        border-color: #5865f2;
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1), 0 2px 5px rgba(31, 42, 68, 0.18);
+    }
+
+    /* The 3D iframe and code/statistics stage stay dark by design. */
+    body:not(.dark) .gradio-container.gradio-container .contain .viewer-empty-state {
+        --ui-muted: #9099ad;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #mesh-stats {
+        --background-fill-primary: #090e19;
+        --background-fill-secondary: #0d1320;
+        --body-text-color: #dfe3f1;
+        --body-text-color-subdued: #8f99af;
+        --ui-scrollbar-track: #0b1020;
+        --ui-scrollbar-thumb: #636be8;
+        color: #dfe3f1;
+    }
+
+    /* Generation console: light dashboard cards, dark terminal well. */
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-title strong {
+        color: #172136;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-title span,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-progress-meta {
+        color: #637089;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-progress-track {
+        background: #dbe2ee;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-jobbar,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-log,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-console-footer {
+        --ui-scrollbar-track: #0b1020;
+        --ui-scrollbar-thumb: #636be8;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-details-card,
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-output-card {
+        background: linear-gradient(145deg, #ffffff 0%, #f7f9fc 100%) !important;
+        border-color: #d8e0ec !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.9),
+            0 8px 20px rgba(31, 42, 68, 0.06);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-detail {
+        background: linear-gradient(180deg, #f7f9fc, #f1f4f9);
+        border-color: #d8e0ec;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-detail strong {
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-output-card .generation-output-file {
+        background: linear-gradient(180deg, #ffffff 0%, #f4f6fa 100%) !important;
+        border-color: #d3dce9 !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-output-card .generation-output-file td.filename {
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-output-card .generation-output-file td.download a {
+        background: #eef0ff;
+        border-color: #858dea;
+        box-shadow: 0 5px 13px rgba(62, 72, 190, 0.1);
+        color: #4653ce;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-output-card .generation-output-file td.download a:hover {
+        background: #e3e6ff;
+        border-color: #6670e8;
+        box-shadow: 0 7px 16px rgba(62, 72, 190, 0.15);
+        color: #3542ba;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-output-meta {
+        background: #eef2f7;
+        border-color: #dce3ee;
+        color: #637089 !important;
+    }
+
+    /* RTX preset drawer. */
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal {
+        --rtx-border: #d7dfeb;
+        --rtx-card: rgba(255, 255, 255, 0.96);
+        --rtx-card-muted: #eef2f7;
+        --rtx-muted: #637089;
+        --rtx-panel: #f8fafc;
+        background: rgba(15, 23, 42, 0.34);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal > .rtx3090-modal-panel {
+        background:
+            radial-gradient(circle at 46% -8%, rgba(83, 91, 220, 0.09), transparent 32%),
+            linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+        box-shadow: 0 28px 86px rgba(31, 42, 68, 0.22);
+        color: #172136;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-modal-header-block {
+        background: #ffffff !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-modal-header {
+        background: rgba(255, 255, 255, 0.98);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-header-icon,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-modal-header h2,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-section-heading,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-machine-copy strong,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card h3,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card.is-selected h3,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-values b,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx-preset-values b,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-modal-note strong {
+        color: #172136;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal-close {
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-api-intro p {
+        color: #344159;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-header-scope,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-api-intro p strong {
+        color: #564fd0;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-verified {
+        background: #eaf8f0;
+        border-color: #abdcc2;
+        color: #16794b !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-machine-check {
+        border-color: #16794b;
+        color: #16794b;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card.is-selected .rtx3090-profile-selector,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx-preset-status-check {
+        background: #16794b;
+        border-color: #16794b;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-context-tabs span {
+        background: #f6f8fc;
+        border-color: #d3dce9;
+        color: #526078;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-context-tabs span.active {
+        background: #eef0ff;
+        color: #3441a8;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-machine-strip,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx-preset-status,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-modal-note {
+        background: linear-gradient(135deg, #ffffff, #f5f7fb);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card {
+        background: linear-gradient(135deg, #ffffff, #f5f7fb);
+        border-color: #d3dce9;
+        opacity: 1;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card.is-selected {
+        background: linear-gradient(135deg, #f0fbf5, #f7fcf9);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card:not(.is-selected):hover {
+        border-color: #aeb9cc;
+        opacity: 1;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card:not(.is-selected) h3,
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card:not(.is-selected) p {
+        color: #526078;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card:not(.is-selected) .rtx3090-profile-values span {
+        background: #eef2f7;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx3090-profile-card:not(.is-selected) .rtx3090-profile-values b {
+        color: #344159;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal .rtx-preset-actions button {
+        background: linear-gradient(135deg, #eef2f7, #e6ebf3) !important;
+        border-color: #c7d1e0 !important;
+        color: #344159 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal .rtx-preset-actions button:hover {
+        border-color: #9eaabd !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal .rtx-preset-actions button.rtx-preset-action-active {
+        background: linear-gradient(135deg, #0f7a46 0%, #167f4d 100%) !important;
+        border-color: #0f7241 !important;
+        color: #ffffff !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .rtx-preset-current {
+        background: #eef2f7;
+        border-color: #d8e0ec;
+        color: #526078 !important;
+    }
+
+    /* Generation history drawer. */
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-modal {
+        --history-border: #d7dfeb;
+        --history-card: rgba(255, 255, 255, 0.97);
+        --history-muted: #637089;
+        --history-panel: #f8fafc;
+        background: rgba(15, 23, 42, 0.34);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-panel {
+        background:
+            radial-gradient(circle at 46% -8%, rgba(83, 91, 220, 0.09), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+        box-shadow: 0 28px 86px rgba(31, 42, 68, 0.22);
+        color: #172136;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-header,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-toolbar {
+        background: rgba(255, 255, 255, 0.97);
+        border-color: #d7dfeb;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-heading h2,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-toolbar > div > strong,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-card-title,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-metric strong,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-state strong {
+        color: #172136;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-icon-button {
+        background: #ffffff;
+        border-color: #cbd5e3;
+        color: #526078;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-icon-button:hover {
+        background: #eef2f7;
+        border-color: #9eabbe;
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain #generation-history-close {
+        background: transparent;
+        border-left-color: #d7dfeb;
+        color: #26324a;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-count {
+        color: #16794b !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-local-badge,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-model,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-metric,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-state-icon {
+        background: #eef2f7;
+        border-color: #d4dde9;
+        color: #526078 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-card {
+        background: linear-gradient(145deg, #ffffff, #f7f9fc);
+        border-color: #d7dfeb;
+        box-shadow: 0 14px 34px rgba(31, 42, 68, 0.08);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-card:hover {
+        border-color: #aab6ca;
+        box-shadow: 0 18px 38px rgba(31, 42, 68, 0.13);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-card-date,
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-metric span {
+        color: #637089 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-download {
+        background: #eef2f7;
+        border-color: #cbd5e3;
+        color: #344159 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-download:hover {
+        background: #e4e9f2;
+        border-color: #a7b3c7;
+        color: #172136 !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-state {
+        border-color: #c7d1e0;
+        color: #344159;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain .generation-history-skeleton {
+        background:
+            linear-gradient(#eef2f7 0 0) 0 0 / 100% 154px no-repeat,
+            linear-gradient(#e4e9f2 0 0) 14px 170px / 48% 13px no-repeat,
+            linear-gradient(#eef2f7 0 0) 14px 194px / calc(100% - 28px) 52px no-repeat,
+            linear-gradient(#e4e9f2 0 0) 14px 260px / calc(100% - 28px) 36px no-repeat,
+            #ffffff;
+        border-color: #d7dfeb;
+    }
