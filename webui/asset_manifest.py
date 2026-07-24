@@ -26,6 +26,7 @@ STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
     "styles/60-results-console.css",
     "styles/70-left-rail-settings.css",
     "styles/80-light-theme.css",
+    "styles/82-hardware-catalog.css",
     "styles/85-history-review.css",
     "styles/90-responsive.css",
 )

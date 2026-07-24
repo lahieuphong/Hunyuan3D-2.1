@@ -38,6 +38,67 @@ def _text(value: Any, max_length: int = 180) -> str | None:
     return value[:max_length] if value else None
 
 
+def _integer(value: Any) -> int | None:
+    number = _number(value)
+    if number is None or int(number) != number:
+        return None
+    return int(number)
+
+
+def _choice(value: Any, choices: set[str]) -> str | None:
+    text = _text(value, 32)
+    return text if text in choices else None
+
+
+def _compact_mapping(value: dict[str, Any]) -> dict[str, Any] | None:
+    compact = {key: item for key, item in value.items() if item is not None}
+    return compact or None
+
+
+def _hardware_summary(manifest: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the safe, display-oriented hardware snapshot for a history item."""
+    hardware = _mapping(manifest.get("hardware"))
+    if not hardware:
+        return None
+
+    runtime = _mapping(hardware.get("runtime"))
+    runtime_summary = _compact_mapping({
+        "name": _text(runtime.get("name")),
+        "backend": _text(runtime.get("backend"), 32),
+        "total_vram_bytes": _integer(runtime.get("total_vram_bytes")),
+        "capability": _text(runtime.get("capability"), 32),
+        "dtype": _text(runtime.get("dtype"), 48),
+        "detected": (
+            runtime.get("detected")
+            if isinstance(runtime.get("detected"), bool)
+            else None
+        ),
+    })
+    return _compact_mapping({
+        "id": _text(hardware.get("id"), 96),
+        "label": _text(hardware.get("label")),
+        "catalog_version": _integer(hardware.get("catalog_version")),
+        "selection_source": _choice(
+            hardware.get("selection_source"),
+            {"ui", "api"},
+        ),
+        "runtime": runtime_summary,
+    })
+
+
+def _preset_summary(manifest: dict[str, Any]) -> dict[str, Any] | None:
+    """Return preset identity only; manifest params remain the source of truth."""
+    preset = _mapping(manifest.get("preset"))
+    if not preset:
+        return None
+    return _compact_mapping({
+        "id": _text(preset.get("id"), 96),
+        "hardware_id": _text(preset.get("hardware_id"), 96),
+        "catalog_version": _integer(preset.get("catalog_version")),
+        "source": _choice(preset.get("source"), {"catalog", "custom"}),
+    })
+
+
 def _read_manifest(folder: Path) -> dict[str, Any]:
     path = folder / "generation.json"
     try:
@@ -192,6 +253,12 @@ def _history_item(folder: Path) -> tuple[dict[str, Any], float] | None:
             "download_url": f"/static/{generation_uid}/white_mesh.glb",
         },
     }
+    hardware = _hardware_summary(manifest)
+    preset = _preset_summary(manifest)
+    if hardware:
+        item["hardware"] = hardware
+    if preset:
+        item["preset"] = preset
     return item, sort_timestamp
 
 

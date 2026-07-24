@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "default_hardware_id": null,
+  "hardware": [
+    {
+      "id": "nvidia-8gb-experimental",
+      "label": "NVIDIA 8 GB · Thử nghiệm",
+      "display_name": "NVIDIA GPU 8 GB",
+      "short_label": "8 GB Experimental",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 7.5,
+      "vram_max_gb": 9.9,
+      "vram_label": "8 GB",
+      "aliases": [],
+      "examples": ["RTX 3060 Ti", "RTX 3070", "RTX 4060"],
+      "dtype": "float16",
+      "verification": "experimental",
+      "verification_label": "Có thể thiếu VRAM",
+      "summary": "Dành cho máy dưới mức VRAM khuyến nghị của dự án. Ưu tiên mesh nhẹ và chunk nhỏ.",
+      "note": "README của Hunyuan3D khuyến nghị khoảng 10 GB VRAM cho shape generation. Profile 8 GB chỉ để thử nghiệm và vẫn có thể gặp lỗi thiếu bộ nhớ.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "196 · Tiết kiệm VRAM",
+          "description": "Mức khởi đầu thận trọng nhất cho GPU 8 GB.",
+          "tone": "safe",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 196,
+            "num_chunks": 2000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "256 · Cân bằng",
+          "description": "Mesh dày hơn; chỉ dùng khi preset 196 đã chạy ổn định.",
+          "tone": "quality",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 256,
+            "num_chunks": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": "nvidia-10-12gb",
+      "label": "NVIDIA 10–12 GB",
+      "display_name": "NVIDIA GPU 10–12 GB",
+      "short_label": "10–12 GB",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 9.9,
+      "vram_max_gb": 13.9,
+      "vram_label": "10–12 GB",
+      "aliases": [],
+      "examples": ["RTX 3060 12 GB", "RTX 3080", "RTX 4070"],
+      "dtype": "float16",
+      "verification": "estimated",
+      "verification_label": "Đề xuất theo VRAM",
+      "summary": "Cấu hình tham khảo cho nhóm GPU phổ biến 10–12 GB.",
+      "note": "Bắt đầu ở 196 hoặc 256. Nếu tăng Octree, hãy giữ chunk vừa phải và theo dõi VRAM trong Generation Console.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "196 · Mặc định an toàn",
+          "description": "Ưu tiên ổn định và giảm đỉnh bộ nhớ khi giải mã.",
+          "tone": "safe",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 196,
+            "num_chunks": 4000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "256 · Chất lượng cân bằng",
+          "description": "Phù hợp khi preset 196 đã chạy ổn định trên máy.",
+          "tone": "quality",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 256,
+            "num_chunks": 4000
+          }
+        }
+      ]
+    },
+    {
+      "id": "nvidia-16gb",
+      "label": "NVIDIA 16 GB",
+      "display_name": "NVIDIA GPU 16 GB",
+      "short_label": "16 GB",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 13.9,
+      "vram_max_gb": 19.9,
+      "vram_label": "16 GB",
+      "aliases": [],
+      "examples": ["RTX 4060 Ti 16 GB", "RTX 4070 Ti SUPER", "RTX 4080"],
+      "dtype": "float16",
+      "verification": "estimated",
+      "verification_label": "Đề xuất theo VRAM",
+      "summary": "Cân bằng giữa tốc độ giải mã và mật độ mesh cho GPU 16 GB.",
+      "note": "Preset 384 chưa được benchmark end-to-end trong repo này. Hãy thử 256 trước, sau đó mới chuyển sang chất lượng cao.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "256 · Mặc định an toàn",
+          "description": "Mức khởi đầu phù hợp cho đa số đầu vào.",
+          "tone": "safe",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 256,
+            "num_chunks": 6000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "384 · Chất lượng cao",
+          "description": "Dùng khi cần mesh dày hơn và 256 đã chạy ổn định.",
+          "tone": "quality",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 384,
+            "num_chunks": 4000
+          }
+        }
+      ]
+    },
+    {
+      "id": "nvidia-rtx-3090-24gb",
+      "label": "RTX 3090 · 24 GB",
+      "display_name": "NVIDIA GeForce RTX 3090",
+      "short_label": "RTX 3090",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 23.0,
+      "vram_max_gb": 25.0,
+      "vram_label": "24 GB",
+      "aliases": ["NVIDIA GeForce RTX 3090"],
+      "examples": ["NVIDIA GeForce RTX 3090 24 GB"],
+      "dtype": "float16",
+      "verification": "verified",
+      "verification_label": "Đã kiểm tra end-to-end",
+      "summary": "Profile chuẩn của máy hiện tại, đã chạy thành công với cả đầu vào 1 ảnh và 4 ảnh.",
+      "note": "Seed không làm tăng VRAM. Chunks 8000 cân bằng tốc độ và bộ nhớ. Không đặt Octree 512 làm mặc định trên RTX 3090 24 GB.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "256 · Mặc định an toàn",
+          "description": "Dùng cho lần chạy đầu hoặc khi ưu tiên ổn định và tốc độ.",
+          "tone": "safe",
+          "verified": true,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 256,
+            "num_chunks": 8000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "384 · Chất lượng cao",
+          "description": "Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.",
+          "tone": "quality",
+          "verified": true,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 384,
+            "num_chunks": 8000
+          }
+        }
+      ]
+    },
+    {
+      "id": "nvidia-24gb",
+      "label": "NVIDIA 24 GB · Khác",
+      "display_name": "NVIDIA GPU 24 GB",
+      "short_label": "24 GB",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 19.9,
+      "vram_max_gb": 27.9,
+      "vram_label": "24 GB",
+      "aliases": [],
+      "examples": ["RTX 4090", "RTX A5000", "NVIDIA A10"],
+      "dtype": "float16",
+      "verification": "estimated",
+      "verification_label": "Đề xuất theo VRAM",
+      "summary": "Dành cho GPU 24 GB không phải RTX 3090 đã xác minh của workspace.",
+      "note": "Cùng dung lượng VRAM không đảm bảo cùng tốc độ hoặc mức tương thích. Profile này là đề xuất và chưa được benchmark end-to-end trong repo.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "256 · Mặc định an toàn",
+          "description": "Khởi đầu ổn định cho GPU 24 GB.",
+          "tone": "safe",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 256,
+            "num_chunks": 8000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "384 · Chất lượng cao",
+          "description": "Tăng mật độ mesh sau khi preset 256 đã chạy ổn định.",
+          "tone": "quality",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 384,
+            "num_chunks": 8000
+          }
+        }
+      ]
+    },
+    {
+      "id": "nvidia-32gb-plus",
+      "label": "NVIDIA 32 GB+",
+      "display_name": "NVIDIA GPU 32 GB trở lên",
+      "short_label": "32 GB+",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 27.9,
+      "vram_max_gb": null,
+      "vram_label": "32 GB+",
+      "aliases": [],
+      "examples": ["RTX 5090 32 GB", "RTX A6000 48 GB"],
+      "dtype": "float16",
+      "verification": "estimated",
+      "verification_label": "Đề xuất theo VRAM",
+      "summary": "Profile tham khảo cho GPU dung lượng lớn và workload mesh dày.",
+      "note": "Octree 512 tốn thời gian và bộ nhớ đáng kể, đồng thời chưa được benchmark end-to-end trong repo. Chỉ dùng sau khi 384 đã ổn định.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "384 · Mặc định chất lượng",
+          "description": "Mức khởi đầu cho GPU từ 32 GB trở lên.",
+          "tone": "safe",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 384,
+            "num_chunks": 8000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "512 · Ultra",
+          "description": "Mesh rất dày; cần theo dõi thời gian và mức dùng VRAM.",
+          "tone": "quality",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 512,
+            "num_chunks": 8000
+          }
+        }
+      ]
+    }
+  ]
+}

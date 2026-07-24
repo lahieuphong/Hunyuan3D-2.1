@@ -55,6 +55,22 @@ import numpy as np
 
 from hy3dshape.utils import logger
 from webui import load_ui_assets, render_history_modal, render_topbar
+from webui.gpu_presets import (
+    HardwareMatch,
+    RuntimeHardware,
+    detect_runtime_hardware,
+    load_gpu_preset_catalog,
+    match_runtime_hardware,
+    resolve_preset_id,
+    short_gpu_name,
+)
+from webui.hardware_templates import (
+    render_catalog_intro,
+    render_preset_cards,
+    render_preset_status,
+    render_profile_note,
+    render_profile_summary,
+)
 from webui.history import list_generation_history
 
 MAX_SEED = 10_000_000
@@ -62,25 +78,21 @@ HAS_REMBG = importlib.util.find_spec('rembg') is not None
 HAS_PYMESHLAB = importlib.util.find_spec('pymeshlab') is not None
 ENV = "Local" # "Huggingface"
 
-# These two profiles were exercised end-to-end with Hunyuan3D-2mv on the
-# workspace RTX 3090 (24 GiB). Keep the conservative profile as the initial UI
-# value, and let users opt into the denser mesh extraction explicitly.
-RTX3090_PRESETS = {
-    'safe': {
-        'steps': 30,
-        'guidance_scale': 5.0,
-        'octree_resolution': 256,
-        'num_chunks': 8000,
-    },
-    'quality': {
-        'steps': 30,
-        'guidance_scale': 5.0,
-        'octree_resolution': 384,
-        'num_chunks': 8000,
-    },
-}
-RTX3090_GENERATION_MODES = {5: 'Turbo', 10: 'Fast', 30: 'Standard'}
-RTX3090_DECODING_MODES = {196: 'Low', 256: 'Standard', 384: 'High'}
+GPU_PRESET_CATALOG = load_gpu_preset_catalog()
+GENERATION_MODES = {5: 'Turbo', 10: 'Fast', 30: 'Standard'}
+DECODING_MODES = {196: 'Low', 256: 'Standard', 384: 'High', 512: 'Ultra'}
+RUNTIME_HARDWARE = RuntimeHardware(
+    requested_device='unknown',
+    backend='unknown',
+    index=None,
+    name='Unknown device',
+    total_vram_bytes=None,
+    capability=None,
+    bf16_supported=None,
+    dtype='float16',
+    detected=False,
+)
+RUNTIME_HARDWARE_MATCH = HardwareMatch(None, 'unavailable', False)
 spaces_api: Any
 
 if ENV == 'Huggingface':
@@ -126,7 +138,7 @@ _RMBG_WORKER = None
 _POSTPROCESSORS = None
 
 
-def resolve_rtx3090_mode(value, modes):
+def resolve_control_mode(value, modes):
     """Map an exact integer control value to its named UI mode."""
     if isinstance(value, bool):
         return None
@@ -139,145 +151,256 @@ def resolve_rtx3090_mode(value, modes):
     return modes.get(int(numeric_value))
 
 
-def get_rtx3090_preset(profile, *, saved=False):
-    """Return Gradio values and an explanatory status card for a GPU preset."""
-    if profile not in RTX3090_PRESETS:
-        raise ValueError(f"Unknown RTX 3090 preset: {profile}")
-
-    preset = RTX3090_PRESETS[profile]
-    is_quality = profile == 'quality'
-    profile_name = 'Chất lượng cao' if is_quality else 'Mặc định an toàn'
-    profile_class = 'quality' if is_quality else 'safe'
-    status_label = 'Saved values' if saved else '&#272;ang d&#249;ng'
-    status_html = f"""
-    <div class="rtx-preset-status {profile_class}" data-profile="{profile_class}">
-        <div class="rtx-preset-status-heading">
-            <div class="rtx-preset-status-title">
-                <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="check" aria-hidden="true"></span>
-                <span>RTX 3090 · 1 ảnh &amp; 4 ảnh · {profile_name}</span>
-            </div>
-            <span class="rtx-preset-current">{status_label}</span>
-        </div>
-        <div class="rtx-preset-values">
-            <span><b>{preset['steps']}</b><small>Steps</small></span>
-            <span><b>{preset['guidance_scale']}</b><small>Guidance</small></span>
-            <span><b>{preset['octree_resolution']}</b><small>Octree</small></span>
-            <span><b>{preset['num_chunks']}</b><small>Chunks</small></span>
-        </div>
-    </div>
-    """
+def recommended_hardware_id():
     return (
-        preset['steps'],
-        preset['guidance_scale'],
-        preset['octree_resolution'],
-        preset['num_chunks'],
-        resolve_rtx3090_mode(preset['steps'], RTX3090_GENERATION_MODES),
-        resolve_rtx3090_mode(
-            preset['octree_resolution'],
-            RTX3090_DECODING_MODES,
-        ),
-        status_html,
+        RUNTIME_HARDWARE_MATCH.hardware_id
+        or GPU_PRESET_CATALOG.default_hardware_id
+        or GPU_PRESET_CATALOG.hardware[0].id
     )
 
 
-def resolve_rtx3090_profile(steps, guidance_scale, octree_resolution, num_chunks):
-    """Resolve a preset from its complete parameter tuple."""
-    raw_values = (steps, guidance_scale, octree_resolution, num_chunks)
-    if any(isinstance(value, bool) for value in raw_values):
-        return None
-
-    try:
-        normalized_integers = []
-        for value in (steps, octree_resolution, num_chunks):
-            numeric_value = float(value)
-            if not math.isfinite(numeric_value) or not numeric_value.is_integer():
-                return None
-            normalized_integers.append(int(numeric_value))
-        normalized_guidance = float(guidance_scale)
-    except (OverflowError, TypeError, ValueError):
-        return None
-
-    if not math.isfinite(normalized_guidance):
-        return None
-
-    normalized_steps, normalized_octree, normalized_chunks = normalized_integers
-    for profile, preset in RTX3090_PRESETS.items():
-        if (
-            normalized_steps == preset['steps']
-            and math.isclose(
-                normalized_guidance,
-                float(preset['guidance_scale']),
-                rel_tol=1e-9,
-                abs_tol=1e-9,
-            )
-            and normalized_octree == preset['octree_resolution']
-            and normalized_chunks == preset['num_chunks']
-        ):
-            return profile
-    return None
+def get_hardware_profile(hardware_id=None):
+    profile = GPU_PRESET_CATALOG.get_hardware(hardware_id)
+    if profile is not None:
+        return profile
+    fallback = GPU_PRESET_CATALOG.get_hardware(recommended_hardware_id())
+    return fallback or GPU_PRESET_CATALOG.hardware[0]
 
 
-def get_rtx3090_status(
+def get_hardware_preset(hardware_id, preset_id, *, saved=False):
+    """Return Advanced Options values for one validated catalog preset."""
+    hardware = get_hardware_profile(hardware_id)
+    preset = hardware.get_preset(preset_id)
+    if preset is None:
+        raise ValueError(
+            f"Unknown GPU preset {preset_id!r} for hardware {hardware.id!r}"
+        )
+    return (
+        preset.steps,
+        preset.guidance_scale,
+        preset.octree_resolution,
+        preset.num_chunks,
+        resolve_control_mode(preset.steps, GENERATION_MODES),
+        resolve_control_mode(preset.octree_resolution, DECODING_MODES),
+        render_preset_status(
+            hardware,
+            preset,
+            preset.parameter_tuple,
+            saved=saved,
+        ),
+    )
+
+
+def get_hardware_status(
+    hardware_id,
     steps,
     guidance_scale,
     octree_resolution,
     num_chunks,
     *,
     saved=False,
+    legacy=False,
 ):
-    """Render the preset status from the actual values shown in the form."""
-    profile = resolve_rtx3090_profile(
+    """Render status from the selected hardware and actual form values."""
+    hardware = get_hardware_profile(hardware_id)
+    preset_id = resolve_preset_id(
+        hardware.id,
         steps,
         guidance_scale,
         octree_resolution,
         num_chunks,
+        GPU_PRESET_CATALOG,
     )
-    if profile:
-        return get_rtx3090_preset(profile, saved=saved)[-1]
-
-    profile_name = 'Custom saved configuration' if saved else 'Custom configuration'
-    status_label = 'Saved values' if saved else 'In use'
-    display_values = tuple(
-        '&mdash;' if value is None else escape(str(value))
-        for value in (steps, guidance_scale, octree_resolution, num_chunks)
+    preset = hardware.get_preset(preset_id) if preset_id else None
+    return render_preset_status(
+        hardware,
+        preset,
+        (steps, guidance_scale, octree_resolution, num_chunks),
+        saved=saved,
+        legacy=legacy,
     )
-    display_steps, display_guidance, display_octree, display_chunks = display_values
-    return f"""
-    <div class="rtx-preset-status custom" data-profile="custom">
-        <div class="rtx-preset-status-heading">
-            <div class="rtx-preset-status-title">
-                <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="settings" aria-hidden="true"></span>
-                <span>RTX 3090 - 1 &amp; 4 views - {profile_name}</span>
-            </div>
-            <span class="rtx-preset-current">{status_label}</span>
-        </div>
-        <div class="rtx-preset-values">
-            <span><b>{display_steps}</b><small>Steps</small></span>
-            <span><b>{display_guidance}</b><small>Guidance</small></span>
-            <span><b>{display_octree}</b><small>Octree</small></span>
-            <span><b>{display_chunks}</b><small>Chunks</small></span>
-        </div>
-    </div>
-    """
 
 
-def get_rtx3090_form_state(
+def get_hardware_form_state(
+    hardware_id,
+    steps,
+    guidance_scale,
+    octree_resolution,
+    num_chunks,
+    history_review_marker=None,
+):
+    """Return synchronized mode controls and selected hardware status."""
+    history_review = (
+        isinstance(history_review_marker, str)
+        and 'data-history-review-active="true"' in history_review_marker
+    )
+    known_hardware = GPU_PRESET_CATALOG.get_hardware(hardware_id)
+    return (
+        resolve_control_mode(steps, GENERATION_MODES),
+        resolve_control_mode(octree_resolution, DECODING_MODES),
+        get_hardware_status(
+            hardware_id,
+            steps,
+            guidance_scale,
+            octree_resolution,
+            num_chunks,
+            saved=history_review,
+            legacy=history_review and known_hardware is None,
+        ),
+    )
+
+
+def hardware_browser_state(hardware_id, preset_id=None):
+    hardware = get_hardware_profile(hardware_id)
+    preset = hardware.get_preset(preset_id)
+    if preset is None:
+        preset = hardware.get_preset(hardware.default_preset_id)
+    return {
+        'catalog_version': GPU_PRESET_CATALOG.schema_version,
+        'runtime_fingerprint': RUNTIME_HARDWARE.fingerprint,
+        'hardware_id': hardware.id,
+        'preset_id': preset.id if preset else None,
+    }
+
+
+def resolve_browser_hardware_selection(state):
+    if isinstance(state, dict):
+        stored_profile = GPU_PRESET_CATALOG.get_hardware(state.get('hardware_id'))
+        if (
+            stored_profile is not None
+            and state.get('catalog_version') == GPU_PRESET_CATALOG.schema_version
+            and state.get('runtime_fingerprint') == RUNTIME_HARDWARE.fingerprint
+        ):
+            stored_preset = stored_profile.get_preset(state.get('preset_id'))
+            return (
+                stored_profile.id,
+                (
+                    stored_preset.id
+                    if stored_preset
+                    else stored_profile.default_preset_id
+                ),
+            )
+    profile = get_hardware_profile(recommended_hardware_id())
+    return profile.id, profile.default_preset_id
+
+
+def resolve_browser_hardware_id(state):
+    return resolve_browser_hardware_selection(state)[0]
+
+
+def apply_hardware_preset(hardware_id, preset_id):
+    hardware = get_hardware_profile(hardware_id)
+    return (
+        *get_hardware_preset(hardware.id, preset_id),
+        hardware_browser_state(hardware.id, preset_id),
+    )
+
+
+def get_hardware_ui_state(
+    hardware_id,
+    steps,
+    guidance_scale,
+    octree_resolution,
+    num_chunks,
+    *,
+    interactive=True,
+    saved=False,
+    legacy=False,
+):
+    hardware = get_hardware_profile(hardware_id)
+    selected_preset_id = resolve_preset_id(
+        hardware.id,
+        steps,
+        guidance_scale,
+        octree_resolution,
+        num_chunks,
+        GPU_PRESET_CATALOG,
+    )
+    safe = hardware.get_preset('safe')
+    quality = hardware.get_preset('quality')
+    if safe is None or quality is None:
+        raise RuntimeError(f"Hardware profile {hardware.id!r} must define safe and quality")
+    return (
+        render_profile_summary(
+            hardware,
+            recommended_hardware_id=RUNTIME_HARDWARE_MATCH.hardware_id,
+            legacy=legacy,
+        ),
+        render_preset_cards(hardware, selected_preset_id),
+        render_profile_note(hardware),
+        gr.update(value=f'Áp dụng · {safe.label}', interactive=interactive),
+        gr.update(value=f'Áp dụng · {quality.label}', interactive=interactive),
+        get_hardware_status(
+            hardware.id,
+            steps,
+            guidance_scale,
+            octree_resolution,
+            num_chunks,
+            saved=saved,
+            legacy=legacy,
+        ),
+    )
+
+
+def select_hardware_profile(
+    hardware_id,
     steps,
     guidance_scale,
     octree_resolution,
     num_chunks,
 ):
-    """Return synchronized Turbo radios and RTX preset status markup."""
+    hardware = get_hardware_profile(hardware_id)
     return (
-        resolve_rtx3090_mode(steps, RTX3090_GENERATION_MODES),
-        resolve_rtx3090_mode(octree_resolution, RTX3090_DECODING_MODES),
-        get_rtx3090_status(
+        hardware_browser_state(hardware.id, hardware.default_preset_id),
+        *get_hardware_ui_state(
+            hardware.id,
             steps,
             guidance_scale,
             octree_resolution,
             num_chunks,
         ),
     )
+
+
+def build_generation_hardware_metadata(hardware_id, params):
+    """Validate and snapshot UI hardware selection without changing inference."""
+    hardware = GPU_PRESET_CATALOG.get_hardware(hardware_id)
+    values = (
+        params.get('steps'),
+        params.get('guidance_scale'),
+        params.get('octree_resolution'),
+        params.get('num_chunks'),
+    )
+    preset_id = (
+        resolve_preset_id(
+            hardware.id,
+            *values,
+            catalog=GPU_PRESET_CATALOG,
+        )
+        if hardware
+        else None
+    )
+    preset = hardware.get_preset(preset_id) if hardware and preset_id else None
+    hardware_metadata = {
+        'catalog_version': GPU_PRESET_CATALOG.schema_version,
+        'id': hardware.id if hardware else None,
+        'label': hardware.label if hardware else None,
+        'selection_source': 'ui' if hardware else 'api',
+        'runtime': RUNTIME_HARDWARE.snapshot(),
+    }
+    preset_metadata = {
+        'catalog_version': GPU_PRESET_CATALOG.schema_version,
+        'hardware_id': hardware.id if hardware else None,
+        'id': preset.id if preset else 'custom',
+        'source': 'catalog' if preset else 'custom',
+        'params_snapshot': {
+            'steps': values[0],
+            'guidance_scale': values[1],
+            'octree_resolution': values[2],
+            'num_chunks': values[3],
+        },
+    }
+    return hardware_metadata, preset_metadata
 
 
 def get_background_remover():
@@ -739,8 +862,29 @@ def build_stored_model_viewer_html(save_folder, mesh_filename, height=660):
     """
 
 
-def restore_generation_from_request(request: gr.Request | None = None):
+def restore_generation_from_request(
+    browser_hardware_state=None,
+    request: gr.Request | None = None,
+):
     """Restore saved inputs, mesh preview and settings from a generation URL."""
+    fresh_hardware_id, fresh_preset_id = resolve_browser_hardware_selection(
+        browser_hardware_state
+    )
+    fresh_hardware = get_hardware_profile(fresh_hardware_id)
+    fresh_preset = fresh_hardware.get_preset(fresh_preset_id)
+    if fresh_preset is None:
+        raise RuntimeError(
+            f"Hardware profile {fresh_hardware.id!r} has no default preset"
+        )
+    fresh_values = fresh_preset.parameter_tuple
+    if globals().get('TURBO_MODE', False):
+        fresh_values = (
+            5,
+            fresh_values[1],
+            fresh_values[2],
+            fresh_values[3],
+        )
+    fresh_ui = get_hardware_ui_state(fresh_hardware.id, *fresh_values)
     editable = (
         gr.update(),
         gr.update(interactive=True),
@@ -752,19 +896,30 @@ def restore_generation_from_request(request: gr.Request | None = None):
         gr.update(),
         gr.update(),
         gr.update(interactive=True),
+        gr.update(value=fresh_values[0], interactive=True),
+        gr.update(value=fresh_values[1], interactive=True),
+        gr.update(value=fresh_values[2], interactive=True),
+        gr.update(interactive=True),
+        gr.update(value=fresh_values[3], interactive=True),
         gr.update(interactive=True),
         gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
-        gr.update(interactive=True),
+        fresh_ui[5],
+        fresh_ui[3],
+        fresh_ui[4],
+        gr.update(
+            value=resolve_control_mode(fresh_values[0], GENERATION_MODES),
+            interactive=True,
+        ),
+        gr.update(
+            value=resolve_control_mode(fresh_values[2], DECODING_MODES),
+            interactive=True,
+        ),
         '<span data-history-review-active="false"></span>',
+        hardware_browser_state(fresh_hardware.id, fresh_preset.id),
+        gr.update(value=fresh_hardware.id, interactive=True),
+        fresh_ui[0],
+        fresh_ui[1],
+        fresh_ui[2],
     )
     try:
         generation_uid = generation_uid_query_from_request(request)
@@ -873,20 +1028,36 @@ def restore_generation_from_request(request: gr.Request | None = None):
         if isinstance(params.get('randomize_seed'), bool)
         else False
     )
-    preset_status = get_rtx3090_status(
+    raw_hardware = manifest.get('hardware')
+    raw_preset = manifest.get('preset')
+    stored_hardware_id = (
+        raw_hardware.get('id')
+        if isinstance(raw_hardware, dict)
+        else None
+    )
+    if not stored_hardware_id and isinstance(raw_preset, dict):
+        stored_hardware_id = raw_preset.get('hardware_id')
+    saved_hardware = GPU_PRESET_CATALOG.get_hardware(stored_hardware_id)
+    history_hardware = saved_hardware or fresh_hardware
+    legacy_hardware = saved_hardware is None
+    history_ui = get_hardware_ui_state(
+        history_hardware.id,
         steps_value,
         guidance_value,
         octree_value,
         chunks_value,
+        interactive=False,
         saved=True,
+        legacy=legacy_hardware,
     )
-    generation_mode_value = resolve_rtx3090_mode(
+    preset_status = history_ui[5]
+    generation_mode_value = resolve_control_mode(
         steps_value,
-        RTX3090_GENERATION_MODES,
+        GENERATION_MODES,
     )
-    decoding_mode_value = resolve_rtx3090_mode(
+    decoding_mode_value = resolve_control_mode(
         octree_value,
-        RTX3090_DECODING_MODES,
+        DECODING_MODES,
     )
 
     return (
@@ -929,11 +1100,19 @@ def restore_generation_from_request(request: gr.Request | None = None):
             interactive=False,
         ),
         preset_status,
-        gr.update(interactive=False),
-        gr.update(interactive=False),
+        history_ui[3],
+        history_ui[4],
         gr.update(value=generation_mode_value, interactive=False),
         gr.update(value=decoding_mode_value, interactive=False),
         f'<span data-history-review-active="true" data-input-mode="{input_mode}"></span>',
+        browser_hardware_state,
+        gr.update(
+            value=history_hardware.id if saved_hardware else None,
+            interactive=False,
+        ),
+        history_ui[0],
+        history_ui[1],
+        history_ui[2],
     )
 
 @spaces_api.GPU(duration=60)
@@ -953,6 +1132,8 @@ def _gen_shape(
     num_chunks=200000,
     randomize_seed: bool = False,
     generation_uid=None,
+    hardware_metadata=None,
+    preset_metadata=None,
 ):
     tracking_enabled = generation_uid is not None and bool(str(generation_uid).strip())
     save_folder = None
@@ -971,6 +1152,8 @@ def _gen_shape(
             created_at=generation_created_at,
             updated_at=generation_created_at,
             storage_folder=generation_storage_path(save_folder),
+            hardware=hardware_metadata,
+            preset=preset_metadata,
             events=[{
                 'stage': 'request_received',
                 'message': GENERATION_STAGE_MESSAGES['request_received'],
@@ -1040,6 +1223,10 @@ def _gen_shape(
             'num_chunks': num_chunks,
         }
     }
+    if isinstance(hardware_metadata, dict):
+        stats['hardware'] = hardware_metadata
+    if isinstance(preset_metadata, dict):
+        stats['preset'] = preset_metadata
     if tracking_enabled:
         stats['generation'] = {
             'uid': generation_uid,
@@ -1067,6 +1254,8 @@ def _gen_shape(
             model=stats['model'],
             params=stats['params'],
             inputs=input_files,
+            hardware=hardware_metadata,
+            preset=preset_metadata,
         )
 
     if tracking_enabled:
@@ -1429,10 +1618,20 @@ def shape_generation(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
+    hardware_profile_id=None,
     request: gr.Request | None = None,
 ):
     start_time_0 = time.time()
     generation_uid = generation_uid_from_request(request)
+    hardware_metadata, preset_metadata = build_generation_hardware_metadata(
+        hardware_profile_id,
+        {
+            'steps': steps,
+            'guidance_scale': guidance_scale,
+            'octree_resolution': octree_resolution,
+            'num_chunks': num_chunks,
+        },
+    )
     try:
         result = _gen_shape(
             caption=caption,
@@ -1450,6 +1649,8 @@ def shape_generation(
             num_chunks=num_chunks,
             randomize_seed=randomize_seed,
             generation_uid=generation_uid,
+            hardware_metadata=hardware_metadata,
+            preset_metadata=preset_metadata,
         )
     except GenerationUidConflictError as exc:
         raise gr.Error(str(exc)) from exc
@@ -1487,6 +1688,8 @@ def shape_generation(
             completed_at=completed_at,
             outputs=outputs,
             stats=stats,
+            hardware=hardware_metadata,
+            preset=preset_metadata,
         )
     except Exception as exc:
         mark_generation_failed(generation_uid, exc)
@@ -1545,12 +1748,38 @@ def build_app():
         'float32': 'FP32',
     }.get(str(getattr(args, 'dtype', 'float16')).lower(), 'FP16')
     runtime_label = f'{runtime_device} {runtime_dtype}'
+    hardware_presets_visible = MV_MODE and bool(GPU_PRESET_CATALOG.hardware)
+    initial_hardware_id = recommended_hardware_id()
+    initial_hardware = get_hardware_profile(initial_hardware_id)
+    initial_control_values = (
+        5 if TURBO_MODE else 30,
+        5.0,
+        256,
+        8000,
+    )
+    initial_preset_id = resolve_preset_id(
+        initial_hardware.id,
+        *initial_control_values,
+        catalog=GPU_PRESET_CATALOG,
+    )
+    hardware_action_label = (
+        short_gpu_name(RUNTIME_HARDWARE.name)
+        if RUNTIME_HARDWARE.detected
+        else 'GPU Presets'
+    )
     rtx_profile_action = """
-            <button id="app-rtx-profile" class="app-topbar-button" type="button">
+            <button
+                id="app-rtx-profile"
+                class="app-topbar-button"
+                type="button"
+                aria-haspopup="dialog"
+                aria-controls="rtx3090-modal"
+                aria-expanded="false"
+            >
                 <span class="ui-icon-slot" data-ui-icon="memory" aria-hidden="true"></span>
-                <span>RTX 3090</span>
+                <span>{hardware_action_label}</span>
             </button>
-    """ if MV_MODE and args.device == 'cuda' else ''
+    """.format(hardware_action_label=escape(hardware_action_label)) if hardware_presets_visible else ''
 
     title_html = (
         render_topbar(brand_name, workspace_title, rtx_profile_action)
@@ -1573,6 +1802,10 @@ def build_app():
             '<span data-history-review-active="false"></span>',
             visible=False,
             elem_id='history-review-state',
+        )
+        hardware_browser_preference = gr.BrowserState(
+            default_value=hardware_browser_state(initial_hardware_id),
+            storage_key='hunyuan3d.hardware-profile.v1',
         )
 
         with gr.Row(elem_id='workspace-grid'):
@@ -1650,6 +1883,11 @@ def build_app():
                                         visible=HAS_TEXTUREGEN,
                                         min_width=100,
                                         elem_id='generate-textured-3d-button')
+                    shape_generation_api_bridge = gr.Button(
+                        value='Shape Generation API',
+                        visible=False,
+                        elem_id='shape-generation-api-bridge',
+                    )
 
                 if not MV_MODE:
                     with gr.Group(elem_id='mesh-download-card'):
@@ -1674,7 +1912,7 @@ Fast for very complex cases, Standard seldom use.',
                         decode_mode = gr.Radio(
                             label='Decoding Mode',
                             info='The resolution for exporting mesh from generated vectset',
-                            choices=['Low', 'Standard', 'High'],
+                            choices=['Low', 'Standard', 'High', 'Ultra'],
                             value='Standard',
                             elem_id='decoding-mode')
                     with gr.Tab('Advanced Options', id='tab_advanced_options', elem_id='advanced-settings-form'):
@@ -1702,6 +1940,7 @@ Fast for very complex cases, Standard seldom use.',
                             cfg_scale = gr.Number(value=5.0, label='Guidance Scale', min_width=100,
                                                   elem_classes='ui-control')
                             num_chunks = gr.Slider(maximum=5000000, minimum=1000, value=8000,
+                                                   step=1000,
                                                    label='Number of Chunks', min_width=100,
                                                    elem_classes='ui-control')
                         with gr.Row(elem_classes=['ui-control-row', 'ui-control-row-checks']):
@@ -1830,22 +2069,22 @@ Fast for very complex cases, Standard seldom use.',
 
         with gr.Column(
             elem_id='rtx3090-modal',
-            visible=MV_MODE and args.device == 'cuda',
+            visible=hardware_presets_visible,
         ):
             with gr.Column(elem_classes='rtx3090-modal-panel'):
                 gr.HTML("""
                 <div class="rtx3090-modal-header">
                     <div class="rtx3090-header-main">
                         <span class="rtx3090-header-icon ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></span>
-                        <h2 id="rtx3090-modal-title">RTX 3090 · Cấu hình đề xuất</h2>
+                        <h2 id="rtx3090-modal-title">GPU Presets · Cấu hình đề xuất</h2>
                         <span class="rtx3090-header-scope">1 ảnh &amp; 4 ảnh</span>
                     </div>
                     <div class="rtx3090-header-actions">
                         <span class="rtx3090-verified">
                             <i class="rtx3090-verified-dot"></i>
-                            Đã kiểm tra
+                            Danh sách cục bộ
                         </span>
-                        <span class="rtx3090-preset-count"><b>2</b> preset</span>
+                        <span class="rtx3090-preset-count"><b>{hardware_count}</b> cấu hình · {preset_count} preset</span>
                         <button id="rtx3090-modal-close" type="button" aria-label="Đóng cửa sổ cấu hình">
                             <svg class="rtx3090-close-icon" width="100%" height="100%" viewBox="0 0 5 5" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill: currentcolor; fill-rule: evenodd; clip-rule: evenodd; stroke-linejoin: round; stroke-miterlimit: 2;" aria-hidden="true" focusable="false">
                                 <g>
@@ -1856,120 +2095,76 @@ Fast for very complex cases, Standard seldom use.',
                         </button>
                     </div>
                 </div>
-                """, elem_classes='rtx3090-modal-header-block')
-                gr.HTML("""
-                <div class="rtx3090-api-intro">
-                    <div class="rtx3090-context-tabs">
-                        <span class="active"><i class="ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></i>RTX 3090</span>
-                        <span><i class="ui-icon-slot" data-ui-icon="memory" aria-hidden="true"></i>24 GB VRAM</span>
-                        <span>1 ảnh</span>
-                        <span>4 ảnh</span>
-                        <span>FP16</span>
-                    </div>
-                    <p>
-                        Chọn một trong các cấu hình dưới đây để tối ưu chất lượng mesh trên máy hiện tại.<br>
-                        Các giá trị sẽ được cập nhật trực tiếp vào <strong>Advanced Options</strong>.
-                    </p>
-                </div>
-                """, elem_classes='rtx3090-intro-block')
+                """.format(
+                    hardware_count=len(GPU_PRESET_CATALOG.hardware),
+                    preset_count=GPU_PRESET_CATALOG.preset_count,
+                ), elem_classes='rtx3090-modal-header-block')
+                gr.HTML(
+                    render_catalog_intro(
+                        RUNTIME_HARDWARE,
+                        RUNTIME_HARDWARE_MATCH,
+                        GPU_PRESET_CATALOG,
+                    ),
+                    elem_classes='rtx3090-intro-block',
+                )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>1. Xác nhận cấu hình máy.</b>
-                    <span>Hai preset này dành riêng cho RTX 3090 24 GB đang chạy WebUI.</span>
+                    <b>1. Chọn nhóm GPU/VRAM của máy.</b>
+                    <span>WebUI đã tự đề xuất theo GPU được phát hiện; bạn vẫn có thể chọn thủ công.</span>
                 </div>
                 """, elem_classes='rtx3090-section-one')
-                gr.HTML("""
-                <div class="rtx3090-machine-strip">
-                    <div class="rtx3090-machine-badge">24 GB</div>
-                    <div class="rtx3090-machine-copy">
-                        <strong>NVIDIA GeForce RTX 3090 · CUDA · FP16</strong>
-                        <span>
-                            Hai mức dưới đây đã được kiểm tra end-to-end trên chính máy này,
-                            không gặp lỗi thiếu VRAM với cả đầu vào 1 ảnh và 4 ảnh.
-                        </span>
-                    </div>
-                    <span class="rtx3090-machine-check ui-icon-slot" data-ui-icon="check" aria-hidden="true"></span>
-                </div>
-                """, elem_classes='rtx3090-machine-block')
+                hardware_profile = gr.Dropdown(
+                    choices=GPU_PRESET_CATALOG.choices(),
+                    value=initial_hardware.id,
+                    label='GPU / VRAM profile',
+                    info='Danh sách nằm trong webui/data/gpu_preset_catalog.json',
+                    elem_id='hardware-profile-select',
+                    elem_classes='hardware-profile-select-control',
+                )
+                hardware_profile_summary = gr.HTML(
+                    render_profile_summary(
+                        initial_hardware,
+                        recommended_hardware_id=RUNTIME_HARDWARE_MATCH.hardware_id,
+                    ),
+                    elem_classes='rtx3090-machine-block',
+                )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>2. Chọn mức phù hợp rồi bấm Áp dụng.</b>
-                    <span>Thông số bên dưới dùng chung cho cả chế độ 1 ảnh và 4 ảnh.</span>
+                    <b>2. Chọn mức chất lượng rồi bấm Áp dụng.</b>
+                    <span>Mỗi nhóm GPU có hai preset riêng; thông số dùng chung cho chế độ 1 ảnh và 4 ảnh.</span>
                 </div>
                 """, elem_classes='rtx3090-section-two')
-                gr.HTML("""
-                <div class="rtx3090-profile-grid">
-                    <article
-                        class="rtx3090-profile-card safe is-selected"
-                        data-profile="safe"
-                        role="button"
-                        tabindex="0"
-                        aria-pressed="true"
-                        aria-controls="advanced-settings-form"
-                        aria-label="Chọn và áp dụng preset 256 mặc định an toàn"
-                    >
-                        <div class="rtx3090-profile-heading">
-                            <h3>256 · Mặc định an toàn</h3>
-                            <span class="rtx3090-profile-selector" aria-hidden="true"></span>
-                        </div>
-                        <p>Dùng cho lần chạy đầu hoặc khi cần ưu tiên ổn định và tốc độ.</p>
-                        <div class="rtx3090-profile-values">
-                            <span><b>30</b><small>Steps</small></span>
-                            <span><b>5.0</b><small>Guidance</small></span>
-                            <span><b>256</b><small>Octree</small></span>
-                            <span><b>8000</b><small>Chunks</small></span>
-                        </div>
-                    </article>
-                    <article
-                        class="rtx3090-profile-card quality"
-                        data-profile="quality"
-                        role="button"
-                        tabindex="0"
-                        aria-pressed="false"
-                        aria-controls="advanced-settings-form"
-                        aria-label="Chọn và áp dụng preset 384 chất lượng cao"
-                    >
-                        <div class="rtx3090-profile-heading">
-                            <h3>384 · Chất lượng cao</h3>
-                            <span class="rtx3090-profile-selector" aria-hidden="true"></span>
-                        </div>
-                        <p>Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.</p>
-                        <div class="rtx3090-profile-values">
-                            <span><b>30</b><small>Steps</small></span>
-                            <span><b>5.0</b><small>Guidance</small></span>
-                            <span><b>384</b><small>Octree</small></span>
-                            <span><b>8000</b><small>Chunks</small></span>
-                        </div>
-                    </article>
-                </div>
-                """, elem_classes='rtx3090-profiles-block')
+                hardware_profile_cards = gr.HTML(
+                    render_preset_cards(initial_hardware, initial_preset_id),
+                    elem_classes='rtx3090-profiles-block',
+                )
                 with gr.Row(elem_classes='rtx-preset-actions'):
                     rtx_safe_preset = gr.Button(
-                        value='Áp dụng · 256 an toàn',
+                        value=(
+                            f"Áp dụng · {initial_hardware.get_preset('safe').label}"
+                        ),
                         min_width=160,
                         elem_id='rtx3090-safe-preset',
                     )
                     rtx_quality_preset = gr.Button(
-                        value='Áp dụng · 384 chất lượng cao',
+                        value=(
+                            f"Áp dụng · {initial_hardware.get_preset('quality').label}"
+                        ),
                         variant='primary',
                         min_width=180,
                         elem_id='rtx3090-quality-preset',
                     )
                 rtx_preset_status = gr.HTML(
-                    get_rtx3090_status(5 if TURBO_MODE else 30, 5.0, 256, 8000),
+                    get_hardware_status(
+                        initial_hardware.id,
+                        *initial_control_values,
+                    ),
                     elem_classes='rtx3090-status-block',
                 )
-                gr.HTML("""
-                <div class="rtx3090-modal-note">
-                    <span class="rtx3090-note-icon ui-icon-slot" data-ui-icon="warning" aria-hidden="true"></span>
-                    <p>
-                        <strong>Lưu ý:</strong> Seed không làm tăng VRAM. Bật Randomize để thử biến thể,
-                        tắt để tái tạo đúng kết quả.<br>
-                        Chunks 8000 cân bằng tốc độ/bộ nhớ và không làm mesh đẹp hơn khi tăng quá cao.<br>
-                        Không đặt Octree 512 làm mặc định trên RTX 3090 24 GB.
-                    </p>
-                </div>
-                """, elem_classes='rtx3090-note-block')
+                hardware_profile_note = gr.HTML(
+                    render_profile_note(initial_hardware),
+                    elem_classes='rtx3090-note-block',
+                )
 
         assert file_out is not None and file_out2 is not None
 
@@ -1994,6 +2189,7 @@ Fast for very complex cases, Standard seldom use.',
 
         restore_event = demo.load(
             fn=restore_generation_from_request,
+            inputs=[hardware_browser_preference],
             outputs=[
                 input_mode,
                 image,
@@ -2018,6 +2214,11 @@ Fast for very complex cases, Standard seldom use.',
                 gen_mode,
                 decode_mode,
                 history_review_state,
+                hardware_browser_preference,
+                hardware_profile,
+                hardware_profile_summary,
+                hardware_profile_cards,
+                hardware_profile_note,
             ],
             queue=False,
             show_progress='hidden',
@@ -2032,16 +2233,41 @@ Fast for very complex cases, Standard seldom use.',
             gen_mode,
             decode_mode,
             rtx_preset_status,
+            hardware_browser_preference,
         ]
+        hardware_profile.input(
+            fn=select_hardware_profile,
+            inputs=[
+                hardware_profile,
+                num_steps,
+                cfg_scale,
+                octree_resolution,
+                num_chunks,
+            ],
+            outputs=[
+                hardware_browser_preference,
+                hardware_profile_summary,
+                hardware_profile_cards,
+                hardware_profile_note,
+                rtx_safe_preset,
+                rtx_quality_preset,
+                rtx_preset_status,
+            ],
+            queue=False,
+            show_progress='hidden',
+            api_name=False,
+        )
         rtx_quality_preset.click(
-            fn=lambda: get_rtx3090_preset('quality'),
+            fn=lambda hardware_id: apply_hardware_preset(hardware_id, 'quality'),
+            inputs=[hardware_profile],
             outputs=rtx_preset_outputs,
             queue=False,
             show_progress='hidden',
             api_name=False,
         )
         rtx_safe_preset.click(
-            fn=lambda: get_rtx3090_preset('safe'),
+            fn=lambda hardware_id: apply_hardware_preset(hardware_id, 'safe'),
+            inputs=[hardware_profile],
             outputs=rtx_preset_outputs,
             queue=False,
             show_progress='hidden',
@@ -2055,12 +2281,14 @@ Fast for very complex cases, Standard seldom use.',
             num_chunks,
         ):
             rtx_setting_control.input(
-                fn=get_rtx3090_form_state,
+                fn=get_hardware_form_state,
                 inputs=[
+                    hardware_profile,
                     num_steps,
                     cfg_scale,
                     octree_resolution,
                     num_chunks,
+                    history_review_state,
                 ],
                 outputs=[gen_mode, decode_mode, rtx_preset_status],
                 queue=False,
@@ -2087,9 +2315,11 @@ Fast for very complex cases, Standard seldom use.',
                 check_box_rembg,
                 num_chunks,
                 randomize_seed,
+                hardware_profile,
             ],
             outputs=[file_out, html_gen_mesh, stats, seed],
             show_progress='hidden' if MV_MODE else 'full',
+            api_name=False,
         ).then(
             lambda: (gr.update(visible=False, value=False), gr.update(interactive=True), gr.update(interactive=True),
                      gr.update(interactive=False)),
@@ -2099,6 +2329,29 @@ Fast for very complex cases, Standard seldom use.',
             lambda: gr.update(selected='gen_mesh_panel'),
             outputs=[tabs_output],
             show_progress='hidden',
+        )
+
+        shape_generation_api_bridge.click(
+            shape_generation,
+            inputs=[
+                caption,
+                input_mode,
+                image,
+                mv_image_front,
+                mv_image_back,
+                mv_image_left,
+                mv_image_right,
+                num_steps,
+                cfg_scale,
+                seed,
+                octree_resolution,
+                check_box_rembg,
+                num_chunks,
+                randomize_seed,
+            ],
+            outputs=[file_out, html_gen_mesh, stats, seed],
+            show_progress='hidden' if MV_MODE else 'full',
+            api_name='shape_generation',
         )
 
         btn_all.click(
@@ -2145,8 +2398,15 @@ Fast for very complex cases, Standard seldom use.',
             inputs=[gen_mode],
             outputs=[num_steps],
         ).then(
-            fn=get_rtx3090_form_state,
-            inputs=[num_steps, cfg_scale, octree_resolution, num_chunks],
+            fn=get_hardware_form_state,
+            inputs=[
+                hardware_profile,
+                num_steps,
+                cfg_scale,
+                octree_resolution,
+                num_chunks,
+                history_review_state,
+            ],
             outputs=[gen_mode, decode_mode, rtx_preset_status],
             queue=False,
             show_progress='hidden',
@@ -2158,16 +2418,25 @@ Fast for very complex cases, Standard seldom use.',
                 return gr.update(value=196)
             elif value == 'Standard':
                 return gr.update(value=256)
-            else:
+            elif value == 'High':
                 return gr.update(value=384)
+            else:
+                return gr.update(value=512)
 
         decode_mode.input(
             on_decode_mode_change,
             inputs=[decode_mode],
             outputs=[octree_resolution],
         ).then(
-            fn=get_rtx3090_form_state,
-            inputs=[num_steps, cfg_scale, octree_resolution, num_chunks],
+            fn=get_hardware_form_state,
+            inputs=[
+                hardware_profile,
+                num_steps,
+                cfg_scale,
+                octree_resolution,
+                num_chunks,
+                history_review_state,
+            ],
             outputs=[gen_mode, decode_mode, rtx_preset_status],
             queue=False,
             show_progress='hidden',
@@ -2329,8 +2598,26 @@ if __name__ == '__main__':
     from hy3dshape import Hunyuan3DDiTFlowMatchingPipeline
     from hy3dshape.pipelines import export_to_trimesh
 
-    if args.device == 'cuda' and not torch.cuda.is_available():
+    requested_torch_device = torch.device(args.device)
+    if requested_torch_device.type == 'cuda' and not torch.cuda.is_available():
         raise RuntimeError('CUDA was requested, but PyTorch cannot access an NVIDIA GPU.')
+
+    RUNTIME_HARDWARE = detect_runtime_hardware(
+        torch,
+        args.device,
+        args.dtype,
+    )
+    RUNTIME_HARDWARE_MATCH = match_runtime_hardware(
+        RUNTIME_HARDWARE,
+        GPU_PRESET_CATALOG,
+    )
+    print(
+        'Hardware preset detection: '
+        f'{RUNTIME_HARDWARE.name} · '
+        f'{RUNTIME_HARDWARE.total_vram_gb or 0:.1f} GiB · '
+        f'{RUNTIME_HARDWARE_MATCH.hardware_id or "manual selection"} '
+        f'({RUNTIME_HARDWARE_MATCH.method})'
+    )
 
     pipeline_dtype = {
         'float16': torch.float16,

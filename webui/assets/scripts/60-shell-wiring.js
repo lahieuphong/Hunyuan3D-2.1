@@ -16,10 +16,14 @@
                 });
             }
 
-            const rtxButton = document.getElementById("app-rtx-profile");
-            if (rtxButton && rtxButton.dataset.uiWired !== "true") {
-                rtxButton.dataset.uiWired = "true";
-                rtxButton.addEventListener("click", openModal);
+            const hardwareButton = document.getElementById("app-rtx-profile");
+            if (hardwareButton && hardwareButton.dataset.uiWired !== "true") {
+                hardwareButton.dataset.uiWired = "true";
+                hardwareButton.setAttribute(
+                    "aria-expanded",
+                    String(modal()?.classList.contains("rtx-open") === true)
+                );
+                hardwareButton.addEventListener("click", openModal);
             }
         };
 
@@ -40,7 +44,12 @@
             trigger.type = "button";
             trigger.className = "rtx3090-footer-trigger";
             trigger.setAttribute("aria-haspopup", "dialog");
-            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="zap"></span><span>RTX 3090 - Cấu hình đề xuất</span>';
+            trigger.setAttribute("aria-controls", modalId);
+            trigger.setAttribute(
+                "aria-expanded",
+                String(modal()?.classList.contains("rtx-open") === true)
+            );
+            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="memory"></span><span>GPU Presets · Cấu hình đề xuất</span>';
             trigger.addEventListener("click", openModal);
 
             const divider = document.createElement("div");
@@ -59,8 +68,14 @@
             element.setAttribute("aria-modal", "true");
             element.setAttribute("aria-labelledby", "rtx3090-modal-title");
             element.setAttribute("aria-hidden", "true");
+            const panel = element.querySelector(".rtx3090-modal-panel");
+            panel?.setAttribute("tabindex", "-1");
             element.addEventListener("click", (event) => {
                 if (event.target === element) closeModal();
             });
-            document.getElementById("rtx3090-modal-close")?.addEventListener("click", closeModal);
+            element.addEventListener("keydown", trapHardwareModalFocus);
+            document.getElementById("rtx3090-modal-close")?.addEventListener(
+                "click",
+                () => closeModal(true)
+            );
         };

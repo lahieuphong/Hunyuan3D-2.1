@@ -6,8 +6,10 @@
             "#generation-mode",
             "#decoding-mode",
             "#advanced-settings-form",
+            "#hardware-profile-select",
             "#rtx3090-modal .rtx3090-profile-grid",
             "#rtx3090-modal .rtx-preset-actions",
+            "[data-mutates-generation-settings]",
         ].join(", ");
         let historyReviewGuardInstalled = false;
 
@@ -65,6 +67,12 @@
                 "#advanced-settings-form input",
                 "#advanced-settings-form select",
                 "#advanced-settings-form button",
+                "#hardware-profile-select input",
+                "#hardware-profile-select select",
+                "#hardware-profile-select button",
+                "[data-mutates-generation-settings] input",
+                "[data-mutates-generation-settings] select",
+                "[data-mutates-generation-settings] button",
                 "#rtx3090-modal .rtx-preset-actions button",
             ].join(", ")).forEach((control) => {
                 control.disabled = true;
@@ -74,6 +82,8 @@
             document.querySelectorAll([
                 "#prompt-mode-tabs button[role='tab']",
                 "#rtx3090-modal .rtx3090-profile-card[data-profile]",
+                "#hardware-profile-select [role='combobox']",
+                "[data-mutates-generation-settings][role='button']",
             ].join(", ")).forEach((control) => {
                 control.setAttribute("aria-disabled", "true");
                 control.tabIndex = -1;

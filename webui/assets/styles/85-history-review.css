@@ -8,6 +8,8 @@
     body.is-history-review #prompt-mode-tabs .ui-upload,
     body.is-history-review #generation-mode,
     body.is-history-review #decoding-mode,
+    body.is-history-review #hardware-profile-select,
+    body.is-history-review [data-mutates-generation-settings],
     body.is-history-review .generate-actions button:disabled,
     body.is-history-review #rtx3090-modal .rtx-preset-actions button:disabled {
         opacity: 0.72;
@@ -21,9 +23,28 @@
         transform: none !important;
     }
 
+    body.is-history-review #hardware-profile-select,
+    body.is-history-review #hardware-profile-select:focus-within {
+        border-color: var(--rtx-border) !important;
+        box-shadow: none !important;
+        opacity: 0.76;
+    }
+
+    body.is-history-review #hardware-profile-select input:disabled,
+    body.is-history-review #hardware-profile-select button:disabled,
+    body.is-history-review #hardware-profile-select [aria-disabled="true"] {
+        cursor: not-allowed !important;
+        opacity: 1;
+    }
+
     body.is-history-review .rtx3090-profile-card {
         cursor: not-allowed !important;
         transform: none !important;
+    }
+
+    body.is-history-review [data-mutates-generation-settings] {
+        cursor: not-allowed !important;
+        user-select: none !important;
     }
 
     body.is-history-review .rtx3090-profile-card:not(.is-selected):hover {
