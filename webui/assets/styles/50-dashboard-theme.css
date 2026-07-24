@@ -112,6 +112,19 @@
         width: 30px;
     }
 
+    .ui-brand-mark {
+        align-items: center;
+        display: inline-flex;
+        justify-content: center;
+    }
+
+    .app-context-logo {
+        display: block;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+    }
+
     .app-title-block {
         gap: 12px;
     }

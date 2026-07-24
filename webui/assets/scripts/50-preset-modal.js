@@ -12,10 +12,11 @@
 
         const renderPresetSelection = (activeProfile) => {
             const element = modal();
-            if (!element || !presetButtonIds[activeProfile]) return;
+            if (!element) return;
+            const knownProfile = Boolean(presetButtonIds[activeProfile]);
 
             element.querySelectorAll(".rtx3090-profile-card[data-profile]").forEach((card) => {
-                const isActive = card.dataset.profile === activeProfile;
+                const isActive = knownProfile && card.dataset.profile === activeProfile;
                 card.classList.toggle("is-selected", isActive);
                 card.setAttribute("aria-pressed", String(isActive));
             });
@@ -23,7 +24,7 @@
             Object.entries(presetButtonIds).forEach(([profile, buttonId]) => {
                 const button = document.getElementById(buttonId);
                 if (!button) return;
-                const isActive = profile === activeProfile;
+                const isActive = knownProfile && profile === activeProfile;
                 button.classList.toggle("rtx-preset-action-active", isActive);
                 button.setAttribute("aria-pressed", String(isActive));
             });
@@ -45,6 +46,7 @@
                 card.dataset.rtxPresetWired = "true";
 
                 const applyCardPreset = () => {
+                    if (isHistoryReviewRoute()) return;
                     const profile = card.dataset.profile;
                     const button = document.getElementById(presetButtonIds[profile]);
                     if (!button) return;
@@ -64,7 +66,14 @@
                 const button = document.getElementById(buttonId);
                 if (!button || button.dataset.rtxPresetWired === "true") return;
                 button.dataset.rtxPresetWired = "true";
-                button.addEventListener("click", () => renderPresetSelection(profile));
+                button.addEventListener("click", (event) => {
+                    if (isHistoryReviewRoute()) {
+                        event.preventDefault();
+                        syncPresetSelection();
+                        return;
+                    }
+                    renderPresetSelection(profile);
+                });
             });
         };
 

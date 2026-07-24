@@ -38,6 +38,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from glob import glob
+from html import escape
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
@@ -78,6 +79,8 @@ RTX3090_PRESETS = {
         'num_chunks': 8000,
     },
 }
+RTX3090_GENERATION_MODES = {5: 'Turbo', 10: 'Fast', 30: 'Standard'}
+RTX3090_DECODING_MODES = {196: 'Low', 256: 'Standard', 384: 'High'}
 spaces_api: Any
 
 if ENV == 'Huggingface':
@@ -123,7 +126,20 @@ _RMBG_WORKER = None
 _POSTPROCESSORS = None
 
 
-def get_rtx3090_preset(profile):
+def resolve_rtx3090_mode(value, modes):
+    """Map an exact integer control value to its named UI mode."""
+    if isinstance(value, bool):
+        return None
+    try:
+        numeric_value = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric_value) or not numeric_value.is_integer():
+        return None
+    return modes.get(int(numeric_value))
+
+
+def get_rtx3090_preset(profile, *, saved=False):
     """Return Gradio values and an explanatory status card for a GPU preset."""
     if profile not in RTX3090_PRESETS:
         raise ValueError(f"Unknown RTX 3090 preset: {profile}")
@@ -132,6 +148,7 @@ def get_rtx3090_preset(profile):
     is_quality = profile == 'quality'
     profile_name = 'Chất lượng cao' if is_quality else 'Mặc định an toàn'
     profile_class = 'quality' if is_quality else 'safe'
+    status_label = 'Saved values' if saved else '&#272;ang d&#249;ng'
     status_html = f"""
     <div class="rtx-preset-status {profile_class}" data-profile="{profile_class}">
         <div class="rtx-preset-status-heading">
@@ -139,7 +156,7 @@ def get_rtx3090_preset(profile):
                 <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="check" aria-hidden="true"></span>
                 <span>RTX 3090 · 1 ảnh &amp; 4 ảnh · {profile_name}</span>
             </div>
-            <span class="rtx-preset-current">Đang dùng</span>
+            <span class="rtx-preset-current">{status_label}</span>
         </div>
         <div class="rtx-preset-values">
             <span><b>{preset['steps']}</b><small>Steps</small></span>
@@ -154,7 +171,112 @@ def get_rtx3090_preset(profile):
         preset['guidance_scale'],
         preset['octree_resolution'],
         preset['num_chunks'],
+        resolve_rtx3090_mode(preset['steps'], RTX3090_GENERATION_MODES),
+        resolve_rtx3090_mode(
+            preset['octree_resolution'],
+            RTX3090_DECODING_MODES,
+        ),
         status_html,
+    )
+
+
+def resolve_rtx3090_profile(steps, guidance_scale, octree_resolution, num_chunks):
+    """Resolve a preset from its complete parameter tuple."""
+    raw_values = (steps, guidance_scale, octree_resolution, num_chunks)
+    if any(isinstance(value, bool) for value in raw_values):
+        return None
+
+    try:
+        normalized_integers = []
+        for value in (steps, octree_resolution, num_chunks):
+            numeric_value = float(value)
+            if not math.isfinite(numeric_value) or not numeric_value.is_integer():
+                return None
+            normalized_integers.append(int(numeric_value))
+        normalized_guidance = float(guidance_scale)
+    except (OverflowError, TypeError, ValueError):
+        return None
+
+    if not math.isfinite(normalized_guidance):
+        return None
+
+    normalized_steps, normalized_octree, normalized_chunks = normalized_integers
+    for profile, preset in RTX3090_PRESETS.items():
+        if (
+            normalized_steps == preset['steps']
+            and math.isclose(
+                normalized_guidance,
+                float(preset['guidance_scale']),
+                rel_tol=1e-9,
+                abs_tol=1e-9,
+            )
+            and normalized_octree == preset['octree_resolution']
+            and normalized_chunks == preset['num_chunks']
+        ):
+            return profile
+    return None
+
+
+def get_rtx3090_status(
+    steps,
+    guidance_scale,
+    octree_resolution,
+    num_chunks,
+    *,
+    saved=False,
+):
+    """Render the preset status from the actual values shown in the form."""
+    profile = resolve_rtx3090_profile(
+        steps,
+        guidance_scale,
+        octree_resolution,
+        num_chunks,
+    )
+    if profile:
+        return get_rtx3090_preset(profile, saved=saved)[-1]
+
+    profile_name = 'Custom saved configuration' if saved else 'Custom configuration'
+    status_label = 'Saved values' if saved else 'In use'
+    display_values = tuple(
+        '&mdash;' if value is None else escape(str(value))
+        for value in (steps, guidance_scale, octree_resolution, num_chunks)
+    )
+    display_steps, display_guidance, display_octree, display_chunks = display_values
+    return f"""
+    <div class="rtx-preset-status custom" data-profile="custom">
+        <div class="rtx-preset-status-heading">
+            <div class="rtx-preset-status-title">
+                <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="settings" aria-hidden="true"></span>
+                <span>RTX 3090 - 1 &amp; 4 views - {profile_name}</span>
+            </div>
+            <span class="rtx-preset-current">{status_label}</span>
+        </div>
+        <div class="rtx-preset-values">
+            <span><b>{display_steps}</b><small>Steps</small></span>
+            <span><b>{display_guidance}</b><small>Guidance</small></span>
+            <span><b>{display_octree}</b><small>Octree</small></span>
+            <span><b>{display_chunks}</b><small>Chunks</small></span>
+        </div>
+    </div>
+    """
+
+
+def get_rtx3090_form_state(
+    steps,
+    guidance_scale,
+    octree_resolution,
+    num_chunks,
+):
+    """Return synchronized Turbo radios and RTX preset status markup."""
+    return (
+        resolve_rtx3090_mode(steps, RTX3090_GENERATION_MODES),
+        resolve_rtx3090_mode(octree_resolution, RTX3090_DECODING_MODES),
+        get_rtx3090_status(
+            steps,
+            guidance_scale,
+            octree_resolution,
+            num_chunks,
+        ),
     )
 
 
@@ -619,23 +741,51 @@ def build_stored_model_viewer_html(save_folder, mesh_filename, height=660):
 
 def restore_generation_from_request(request: gr.Request | None = None):
     """Restore saved inputs, mesh preview and settings from a generation URL."""
-    unchanged = tuple(gr.update() for _ in range(17))
-    generation_uid = generation_uid_query_from_request(request)
+    editable = (
+        gr.update(),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        '<span data-history-review-active="false"></span>',
+    )
+    try:
+        generation_uid = generation_uid_query_from_request(request)
+    except gr.Error as error:
+        logger.warning("Could not restore generation URL: %s", error)
+        return editable
     if not generation_uid:
-        return unchanged
+        return editable
 
     save_folder = os.path.join(SAVE_DIR, generation_uid)
     manifest_path = stored_generation_file(save_folder, 'generation.json')
     if not manifest_path:
         logger.warning("Saved generation was not found: %s", generation_uid)
-        return unchanged
+        return editable
 
     try:
         with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
             manifest = json.load(manifest_file)
     except (OSError, UnicodeError, json.JSONDecodeError):
         logger.exception("Could not restore generation manifest: %s", manifest_path)
-        return unchanged
+        return editable
 
     if (
         not isinstance(manifest, dict)
@@ -644,7 +794,7 @@ def restore_generation_from_request(request: gr.Request | None = None):
         or not isinstance(manifest.get('events', []), list)
     ):
         logger.warning("Saved generation manifest is invalid: %s", manifest_path)
-        return unchanged
+        return editable
 
     raw_params = manifest.get('params')
     raw_inputs = manifest.get('inputs')
@@ -661,6 +811,12 @@ def restore_generation_from_request(request: gr.Request | None = None):
         and raw_input_mode in {'four', '4-view', 'multi-view'}
         else 'single'
     )
+    if input_mode == 'four' and not MV_MODE:
+        logger.warning(
+            "Cannot restore a multi-view generation in single-view mode: %s",
+            generation_uid,
+        )
+        return editable
 
     def numeric_param(name, default):
         value = params.get(name, default)
@@ -671,16 +827,22 @@ def restore_generation_from_request(request: gr.Request | None = None):
         except (OverflowError, TypeError, ValueError):
             return default
 
-    def input_path(view_name, fallback_filename):
-        return stored_generation_file(
-            save_folder,
-            inputs.get(view_name) or fallback_filename,
-        )
+    def input_path(*filenames):
+        for filename in filenames:
+            path = stored_generation_file(save_folder, filename)
+            if path:
+                return path
+        return None
 
-    front_image = input_path('front', 'input_front.png')
-    back_image = input_path('back', 'input_back.png')
-    left_image = input_path('left', 'input_left.png')
-    right_image = input_path('right', 'input_right.png')
+    front_image = input_path(
+        inputs.get('front'),
+        inputs.get('image'),
+        'input_front.png',
+        'input_image.png',
+    )
+    back_image = input_path(inputs.get('back'), 'input_back.png')
+    left_image = input_path(inputs.get('left'), 'input_left.png')
+    right_image = input_path(inputs.get('right'), 'input_right.png')
 
     mesh_path = stored_generation_file(
         save_folder,
@@ -696,27 +858,82 @@ def restore_generation_from_request(request: gr.Request | None = None):
         else HTML_OUTPUT_PLACEHOLDER
     )
 
+    seed_value = numeric_param('seed', 1234)
+    steps_value = numeric_param('steps', 30)
+    guidance_value = numeric_param('guidance_scale', 5.0)
+    octree_value = numeric_param('octree_resolution', 256)
+    chunks_value = numeric_param('num_chunks', 8000)
+    rembg_value = (
+        params.get('check_box_rembg')
+        if isinstance(params.get('check_box_rembg'), bool)
+        else not MV_MODE
+    )
+    randomize_seed_value = (
+        params.get('randomize_seed')
+        if isinstance(params.get('randomize_seed'), bool)
+        else False
+    )
+    preset_status = get_rtx3090_status(
+        steps_value,
+        guidance_value,
+        octree_value,
+        chunks_value,
+        saved=True,
+    )
+    generation_mode_value = resolve_rtx3090_mode(
+        steps_value,
+        RTX3090_GENERATION_MODES,
+    )
+    decoding_mode_value = resolve_rtx3090_mode(
+        octree_value,
+        RTX3090_DECODING_MODES,
+    )
+
     return (
         input_mode,
-        front_image if input_mode == 'single' else None,
-        front_image if input_mode == 'four' else None,
-        back_image if input_mode == 'four' else None,
-        left_image if input_mode == 'four' else None,
-        right_image if input_mode == 'four' else None,
-        mesh_path,
+        gr.update(
+            value=front_image if input_mode == 'single' else None,
+            interactive=False,
+        ),
+        gr.update(
+            value=front_image if input_mode == 'four' else None,
+            interactive=False,
+        ),
+        gr.update(
+            value=back_image if input_mode == 'four' else None,
+            interactive=False,
+        ),
+        gr.update(
+            value=left_image if input_mode == 'four' else None,
+            interactive=False,
+        ),
+        gr.update(
+            value=right_image if input_mode == 'four' else None,
+            interactive=False,
+        ),
+        gr.update(value=mesh_path, interactive=False),
         viewer_html,
         stats,
-        numeric_param('seed', 1234),
-        numeric_param('steps', 30),
-        numeric_param('guidance_scale', 5.0),
-        numeric_param('octree_resolution', 256),
-        params.get('check_box_rembg') if isinstance(params.get('check_box_rembg'), bool) else not MV_MODE,
-        numeric_param('num_chunks', 8000),
-        False,
-        gr.update(value=(
-            'Generate 3D · 4 Images' if input_mode == 'four'
-            else 'Generate 3D · 1 Image'
-        )),
+        gr.update(value=seed_value, interactive=False),
+        gr.update(value=steps_value, interactive=False),
+        gr.update(value=guidance_value, interactive=False),
+        gr.update(value=octree_value, interactive=False),
+        gr.update(value=rembg_value, interactive=False),
+        gr.update(value=chunks_value, interactive=False),
+        gr.update(value=randomize_seed_value, interactive=False),
+        gr.update(
+            value=(
+                'Generate 3D · 4 Images' if input_mode == 'four'
+                else 'Generate 3D · 1 Image'
+            ),
+            interactive=False,
+        ),
+        preset_status,
+        gr.update(interactive=False),
+        gr.update(interactive=False),
+        gr.update(value=generation_mode_value, interactive=False),
+        gr.update(value=decoding_mode_value, interactive=False),
+        f'<span data-history-review-active="true" data-input-mode="{input_mode}"></span>',
     )
 
 @spaces_api.GPU(duration=60)
@@ -817,6 +1034,7 @@ def _gen_shape(
             'steps': steps,
             'guidance_scale': guidance_scale,
             'seed': seed,
+            'randomize_seed': bool(randomize_seed),
             'octree_resolution': octree_resolution,
             'check_box_rembg': check_box_rembg,
             'num_chunks': num_chunks,
@@ -1351,6 +1569,11 @@ def build_app():
         js=custom_js,
     ) as demo:
         gr.HTML(title_html)
+        history_review_state = gr.HTML(
+            '<span data-history-review-active="false"></span>',
+            visible=False,
+            elem_id='history-review-state',
+        )
 
         with gr.Row(elem_id='workspace-grid'):
             with gr.Column(scale=3, elem_id='input-panel'):
@@ -1360,7 +1583,7 @@ def build_app():
                     with gr.Tab('Single View', id='tab_single_prompt') as tab_ip:
                         gr.HTML("""
                         <div class="input-mode-guide">
-                            <div class="input-mode-number ui-icon-slot" data-ui-icon="box" aria-hidden="true"></div>
+                            <span class="input-mode-number ui-brand-mark" aria-hidden="true"><img class="app-context-logo" src="/favicon.ico" alt="" draggable="false"></span>
                             <div class="input-mode-copy">
                                 <strong>Best results with one front view</strong>
                                 <span>Use a sharp subject on a clean or transparent background.</span>
@@ -1384,7 +1607,7 @@ def build_app():
                     with gr.Tab('Multi View (1–4)', id='tab_mv_prompt', visible=MV_MODE) as tab_mv:
                         gr.HTML("""
                         <div class="input-mode-guide">
-                            <div class="input-mode-number ui-icon-slot" data-ui-icon="box" aria-hidden="true"></div>
+                            <span class="input-mode-number ui-brand-mark" aria-hidden="true"><img class="app-context-logo" src="/favicon.ico" alt="" draggable="false"></span>
                             <div class="input-mode-copy">
                                 <strong>Best results with four views</strong>
                                 <span>Upload Front, Back, Left and Right views of the same object.</span>
@@ -1408,7 +1631,7 @@ def build_app():
                         gr.HTML("""
                         <div class="input-upload-meta input-upload-meta--stacked">
                             <div class="input-upload-meta-title">
-                                <span class="ui-icon-slot" data-ui-icon="box" aria-hidden="true"></span>
+                                <span class="input-upload-brand-mark ui-brand-mark" aria-hidden="true"><img class="app-context-logo" src="/favicon.ico" alt="" draggable="false"></span>
                                 <strong>Four synchronized views</strong>
                             </div>
                             <span class="input-upload-meta-subtitle">PNG or JPG · Front, Back, Left and Right</span>
@@ -1425,7 +1648,8 @@ def build_app():
                     btn_all = gr.Button(value='Gen Textured Shape',
                                         variant='primary',
                                         visible=HAS_TEXTUREGEN,
-                                        min_width=100)
+                                        min_width=100,
+                                        elem_id='generate-textured-3d-button')
 
                 if not MV_MODE:
                     with gr.Group(elem_id='mesh-download-card'):
@@ -1445,12 +1669,14 @@ def build_app():
                             info='Recommendation: Turbo for most cases, \
 Fast for very complex cases, Standard seldom use.',
                             choices=['Turbo', 'Fast', 'Standard'], 
-                            value='Turbo')
+                            value='Turbo',
+                            elem_id='generation-mode')
                         decode_mode = gr.Radio(
                             label='Decoding Mode',
                             info='The resolution for exporting mesh from generated vectset',
                             choices=['Low', 'Standard', 'High'],
-                            value='Standard')
+                            value='Standard',
+                            elem_id='decoding-mode')
                     with gr.Tab('Advanced Options', id='tab_advanced_options', elem_id='advanced-settings-form'):
                         seed = gr.Slider(
                             label="Seed",
@@ -1730,7 +1956,7 @@ Fast for very complex cases, Standard seldom use.',
                         elem_id='rtx3090-quality-preset',
                     )
                 rtx_preset_status = gr.HTML(
-                    get_rtx3090_preset('safe')[-1],
+                    get_rtx3090_status(5 if TURBO_MODE else 30, 5.0, 256, 8000),
                     elem_classes='rtx3090-status-block',
                 )
                 gr.HTML("""
@@ -1786,18 +2012,12 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
                 btn,
-            ],
-            queue=False,
-            api_name=False,
-        )
-        restore_event.then(
-            fn=lambda: tuple(gr.update(interactive=True) for _ in range(5)),
-            outputs=[
-                image,
-                mv_image_front,
-                mv_image_back,
-                mv_image_left,
-                mv_image_right,
+                rtx_preset_status,
+                rtx_safe_preset,
+                rtx_quality_preset,
+                gen_mode,
+                decode_mode,
+                history_review_state,
             ],
             queue=False,
             show_progress='hidden',
@@ -1809,20 +2029,44 @@ Fast for very complex cases, Standard seldom use.',
             cfg_scale,
             octree_resolution,
             num_chunks,
+            gen_mode,
+            decode_mode,
             rtx_preset_status,
         ]
         rtx_quality_preset.click(
             fn=lambda: get_rtx3090_preset('quality'),
             outputs=rtx_preset_outputs,
             queue=False,
+            show_progress='hidden',
             api_name=False,
         )
         rtx_safe_preset.click(
             fn=lambda: get_rtx3090_preset('safe'),
             outputs=rtx_preset_outputs,
             queue=False,
+            show_progress='hidden',
             api_name=False,
         )
+
+        for rtx_setting_control in (
+            num_steps,
+            cfg_scale,
+            octree_resolution,
+            num_chunks,
+        ):
+            rtx_setting_control.input(
+                fn=get_rtx3090_form_state,
+                inputs=[
+                    num_steps,
+                    cfg_scale,
+                    octree_resolution,
+                    num_chunks,
+                ],
+                outputs=[gen_mode, decode_mode, rtx_preset_status],
+                queue=False,
+                show_progress='hidden',
+                api_name=False,
+            )
         #if HAS_T2I:
         #    tab_tp.select(fn=lambda: gr.update(selected='tab_txt_gallery'), outputs=gallery)
 
@@ -1844,14 +2088,17 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
             ],
-            outputs=[file_out, html_gen_mesh, stats, seed]
+            outputs=[file_out, html_gen_mesh, stats, seed],
+            show_progress='hidden' if MV_MODE else 'full',
         ).then(
             lambda: (gr.update(visible=False, value=False), gr.update(interactive=True), gr.update(interactive=True),
                      gr.update(interactive=False)),
             outputs=[export_texture, reduce_face, confirm_export, file_export],
+            show_progress='hidden',
         ).then(
             lambda: gr.update(selected='gen_mesh_panel'),
             outputs=[tabs_output],
+            show_progress='hidden',
         )
 
         btn_all.click(
@@ -1872,14 +2119,17 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
             ],
-            outputs=[file_out, file_out2, html_gen_mesh, stats, seed]
+            outputs=[file_out, file_out2, html_gen_mesh, stats, seed],
+            show_progress='full',
         ).then(
             lambda: (gr.update(visible=True, value=True), gr.update(interactive=False), gr.update(interactive=True),
                      gr.update(interactive=False)),
             outputs=[export_texture, reduce_face, confirm_export, file_export],
+            show_progress='hidden',
         ).then(
             lambda: gr.update(selected='gen_mesh_panel'),
             outputs=[tabs_output],
+            show_progress='hidden',
         )
 
         def on_gen_mode_change(value):
@@ -1890,7 +2140,18 @@ Fast for very complex cases, Standard seldom use.',
             else:
                 return gr.update(value=30)
 
-        gen_mode.change(on_gen_mode_change, inputs=[gen_mode], outputs=[num_steps])
+        gen_mode.input(
+            on_gen_mode_change,
+            inputs=[gen_mode],
+            outputs=[num_steps],
+        ).then(
+            fn=get_rtx3090_form_state,
+            inputs=[num_steps, cfg_scale, octree_resolution, num_chunks],
+            outputs=[gen_mode, decode_mode, rtx_preset_status],
+            queue=False,
+            show_progress='hidden',
+            api_name=False,
+        )
 
         def on_decode_mode_change(value):
             if value == 'Low':
@@ -1900,8 +2161,18 @@ Fast for very complex cases, Standard seldom use.',
             else:
                 return gr.update(value=384)
 
-        decode_mode.change(on_decode_mode_change, inputs=[decode_mode], 
-                           outputs=[octree_resolution])
+        decode_mode.input(
+            on_decode_mode_change,
+            inputs=[decode_mode],
+            outputs=[octree_resolution],
+        ).then(
+            fn=get_rtx3090_form_state,
+            inputs=[num_steps, cfg_scale, octree_resolution, num_chunks],
+            outputs=[gen_mode, decode_mode, rtx_preset_status],
+            queue=False,
+            show_progress='hidden',
+            api_name=False,
+        )
 
         def on_export_click(file_out, file_out2, file_type, 
                             reduce_face, export_texture, target_face_num):
@@ -1988,7 +2259,7 @@ if __name__ == '__main__':
     HTML_OUTPUT_PLACEHOLDER = f"""
     <div class='viewer-empty-state' style='height: {HTML_HEIGHT}px;'>
       <div class='viewer-empty-copy'>
-        <span class='viewer-empty-mark ui-icon-slot' data-ui-icon='box' aria-hidden='true'></span>
+        <span class='viewer-empty-mark ui-brand-mark' aria-hidden='true'><img class='app-context-logo' src='/favicon.ico' alt='' draggable='false'></span>
         <strong>3D preview is ready</strong>
         <p>Upload your input views and generate a mesh to begin.</p>
       </div>

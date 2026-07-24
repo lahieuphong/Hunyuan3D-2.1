@@ -63,6 +63,19 @@
         width: 30px;
     }
 
+    #prompt-mode-tabs .input-mode-number.ui-brand-mark {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0;
+        box-shadow: none !important;
+    }
+
+    #prompt-mode-tabs .input-mode-number .app-context-logo {
+        filter: drop-shadow(0 1px 3px rgba(249, 119, 0, 0.16));
+        height: 22px;
+        width: 22px;
+    }
+
     #prompt-mode-tabs .input-mode-number .ui-icon {
         height: 14px;
         width: 14px;
@@ -132,6 +145,17 @@
         width: 12px;
     }
 
+    .input-upload-brand-mark {
+        flex: 0 0 14px;
+        height: 14px;
+        width: 14px;
+    }
+
+    .input-upload-brand-mark .app-context-logo {
+        height: 13px;
+        width: 13px;
+    }
+
     .input-upload-meta-subtitle {
         color: var(--ui-muted);
         font-size: 9.5px;
@@ -186,7 +210,12 @@
     }
 
     #settings-tabs {
+        gap: 4px !important;
         margin-top: 4px;
+    }
+
+    #settings-tabs > .tab-wrapper:has(#advanced-settings-form-button) {
+        padding-bottom: 0 !important;
     }
 
     #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button) {
@@ -214,25 +243,8 @@
 
     #settings-tabs > .tab-wrapper > .tab-container[role="tablist"]:has(> #advanced-settings-form-button)
     > #advanced-settings-form-button::after {
-        background: transparent !important;
-        border: 0 !important;
-        color: #7e879e;
-        content: "⌄";
-        display: block !important;
-        font-size: 13px;
-        height: auto !important;
-        margin-left: auto;
-        position: static !important;
-        width: auto !important;
-        border-color: #8f99af !important;
-        border-style: solid !important;
-        border-width: 0 1.5px 1.5px 0 !important;
-        content: "" !important;
-        flex: 0 0 6px;
-        height: 6px !important;
-        margin: -3px 3px 0 auto !important;
-        transform: rotate(45deg) !important;
-        width: 6px !important;
+        content: none !important;
+        display: none !important;
     }
 
     #advanced-settings-form {
@@ -459,11 +471,39 @@
         outline: 0;
     }
 
+    #advanced-settings-form-button .advanced-options-chevron {
+        color: #929bb1;
+        flex: 0 0 14px;
+        height: 14px !important;
+        margin-left: auto;
+        transform: rotate(0deg);
+        transition: color 150ms ease, transform 180ms ease;
+        width: 14px !important;
+    }
+
+    #advanced-settings-form-button[aria-expanded="true"] .advanced-options-chevron {
+        transform: rotate(180deg);
+    }
+
+    #advanced-settings-form-button:hover .advanced-options-chevron {
+        color: currentColor;
+    }
+
+    #settings-tabs.is-advanced-collapsed #advanced-settings-form {
+        display: none !important;
+    }
+
     #advanced-settings-form {
         --advanced-card-bg: linear-gradient(145deg, #151c2d 0%, #101624 100%);
         --advanced-card-border: #303c5a;
         --advanced-field-bg: linear-gradient(180deg, #0d1424 0%, #09101d 100%);
-        padding: 10px 8px 0 !important;
+        padding: 6px 8px 0 !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        #advanced-settings-form-button .advanced-options-chevron {
+            transition: none;
+        }
     }
 
     #advanced-settings-form > .column {

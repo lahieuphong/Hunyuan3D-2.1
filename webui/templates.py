@@ -34,8 +34,9 @@ def render_topbar(
                 <span class="ui-icon-slot" data-ui-icon="history" aria-hidden="true"></span>
                 <span>History</span>
             </button>
-            <button id="app-theme-settings" class="app-topbar-button app-topbar-icon-button" type="button" aria-label="Settings">
+            <button id="app-theme-settings" class="app-topbar-button" type="button" aria-label="Settings">
                 <span class="ui-icon-slot" data-ui-icon="settings" aria-hidden="true"></span>
+                <span>Settings</span>
             </button>
             {rtx_profile_action}
         </nav>

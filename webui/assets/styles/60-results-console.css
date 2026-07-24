@@ -115,14 +115,19 @@
 
     .viewer-empty-mark {
         align-items: center;
-        background: rgba(102, 112, 255, 0.12);
-        border: 1px solid rgba(102, 112, 255, 0.34);
-        border-radius: 12px;
-        color: #8d94ff;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
         display: inline-flex;
         height: 42px;
         justify-content: center;
         width: 42px;
+    }
+
+    .viewer-empty-mark .app-context-logo {
+        filter: drop-shadow(0 2px 5px rgba(249, 119, 0, 0.18));
+        height: 30px;
+        width: 30px;
     }
 
     .viewer-empty-copy strong {

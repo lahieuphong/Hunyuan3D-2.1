@@ -1,0 +1,77 @@
+
+    body.is-history-review [data-history-readonly="true"],
+    body.is-history-review [data-history-readonly="true"] * {
+        cursor: not-allowed !important;
+    }
+
+    body.is-history-review #advanced-settings-form .ui-control,
+    body.is-history-review #prompt-mode-tabs .ui-upload,
+    body.is-history-review #generation-mode,
+    body.is-history-review #decoding-mode,
+    body.is-history-review .generate-actions button:disabled,
+    body.is-history-review #rtx3090-modal .rtx-preset-actions button:disabled {
+        opacity: 0.72;
+    }
+
+    body.is-history-review #advanced-settings-form .ui-control:hover,
+    body.is-history-review #advanced-settings-form input:hover,
+    body.is-history-review #advanced-settings-form button:hover {
+        border-color: var(--ui-border) !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+
+    body.is-history-review .rtx3090-profile-card {
+        cursor: not-allowed !important;
+        transform: none !important;
+    }
+
+    body.is-history-review .rtx3090-profile-card:not(.is-selected):hover {
+        border-color: #3a3f4d;
+        box-shadow: none;
+        opacity: 0.78;
+        transform: none;
+    }
+
+    body.is-history-review #rtx3090-modal .rtx-preset-actions button:hover {
+        border-color: #5d606b !important;
+        box-shadow: none !important;
+        opacity: 0.72;
+        transform: none !important;
+    }
+
+    .history-readonly-badge {
+        background: rgba(116, 124, 255, 0.12);
+        border: 1px solid rgba(130, 138, 255, 0.3);
+        border-radius: 999px;
+        color: #aeb4ff !important;
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        line-height: 1;
+        margin-left: auto;
+        padding: 4px 6px;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    body.is-history-review #advanced-settings-form-button .advanced-options-chevron {
+        margin-left: 6px;
+    }
+
+    body:not(.dark).is-history-review .rtx3090-profile-card:not(.is-selected):hover {
+        border-color: #d3dce9;
+        box-shadow: none;
+        opacity: 1;
+    }
+
+    body:not(.dark).is-history-review #rtx3090-modal .rtx-preset-actions button:hover {
+        border-color: #c7d1e0 !important;
+        box-shadow: none !important;
+    }
+
+    body:not(.dark).is-history-review .history-readonly-badge {
+        background: #eef0ff;
+        border-color: #c8cdfa;
+        color: #4d57bd !important;
+    }

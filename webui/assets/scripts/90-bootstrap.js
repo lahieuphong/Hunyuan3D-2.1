@@ -2,6 +2,7 @@
         const observer = new MutationObserver(() => {
             installFooterItem();
             installUnifiedIcons();
+            installAdvancedOptionsDisclosure();
             installSmoothThemeSwitching();
             installStableUploadPreviews();
             wireTopbar();
@@ -10,6 +11,7 @@
             wireGenerationHistoryModal();
             syncPresetSelection();
             installTabRouting();
+            installHistoryReviewMode();
             installGenerationRouting();
             syncGenerationHistoryFromUrl();
             syncGenerationConsoleFromUrl();
@@ -18,6 +20,7 @@
 
         installFooterItem();
         installUnifiedIcons();
+        installAdvancedOptionsDisclosure();
         installSmoothThemeSwitching();
         installStableUploadPreviews();
         wireTopbar();
@@ -26,6 +29,7 @@
         wireGenerationHistoryModal();
         syncPresetSelection();
         installTabRouting();
+        installHistoryReviewMode();
         installGenerationRouting();
         syncFromUrl();
         syncGenerationHistoryFromUrl();

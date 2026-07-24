@@ -238,6 +238,10 @@
         color: #172136 !important;
     }
 
+    body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form-button .advanced-options-chevron {
+        color: #637089;
+    }
+
     body:not(.dark) .gradio-container.gradio-container .contain #advanced-settings-form {
         --advanced-card-bg: linear-gradient(145deg, #ffffff 0%, #f6f8fc 100%);
         --advanced-card-border: #d5ddea;
