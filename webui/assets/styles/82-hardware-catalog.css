@@ -9,6 +9,10 @@
         --hardware-warning: #f2b455;
     }
 
+    #rtx3090-modal:not(.hardware-presets-enabled).rtx-open {
+        display: none !important;
+    }
+
     #rtx3090-modal .rtx3090-header-actions {
         gap: 12px;
     }
@@ -90,18 +94,24 @@
         line-height: 1.4;
     }
 
-    #rtx3090-modal > .rtx3090-modal-panel > #hardware-profile-select.hardware-profile-select-control {
-        background: linear-gradient(135deg, rgba(21, 29, 48, 0.96), rgba(17, 24, 40, 0.94)) !important;
-        border: 1px solid var(--rtx-border) !important;
-        border-radius: 12px !important;
+    #hardware-profile-select.hardware-profile-select-control {
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
         margin-top: 13px !important;
-        padding: 12px 14px 13px !important;
-        transition: border-color 150ms ease, box-shadow 150ms ease;
+        padding: 0 !important;
+    }
+
+    #hardware-profile-select.hardware-profile-select-control > .container {
+        margin-inline: 0 !important;
+        padding-inline: 0 !important;
+        width: 100% !important;
     }
 
     #hardware-profile-select:focus-within {
-        border-color: #7770ff !important;
-        box-shadow: 0 0 0 3px rgba(111, 104, 255, 0.13) !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
     }
 
     #hardware-profile-select label,
@@ -120,10 +130,18 @@
         min-height: 42px;
     }
 
+    #hardware-profile-select .wrap-inner {
+        padding: 0 !important;
+    }
+
     #hardware-profile-select .secondary-wrap {
         background: #0c1220 !important;
         border: 1px solid #34405a !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+    }
+
+    #hardware-profile-select .secondary-wrap > input {
+        padding-inline-start: 10px !important;
     }
 
     #hardware-profile-select .secondary-wrap:focus-within {
@@ -203,35 +221,6 @@
         min-height: 154px;
     }
 
-    .hardware-preset-grid .rtx3090-profile-card.quality.is-selected {
-        background: linear-gradient(135deg, rgba(37, 38, 73, 0.98), rgba(25, 28, 58, 0.98));
-        border-color: #7770ff;
-        box-shadow:
-            inset 0 0 0 1px rgba(119, 112, 255, 0.23),
-            0 10px 24px rgba(72, 67, 199, 0.17);
-    }
-
-    .hardware-preset-grid .rtx3090-profile-card.quality.is-selected .rtx3090-profile-selector {
-        background: linear-gradient(145deg, #5d63ed, #7770ff);
-        border-color: #8e88ff;
-        box-shadow: 0 0 0 3px rgba(119, 112, 255, 0.13);
-    }
-
-    .hardware-preset-grid .rtx3090-profile-card.quality.is-selected:focus-visible {
-        border-color: #918bff;
-        box-shadow: 0 0 0 3px rgba(119, 112, 255, 0.22);
-    }
-
-    #rtx3090-modal #rtx3090-quality-preset.rtx-preset-action-active {
-        background: linear-gradient(135deg, #4d58dd, #625cf0) !important;
-        border-color: #827bff !important;
-        box-shadow: 0 9px 20px rgba(72, 67, 199, 0.22) !important;
-    }
-
-    .rtx-preset-status.quality .rtx-preset-status-check {
-        background: #6764ef;
-    }
-
     .rtx-preset-status.custom .rtx-preset-status-check {
         background: #d4953c;
     }
@@ -269,17 +258,6 @@
 
     body:not(.dark) .gradio-container.gradio-container .contain .hardware-runtime-strip small {
         color: #637089;
-    }
-
-    body:not(.dark) .gradio-container.gradio-container .contain #rtx3090-modal > .rtx3090-modal-panel > #hardware-profile-select.hardware-profile-select-control {
-        background: linear-gradient(145deg, #ffffff, #f5f7fb) !important;
-        border-color: #d7dfeb !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-    }
-
-    body:not(.dark) .gradio-container.gradio-container .contain #hardware-profile-select:focus-within {
-        border-color: #7883ea !important;
-        box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1) !important;
     }
 
     body:not(.dark) .gradio-container.gradio-container .contain #hardware-profile-select label,
@@ -320,14 +298,6 @@
         color: #9b6415;
     }
 
-    body:not(.dark) .gradio-container.gradio-container .contain .hardware-preset-grid .rtx3090-profile-card.quality.is-selected {
-        background: linear-gradient(135deg, #f0f1ff, #f8f8ff);
-        border-color: #7a80e8;
-        box-shadow:
-            inset 0 0 0 1px rgba(88, 101, 242, 0.12),
-            0 10px 24px rgba(62, 72, 190, 0.1);
-    }
-
     body:not(.dark) .gradio-container.gradio-container .contain .hardware-profile-note.is-estimated {
         background: linear-gradient(135deg, #f6f7ff, #fafbff);
         border-color: #cdd1f4;
@@ -359,8 +329,8 @@
             align-items: flex-start;
         }
 
-        #rtx3090-modal > .rtx3090-modal-panel > #hardware-profile-select.hardware-profile-select-control {
-            padding: 11px 12px 12px !important;
+        #hardware-profile-select.hardware-profile-select-control {
+            padding: 0 !important;
         }
 
         .hardware-profile-summary {

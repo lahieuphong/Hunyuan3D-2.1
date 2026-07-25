@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import gradio_app as app
@@ -12,6 +13,23 @@ import gradio_app as app
 class _Request:
     def __init__(self, referer: str):
         self.headers = {"referer": referer}
+
+
+@contextmanager
+def runtime_match(match, *, multiview=True):
+    previous_match = app.RUNTIME_HARDWARE_MATCH
+    had_multiview = hasattr(app, "MV_MODE")
+    previous_multiview = getattr(app, "MV_MODE", None)
+    app.RUNTIME_HARDWARE_MATCH = match
+    app.MV_MODE = multiview
+    try:
+        yield
+    finally:
+        app.RUNTIME_HARDWARE_MATCH = previous_match
+        if had_multiview:
+            app.MV_MODE = previous_multiview
+        else:
+            delattr(app, "MV_MODE")
 
 
 class GradioHardwareIntegrationTests(unittest.TestCase):
@@ -30,10 +48,11 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         previous_turbo_mode = getattr(app, "TURBO_MODE", None)
         app.TURBO_MODE = True
         try:
-            restored = app.restore_generation_from_request(
-                browser_state,
-                _Request("http://127.0.0.1:8080/?tab=single-view"),
-            )
+            with runtime_match(app.HardwareMatch(hardware_id, "exact", True)):
+                restored = app.restore_generation_from_request(
+                    browser_state,
+                    _Request("http://127.0.0.1:8080/?tab=single-view"),
+                )
         finally:
             if previous_turbo_mode is None:
                 delattr(app, "TURBO_MODE")
@@ -47,20 +66,86 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
 
     def test_generation_metadata_uses_actual_form_values(self):
         hardware_id = "nvidia-rtx-3090-24gb"
-        hardware, preset = app.build_generation_hardware_metadata(
-            hardware_id,
-            {
-                "steps": 30,
-                "guidance_scale": 5.0,
-                "octree_resolution": 384,
-                "num_chunks": 8000,
-            },
-        )
+        with runtime_match(app.HardwareMatch(hardware_id, "exact", True)):
+            hardware, preset = app.build_generation_hardware_metadata(
+                hardware_id,
+                {
+                    "steps": 30,
+                    "guidance_scale": 5.0,
+                    "octree_resolution": 384,
+                    "num_chunks": 8000,
+                },
+            )
 
         self.assertEqual(hardware["id"], hardware_id)
         self.assertEqual(hardware["selection_source"], "ui")
         self.assertEqual(preset["id"], "quality")
         self.assertEqual(preset["params_snapshot"]["octree_resolution"], 384)
+
+    def test_incompatible_runtime_clears_profile_state_and_metadata(self):
+        hardware_id = "nvidia-rtx-3090-24gb"
+        browser_state = app.hardware_browser_state(hardware_id, "quality")
+        with runtime_match(app.HardwareMatch(None, "unavailable", False)):
+            restored = app.restore_generation_from_request(
+                browser_state,
+                _Request("http://127.0.0.1:8080/?tab=single-view"),
+            )
+            hardware, preset = app.build_generation_hardware_metadata(
+                hardware_id,
+                {
+                    "steps": 30,
+                    "guidance_scale": 5.0,
+                    "octree_resolution": 384,
+                    "num_chunks": 8000,
+                },
+            )
+
+        self.assertIsNone(restored[23])
+        self.assertIsNone(restored[24]["value"])
+        self.assertFalse(restored[24]["interactive"])
+        self.assertIsNone(hardware["id"])
+        self.assertEqual(hardware["selection_source"], "api")
+        self.assertIsNone(preset["hardware_id"])
+        self.assertEqual(preset["id"], "custom")
+
+    def test_single_view_mode_clears_profile_state_and_metadata(self):
+        hardware_id = "nvidia-rtx-3090-24gb"
+        browser_state = app.hardware_browser_state(hardware_id, "quality")
+        with runtime_match(
+            app.HardwareMatch(hardware_id, "exact", True),
+            multiview=False,
+        ):
+            restored = app.restore_generation_from_request(
+                browser_state,
+                _Request("http://127.0.0.1:8080/?tab=single-view"),
+            )
+            hardware, preset = app.build_generation_hardware_metadata(
+                hardware_id,
+                {
+                    "steps": 30,
+                    "guidance_scale": 5.0,
+                    "octree_resolution": 384,
+                    "num_chunks": 8000,
+                },
+            )
+
+        self.assertIsNone(restored[23])
+        self.assertIsNone(restored[24]["value"])
+        self.assertFalse(restored[24]["interactive"])
+        self.assertIsNone(hardware["id"])
+        self.assertEqual(hardware["selection_source"], "api")
+        self.assertIsNone(preset["hardware_id"])
+        self.assertEqual(preset["id"], "custom")
+
+    def test_modal_bundle_requires_server_enabled_marker(self):
+        custom_css, custom_js = app.load_ui_assets()
+
+        self.assertIn("isHardwareModalEnabled", custom_js)
+        self.assertIn("if (!isHardwareModalEnabled() || !modal()) return;", custom_js)
+        self.assertIn(
+            "#rtx3090-modal:not(.hardware-presets-enabled).rtx-open",
+            custom_css,
+        )
 
     def test_form_sync_keeps_legacy_history_label(self):
         _, _, status = app.get_hardware_form_state(
@@ -153,6 +238,83 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertFalse(restored[24]["interactive"])
         self.assertIn("quality is-selected", restored[26])
 
+
+    def test_removed_profile_history_keeps_saved_identity(self):
+        generation_uid = str(uuid.uuid4())
+        removed_hardware_id = "nvidia-16gb"
+        removed_hardware_label = "NVIDIA 16 GB"
+        original_values = {
+            name: getattr(app, name, None)
+            for name in (
+                "SAVE_DIR",
+                "MV_MODE",
+                "HTML_HEIGHT",
+                "HTML_OUTPUT_PLACEHOLDER",
+            )
+        }
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            folder = root / generation_uid
+            folder.mkdir()
+            (folder / "generation.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "generation_uid": generation_uid,
+                        "status": "completed",
+                        "events": [],
+                        "input_mode": "single",
+                        "params": {
+                            "input_mode": "single",
+                            "steps": 30,
+                            "guidance_scale": 5.0,
+                            "seed": 1234,
+                            "octree_resolution": 384,
+                            "num_chunks": 4000,
+                        },
+                        "inputs": {},
+                        "outputs": {},
+                        "stats": {},
+                        "hardware": {
+                            "id": removed_hardware_id,
+                            "label": removed_hardware_label,
+                            "catalog_version": 1,
+                        },
+                        "preset": {
+                            "id": "quality",
+                            "hardware_id": removed_hardware_id,
+                            "catalog_version": 1,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            app.SAVE_DIR = str(root)
+            app.MV_MODE = True
+            app.HTML_HEIGHT = 820
+            app.HTML_OUTPUT_PLACEHOLDER = "placeholder"
+            try:
+                restored = app.restore_generation_from_request(
+                    None,
+                    _Request(
+                        f"http://127.0.0.1:8080/?generation={generation_uid}"
+                    ),
+                )
+            finally:
+                for name, value in original_values.items():
+                    if value is None and hasattr(app, name):
+                        delattr(app, name)
+                    else:
+                        setattr(app, name, value)
+
+        self.assertIn(removed_hardware_label, restored[17])
+        self.assertIn("Không còn trong catalog", restored[17])
+        self.assertNotIn("GPU chưa được lưu", restored[17])
+        self.assertEqual(restored[18]["value"], "Preset cũ · Không khả dụng")
+        self.assertEqual(restored[19]["value"], "Preset cũ · Không khả dụng")
+        self.assertIsNone(restored[24]["value"])
+        self.assertIn(removed_hardware_label, restored[26])
+        self.assertNotIn("RTX 3090", restored[26])
 
 if __name__ == "__main__":
     unittest.main()

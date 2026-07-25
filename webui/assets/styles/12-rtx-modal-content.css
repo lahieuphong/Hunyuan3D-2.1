@@ -108,8 +108,8 @@
     }
 
     .rtx3090-profile-card:focus-visible {
-        border-color: #8b84ff;
-        box-shadow: 0 0 0 3px rgba(113, 104, 255, 0.24);
+        border-color: #58dda0;
+        box-shadow: 0 0 0 3px rgba(53, 208, 127, 0.2);
     }
 
     .rtx3090-profile-card.is-selected:focus-visible {

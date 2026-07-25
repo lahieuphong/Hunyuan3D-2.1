@@ -1,23 +1,22 @@
 # GPU preset catalog
 
 `gpu_preset_catalog.json` is the single source of truth for the hardware
-profiles shown by the WebUI. The file is committed with the source, so the
-same list is available after cloning the repository on another machine.
+profiles shown by the WebUI. The production catalog currently contains only
+the verified `RTX 3090 · 24 GB` profile.
 
 ## Using the catalog
 
-1. Start the WebUI on the target machine.
-2. Open **GPU Presets** in the top bar.
+1. Start the WebUI on the verified RTX 3090 machine.
+2. Open **RTX 3090** in the top bar.
 3. Confirm the automatically detected GPU and VRAM.
-4. Select the matching GPU/VRAM profile when the automatic suggestion is not
-   exact.
-5. Apply either the `safe` or `quality` preset. The selected profile and tier
+4. Apply either the `safe` or `quality` preset. The selected profile and tier
    are remembered for that browser and machine fingerprint.
 
 Only entries backed by an end-to-end run may use
-`"verification": "verified"`. Estimated or experimental entries must remain
-clearly labelled as such. At present, the RTX 3090 24 GB profile is the only
-verified profile in this workspace.
+`"verification": "verified"`. Unverified GPU/VRAM groups are intentionally
+excluded until they have their own benchmark evidence.
+Preset actions are exposed only when the runtime GPU name, VRAM, backend, and
+dtype match a verified catalog profile.
 
 ## Adding a profile
 

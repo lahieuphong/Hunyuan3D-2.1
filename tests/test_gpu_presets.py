@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from webui.gpu_presets import (
     CATALOG_PATH,
     HardwareMatch,
+    HardwareProfile,
     RuntimeHardware,
     detect_runtime_hardware,
     load_gpu_preset_catalog,
@@ -30,6 +31,60 @@ GIB = 1024**3
 
 def catalog_payload() -> dict:
     return json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+
+
+def synthetic_generic_profile(
+    source: dict,
+    *,
+    profile_id: str,
+    vram_min_gb: float,
+    vram_max_gb: float | None,
+) -> dict:
+    """Build an unverified generic profile used only by matching tests."""
+    profile = copy.deepcopy(source)
+    profile.update(
+        {
+            "id": profile_id,
+            "label": f"Synthetic {profile_id}",
+            "display_name": "Synthetic NVIDIA GPU",
+            "short_label": "Synthetic GPU",
+            "vram_min_gb": vram_min_gb,
+            "vram_max_gb": vram_max_gb,
+            "vram_label": "Synthetic VRAM",
+            "aliases": [],
+            "examples": ["Synthetic test GPU"],
+            "verification": "estimated",
+            "verification_label": "Estimated test profile",
+            "summary": "Synthetic generic profile for unit tests.",
+            "note": "This profile must never be added to the production catalog.",
+        }
+    )
+    for preset in profile["presets"]:
+        preset["verified"] = False
+    return profile
+
+
+def catalog_with_synthetic_generic_profiles(
+    *ranges: tuple[float, float | None],
+):
+    payload = catalog_payload()
+    verified = next(
+        profile
+        for profile in payload["hardware"]
+        if profile["id"] == "nvidia-rtx-3090-24gb"
+    )
+    payload["default_hardware_id"] = None
+    payload["hardware"] = [verified]
+    payload["hardware"].extend(
+        synthetic_generic_profile(
+            verified,
+            profile_id=f"synthetic-generic-{index}",
+            vram_min_gb=vram_min,
+            vram_max_gb=vram_max,
+        )
+        for index, (vram_min, vram_max) in enumerate(ranges, start=1)
+    )
+    return parse_catalog(payload)
 
 
 def runtime_gpu(
@@ -58,8 +113,8 @@ class CatalogValidationTests(unittest.TestCase):
         catalog = load_gpu_preset_catalog()
 
         self.assertEqual(catalog.schema_version, 1)
-        self.assertEqual(len(catalog.hardware), 6)
-        self.assertEqual(catalog.preset_count, 12)
+        self.assertEqual(len(catalog.hardware), 1)
+        self.assertEqual(catalog.preset_count, 2)
         for profile in catalog.hardware:
             self.assertEqual({preset.id for preset in profile.presets}, {"safe", "quality"})
             self.assertIn(profile.default_preset_id, {"safe", "quality"})
@@ -67,11 +122,11 @@ class CatalogValidationTests(unittest.TestCase):
 
         verified = [profile.id for profile in catalog.hardware if profile.verification == "verified"]
         self.assertEqual(verified, ["nvidia-rtx-3090-24gb"])
+        verified_profile = catalog.get_hardware("nvidia-rtx-3090-24gb")
+        self.assertIsNotNone(verified_profile)
+        assert verified_profile is not None
         self.assertTrue(
-            all(
-                preset.verified
-                for preset in catalog.get_hardware("nvidia-rtx-3090-24gb").presets
-            )
+            all(preset.verified for preset in verified_profile.presets)
         )
         self.assertTrue(
             all(
@@ -131,25 +186,27 @@ class CatalogValidationTests(unittest.TestCase):
 
     def test_verification_label_cannot_overstate_presets(self) -> None:
         payload = catalog_payload()
-        payload["hardware"][0]["verification"] = "verified"
-        payload["hardware"][0]["verification_label"] = "Verified"
+        payload["hardware"][0]["presets"][0]["verified"] = False
         with self.assertRaisesRegex(ValueError, "every preset must be verified"):
             parse_catalog(payload)
 
         payload = catalog_payload()
-        payload["hardware"][0]["presets"][0]["verified"] = True
+        payload["hardware"][0]["verification"] = "estimated"
         with self.assertRaisesRegex(ValueError, "presets cannot be verified"):
             parse_catalog(payload)
 
     def test_aliases_are_unique_after_exact_name_normalization(self) -> None:
         payload = catalog_payload()
-        profile = payload["hardware"][3]
+        profile = payload["hardware"][0]
         profile["aliases"].append("nvidia-geforce rtx 3090")
         with self.assertRaisesRegex(ValueError, "duplicate exact GPU names"):
             parse_catalog(payload)
 
         payload = catalog_payload()
-        payload["hardware"][0]["aliases"] = ["NVIDIA GeForce RTX 3090"]
+        duplicate = copy.deepcopy(payload["hardware"][0])
+        duplicate["id"] = "synthetic-shared-alias"
+        duplicate["label"] = "Synthetic shared alias"
+        payload["hardware"].append(duplicate)
         with self.assertRaisesRegex(ValueError, "is shared by"):
             parse_catalog(payload)
 
@@ -160,7 +217,23 @@ class CatalogValidationTests(unittest.TestCase):
 
     def test_generic_vram_ranges_cannot_overlap(self) -> None:
         payload = catalog_payload()
-        payload["hardware"][1]["vram_min_gb"] = 9.8
+        verified = payload["hardware"][0]
+        payload["hardware"].extend(
+            (
+                synthetic_generic_profile(
+                    verified,
+                    profile_id="synthetic-generic-one",
+                    vram_min_gb=8,
+                    vram_max_gb=16,
+                ),
+                synthetic_generic_profile(
+                    verified,
+                    profile_id="synthetic-generic-two",
+                    vram_min_gb=15,
+                    vram_max_gb=24,
+                ),
+            )
+        )
         with self.assertRaisesRegex(ValueError, "overlapping generic VRAM ranges"):
             parse_catalog(payload)
 
@@ -169,6 +242,7 @@ class RuntimeMatchingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.catalog = parse_catalog(catalog_payload())
+        cls.generic_catalog = catalog_with_synthetic_generic_profiles((7.5, 28))
 
     def test_rtx_3090_uses_verified_exact_alias(self) -> None:
         match = match_runtime_hardware(
@@ -188,16 +262,14 @@ class RuntimeMatchingTests(unittest.TestCase):
             runtime_gpu("NVIDIA GeForce RTX 3090 Ti", 24),
             self.catalog,
         )
-        self.assertEqual(ti_match.hardware_id, "nvidia-24gb")
-        self.assertEqual(ti_match.method, "vram")
+        self.assertEqual(ti_match, HardwareMatch(None, "unavailable", False))
 
-    def test_alias_with_wrong_vram_falls_back_to_generic_profile(self) -> None:
+    def test_alias_with_wrong_vram_is_unavailable_in_repository_catalog(self) -> None:
         match = match_runtime_hardware(
             runtime_gpu("NVIDIA GeForce RTX 3090", 16),
             self.catalog,
         )
-        self.assertEqual(match.hardware_id, "nvidia-16gb")
-        self.assertEqual(match.method, "vram")
+        self.assertEqual(match, HardwareMatch(None, "unavailable", False))
 
     def test_backend_must_match_profile_backend(self) -> None:
         match = match_runtime_hardware(
@@ -206,6 +278,16 @@ class RuntimeMatchingTests(unittest.TestCase):
         )
         self.assertEqual(match, HardwareMatch(None, "unavailable", False))
 
+    def test_verified_profile_requires_matching_dtype(self) -> None:
+        runtime = replace(
+            runtime_gpu("NVIDIA GeForce RTX 3090", 24),
+            dtype="float32",
+        )
+        self.assertEqual(
+            match_runtime_hardware(runtime, self.catalog),
+            HardwareMatch(None, "unavailable", False),
+        )
+
     def test_invalid_runtime_memory_is_unavailable(self) -> None:
         invalid = replace(runtime_gpu("GPU", 8), total_vram_bytes=0)
         self.assertEqual(
@@ -213,16 +295,33 @@ class RuntimeMatchingTests(unittest.TestCase):
             HardwareMatch(None, "unavailable", False),
         )
 
-    def test_sub_8gb_gpu_is_only_a_nearest_experimental_match(self) -> None:
+    def test_unlisted_gpu_is_unavailable_in_repository_catalog(self) -> None:
         for vram_gb in (4, 6):
             with self.subTest(vram_gb=vram_gb):
                 match = match_runtime_hardware(
                     runtime_gpu("Unlisted NVIDIA GPU", vram_gb),
                     self.catalog,
                 )
-                self.assertEqual(match.hardware_id, "nvidia-8gb-experimental")
-                self.assertEqual(match.method, "nearest")
-                self.assertFalse(match.compatible)
+                self.assertEqual(match, HardwareMatch(None, "unavailable", False))
+
+    def test_synthetic_generic_profile_covers_vram_and_nearest_matching(self) -> None:
+        vram_match = match_runtime_hardware(
+            runtime_gpu("Unlisted NVIDIA GPU", 16),
+            self.generic_catalog,
+        )
+        self.assertEqual(
+            vram_match,
+            HardwareMatch("synthetic-generic-1", "vram", True),
+        )
+
+        nearest_match = match_runtime_hardware(
+            runtime_gpu("Unlisted NVIDIA GPU", 6),
+            self.generic_catalog,
+        )
+        self.assertEqual(
+            nearest_match,
+            HardwareMatch("synthetic-generic-1", "nearest", False),
+        )
 
     def test_preset_resolution_requires_finite_in_range_exact_values(self) -> None:
         hardware_id = "nvidia-rtx-3090-24gb"
@@ -302,6 +401,7 @@ class RuntimeDetectionTests(unittest.TestCase):
             "float16",
         )
         self.assertFalse(unavailable.detected)
+        assert unavailable.error is not None
         self.assertIn("unavailable", unavailable.error.lower())
 
         invalid_memory = detect_runtime_hardware(
@@ -310,6 +410,7 @@ class RuntimeDetectionTests(unittest.TestCase):
             "float16",
         )
         self.assertFalse(invalid_memory.detected)
+        assert invalid_memory.error is not None
         self.assertIn("invalid total memory", invalid_memory.error.lower())
 
 
@@ -317,8 +418,13 @@ class TemplateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.catalog = parse_catalog(catalog_payload())
-        cls.verified = cls.catalog.get_hardware("nvidia-rtx-3090-24gb")
-        cls.estimated = cls.catalog.get_hardware("nvidia-16gb")
+        verified = cls.catalog.get_hardware("nvidia-rtx-3090-24gb")
+        cls.generic_catalog = catalog_with_synthetic_generic_profiles((7.5, 28))
+        estimated = cls.generic_catalog.get_hardware("synthetic-generic-1")
+        if verified is None or estimated is None:
+            raise AssertionError("Expected test hardware profiles were not created")
+        cls.verified: HardwareProfile = verified
+        cls.estimated: HardwareProfile = estimated
 
     def test_catalog_intro_distinguishes_compatible_from_nearest(self) -> None:
         runtime = runtime_gpu("NVIDIA GeForce RTX 3090", 24)
@@ -333,7 +439,7 @@ class TemplateTests(unittest.TestCase):
         nearest = render_catalog_intro(
             runtime,
             HardwareMatch(self.estimated.id, "nearest", False),
-            self.catalog,
+            self.generic_catalog,
         )
         self.assertIn("Cấu hình gần nhất", nearest)
         self.assertIn("chọn thủ công", nearest)
@@ -351,7 +457,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("VRAM tùy chỉnh", rendered)
         self.assertIn("&lt;script&gt;", rendered)
         self.assertNotIn("<script>", rendered)
-        self.assertIn("Đề xuất theo VRAM", rendered)
+        self.assertIn(self.estimated.verification_label, rendered)
 
     def test_preset_cards_expose_stable_hardware_and_preset_ids(self) -> None:
         rendered = render_preset_cards(self.verified, "quality")

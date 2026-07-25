@@ -46,7 +46,7 @@ def render_catalog_intro(
             "Hãy kiểm tra VRAM và chọn thủ công trước khi áp dụng."
         )
     else:
-        detected_copy = "Không tìm thấy cấu hình khớp; hãy chọn thủ công."
+        detected_copy = "GPU hiện tại chưa có cấu hình đã kiểm chứng trong catalog."
     match_class = "is-compatible" if match.compatible else "is-warning"
     match_icon = "check" if match.compatible else "warning"
     return f"""
@@ -59,7 +59,7 @@ def render_catalog_intro(
             <span>4 ảnh</span>
         </div>
         <p>
-            Chọn đúng nhóm GPU/VRAM của máy rồi áp dụng một preset.
+            Catalog hiện chỉ giữ cấu hình RTX 3090 · 24 GB đã được kiểm chứng.
             Các giá trị được cập nhật trực tiếp vào <strong>Advanced Options</strong>.
         </p>
         <div class="hardware-runtime-strip {match_class}" data-runtime-fingerprint="{_text(runtime.fingerprint)}">
@@ -171,6 +171,23 @@ def render_profile_note(profile: HardwareProfile) -> str:
     """
 
 
+def render_legacy_profile_notice(
+    hardware_label: str,
+    hardware_id: str | None = None,
+) -> str:
+    identity = hardware_label or hardware_id or "GPU profile cũ"
+    return f"""
+    <div class="rtx3090-modal-note hardware-profile-note is-experimental">
+        <span class="rtx3090-note-icon ui-icon-slot" data-ui-icon="info" aria-hidden="true"></span>
+        <p>
+            <strong>{_text(identity)}</strong><br>
+            Profile đã lưu không còn trong catalog hiện tại. Các thông số generation
+            bên dưới vẫn được giữ nguyên để đối chiếu lịch sử.
+        </p>
+    </div>
+    """
+
+
 def render_preset_status(
     profile: HardwareProfile,
     preset: GpuPreset | None,
@@ -178,6 +195,8 @@ def render_preset_status(
     *,
     saved: bool = False,
     legacy: bool = False,
+    legacy_hardware_label: str | None = None,
+    legacy_hardware_id: str | None = None,
 ) -> str:
     if preset:
         profile_class = preset.tone
@@ -192,7 +211,14 @@ def render_preset_status(
         icon = "settings"
         displayed_values = values
 
-    if legacy:
+    display_hardware_label = profile.short_label
+    display_hardware_id = profile.id
+    if legacy and legacy_hardware_label:
+        display_hardware_label = legacy_hardware_label
+        display_hardware_id = legacy_hardware_id or legacy_hardware_label
+        current_label = "Profile cũ"
+        title = f"{title} · Không còn trong catalog"
+    elif legacy:
         current_label = "Bản ghi cũ"
         title = f"{title} · GPU chưa được lưu"
     elif saved:
@@ -208,13 +234,13 @@ def render_preset_status(
     return f"""
     <div
         class="rtx-preset-status {profile_class}"
-        data-hardware-id="{_text(profile.id)}"
+        data-hardware-id="{_text(display_hardware_id)}"
         data-profile="{_text(preset_id)}"
     >
         <div class="rtx-preset-status-heading">
             <div class="rtx-preset-status-title">
                 <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="{icon}" aria-hidden="true"></span>
-                <span>{_text(profile.short_label)} · 1 ảnh &amp; 4 ảnh · {_text(title)}</span>
+                <span>{_text(display_hardware_label)} · 1 ảnh &amp; 4 ảnh · {_text(title)}</span>
             </div>
             <span class="rtx-preset-current">{_text(current_label)}</span>
         </div>

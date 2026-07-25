@@ -28,7 +28,7 @@
         };
 
         const installFooterItem = () => {
-            if (!modal()) return;
+            if (!isHardwareModalEnabled() || !modal()) return;
             const footer = Array.from(document.querySelectorAll("gradio-app footer, footer")).find(
                 (element) => element.querySelector("button.show-api, a.built-with, button.settings")
             );
@@ -49,7 +49,7 @@
                 "aria-expanded",
                 String(modal()?.classList.contains("rtx-open") === true)
             );
-            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="memory"></span><span>GPU Presets · Cấu hình đề xuất</span>';
+            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="memory"></span><span>RTX 3090 · Cấu hình đề xuất</span>';
             trigger.addEventListener("click", openModal);
 
             const divider = document.createElement("div");

@@ -66,6 +66,7 @@ from webui.gpu_presets import (
 )
 from webui.hardware_templates import (
     render_catalog_intro,
+    render_legacy_profile_notice,
     render_preset_cards,
     render_preset_status,
     render_profile_note,
@@ -159,6 +160,23 @@ def recommended_hardware_id():
     )
 
 
+def get_compatible_runtime_profile():
+    """Return the catalog profile verified for the active runtime, if any."""
+    if not RUNTIME_HARDWARE_MATCH.compatible:
+        return None
+    return GPU_PRESET_CATALOG.get_hardware(RUNTIME_HARDWARE_MATCH.hardware_id)
+
+
+def get_available_hardware_profile():
+    """Return the verified profile only when presets are enabled in this WebUI."""
+    if not globals().get('MV_MODE', False):
+        return None
+    profile = get_compatible_runtime_profile()
+    if profile is None or profile.verification != 'verified':
+        return None
+    return profile
+
+
 def get_hardware_profile(hardware_id=None):
     profile = GPU_PRESET_CATALOG.get_hardware(hardware_id)
     if profile is not None:
@@ -200,6 +218,8 @@ def get_hardware_status(
     *,
     saved=False,
     legacy=False,
+    legacy_hardware_label=None,
+    legacy_hardware_id=None,
 ):
     """Render status from the selected hardware and actual form values."""
     hardware = get_hardware_profile(hardware_id)
@@ -218,6 +238,8 @@ def get_hardware_status(
         (steps, guidance_scale, octree_resolution, num_chunks),
         saved=saved,
         legacy=legacy,
+        legacy_hardware_label=legacy_hardware_label,
+        legacy_hardware_id=legacy_hardware_id,
     )
 
 
@@ -252,7 +274,11 @@ def get_hardware_form_state(
 
 def hardware_browser_state(hardware_id, preset_id=None):
     hardware = get_hardware_profile(hardware_id)
-    preset = hardware.get_preset(preset_id)
+    preset = (
+        hardware.get_preset(preset_id)
+        if isinstance(preset_id, str)
+        else None
+    )
     if preset is None:
         preset = hardware.get_preset(hardware.default_preset_id)
     return {
@@ -271,7 +297,12 @@ def resolve_browser_hardware_selection(state):
             and state.get('catalog_version') == GPU_PRESET_CATALOG.schema_version
             and state.get('runtime_fingerprint') == RUNTIME_HARDWARE.fingerprint
         ):
-            stored_preset = stored_profile.get_preset(state.get('preset_id'))
+            stored_preset_id = state.get('preset_id')
+            stored_preset = (
+                stored_profile.get_preset(stored_preset_id)
+                if isinstance(stored_preset_id, str)
+                else None
+            )
             return (
                 stored_profile.id,
                 (
@@ -289,7 +320,9 @@ def resolve_browser_hardware_id(state):
 
 
 def apply_hardware_preset(hardware_id, preset_id):
-    hardware = get_hardware_profile(hardware_id)
+    hardware = get_available_hardware_profile()
+    if hardware is None or hardware.id != hardware_id:
+        raise gr.Error("GPU preset không khả dụng cho runtime hiện tại.")
     return (
         *get_hardware_preset(hardware.id, preset_id),
         hardware_browser_state(hardware.id, preset_id),
@@ -306,6 +339,8 @@ def get_hardware_ui_state(
     interactive=True,
     saved=False,
     legacy=False,
+    legacy_hardware_label=None,
+    legacy_hardware_id=None,
 ):
     hardware = get_hardware_profile(hardware_id)
     selected_preset_id = resolve_preset_id(
@@ -338,6 +373,8 @@ def get_hardware_ui_state(
             num_chunks,
             saved=saved,
             legacy=legacy,
+            legacy_hardware_label=legacy_hardware_label,
+            legacy_hardware_id=legacy_hardware_id,
         ),
     )
 
@@ -349,7 +386,9 @@ def select_hardware_profile(
     octree_resolution,
     num_chunks,
 ):
-    hardware = get_hardware_profile(hardware_id)
+    hardware = get_available_hardware_profile()
+    if hardware is None or hardware.id != hardware_id:
+        raise gr.Error("GPU preset không khả dụng cho runtime hiện tại.")
     return (
         hardware_browser_state(hardware.id, hardware.default_preset_id),
         *get_hardware_ui_state(
@@ -364,7 +403,14 @@ def select_hardware_profile(
 
 def build_generation_hardware_metadata(hardware_id, params):
     """Validate and snapshot UI hardware selection without changing inference."""
+    runtime_profile = get_available_hardware_profile()
     hardware = GPU_PRESET_CATALOG.get_hardware(hardware_id)
+    if (
+        runtime_profile is None
+        or hardware is None
+        or hardware.id != runtime_profile.id
+    ):
+        hardware = None
     values = (
         params.get('steps'),
         params.get('guidance_scale'),
@@ -867,11 +913,25 @@ def restore_generation_from_request(
     request: gr.Request | None = None,
 ):
     """Restore saved inputs, mesh preview and settings from a generation URL."""
+    runtime_profile = get_available_hardware_profile()
+    hardware_controls_enabled = runtime_profile is not None
     fresh_hardware_id, fresh_preset_id = resolve_browser_hardware_selection(
         browser_hardware_state
     )
-    fresh_hardware = get_hardware_profile(fresh_hardware_id)
-    fresh_preset = fresh_hardware.get_preset(fresh_preset_id)
+    if runtime_profile is None:
+        fresh_hardware_id = None
+        fresh_preset_id = None
+    elif fresh_hardware_id != runtime_profile.id:
+        fresh_hardware_id = runtime_profile.id
+        fresh_preset_id = runtime_profile.default_preset_id
+    fresh_hardware = runtime_profile or get_hardware_profile(fresh_hardware_id)
+    fresh_preset = (
+        fresh_hardware.get_preset(fresh_preset_id)
+        if isinstance(fresh_preset_id, str)
+        else None
+    )
+    if fresh_preset is None:
+        fresh_preset = fresh_hardware.get_preset(fresh_hardware.default_preset_id)
     if fresh_preset is None:
         raise RuntimeError(
             f"Hardware profile {fresh_hardware.id!r} has no default preset"
@@ -884,7 +944,19 @@ def restore_generation_from_request(
             fresh_values[2],
             fresh_values[3],
         )
-    fresh_ui = get_hardware_ui_state(fresh_hardware.id, *fresh_values)
+    fresh_ui = get_hardware_ui_state(
+        fresh_hardware.id,
+        *fresh_values,
+        interactive=hardware_controls_enabled,
+    )
+    hardware_profile_interactive = (
+        hardware_controls_enabled and len(GPU_PRESET_CATALOG.hardware) > 1
+    )
+    fresh_browser_state = (
+        hardware_browser_state(fresh_hardware.id, fresh_preset.id)
+        if hardware_controls_enabled
+        else None
+    )
     editable = (
         gr.update(),
         gr.update(interactive=True),
@@ -915,8 +987,11 @@ def restore_generation_from_request(
             interactive=True,
         ),
         '<span data-history-review-active="false"></span>',
-        hardware_browser_state(fresh_hardware.id, fresh_preset.id),
-        gr.update(value=fresh_hardware.id, interactive=True),
+        fresh_browser_state,
+        gr.update(
+            value=fresh_hardware.id if hardware_controls_enabled else None,
+            interactive=hardware_profile_interactive,
+        ),
         fresh_ui[0],
         fresh_ui[1],
         fresh_ui[2],
@@ -1037,9 +1112,30 @@ def restore_generation_from_request(
     )
     if not stored_hardware_id and isinstance(raw_preset, dict):
         stored_hardware_id = raw_preset.get('hardware_id')
+    stored_hardware_id = (
+        stored_hardware_id.strip()[:96]
+        if isinstance(stored_hardware_id, str) and stored_hardware_id.strip()
+        else None
+    )
+    stored_hardware_label = (
+        raw_hardware.get('label')
+        if isinstance(raw_hardware, dict)
+        else None
+    )
+    stored_hardware_label = (
+        stored_hardware_label.strip()[:180]
+        if isinstance(stored_hardware_label, str) and stored_hardware_label.strip()
+        else None
+    )
     saved_hardware = GPU_PRESET_CATALOG.get_hardware(stored_hardware_id)
     history_hardware = saved_hardware or fresh_hardware
     legacy_hardware = saved_hardware is None
+    legacy_hardware_id = stored_hardware_id if legacy_hardware else None
+    legacy_hardware_label = (
+        stored_hardware_label or legacy_hardware_id
+        if legacy_hardware
+        else None
+    )
     history_ui = get_hardware_ui_state(
         history_hardware.id,
         steps_value,
@@ -1049,7 +1145,25 @@ def restore_generation_from_request(
         interactive=False,
         saved=True,
         legacy=legacy_hardware,
+        legacy_hardware_label=legacy_hardware_label,
+        legacy_hardware_id=legacy_hardware_id,
     )
+    history_safe_preset = history_ui[3]
+    history_quality_preset = history_ui[4]
+    history_profile_cards = history_ui[1]
+    history_profile_note = history_ui[2]
+    if legacy_hardware_label:
+        history_profile_cards = render_legacy_profile_notice(
+            legacy_hardware_label,
+            legacy_hardware_id,
+        )
+        history_profile_note = ''
+        unavailable_preset = gr.update(
+            value='Preset cũ · Không khả dụng',
+            interactive=False,
+        )
+        history_safe_preset = unavailable_preset
+        history_quality_preset = unavailable_preset
     preset_status = history_ui[5]
     generation_mode_value = resolve_control_mode(
         steps_value,
@@ -1100,8 +1214,8 @@ def restore_generation_from_request(
             interactive=False,
         ),
         preset_status,
-        history_ui[3],
-        history_ui[4],
+        history_safe_preset,
+        history_quality_preset,
         gr.update(value=generation_mode_value, interactive=False),
         gr.update(value=decoding_mode_value, interactive=False),
         f'<span data-history-review-active="true" data-input-mode="{input_mode}"></span>',
@@ -1111,8 +1225,8 @@ def restore_generation_from_request(
             interactive=False,
         ),
         history_ui[0],
-        history_ui[1],
-        history_ui[2],
+        history_profile_cards,
+        history_profile_note,
     )
 
 @spaces_api.GPU(duration=60)
@@ -1748,9 +1862,21 @@ def build_app():
         'float32': 'FP32',
     }.get(str(getattr(args, 'dtype', 'float16')).lower(), 'FP16')
     runtime_label = f'{runtime_device} {runtime_dtype}'
-    hardware_presets_visible = MV_MODE and bool(GPU_PRESET_CATALOG.hardware)
-    initial_hardware_id = recommended_hardware_id()
+    runtime_profile = get_available_hardware_profile()
+    hardware_presets_visible = runtime_profile is not None
+    hardware_profile_interactive = (
+        hardware_presets_visible and len(GPU_PRESET_CATALOG.hardware) > 1
+    )
+    initial_hardware_id = (
+        runtime_profile.id if runtime_profile else recommended_hardware_id()
+    )
     initial_hardware = get_hardware_profile(initial_hardware_id)
+    initial_safe_preset = initial_hardware.get_preset('safe')
+    initial_quality_preset = initial_hardware.get_preset('quality')
+    if initial_safe_preset is None or initial_quality_preset is None:
+        raise RuntimeError(
+            f"Hardware profile {initial_hardware.id!r} must define safe and quality"
+        )
     initial_control_values = (
         5 if TURBO_MODE else 30,
         5.0,
@@ -1804,7 +1930,11 @@ def build_app():
             elem_id='history-review-state',
         )
         hardware_browser_preference = gr.BrowserState(
-            default_value=hardware_browser_state(initial_hardware_id),
+            default_value=(
+                hardware_browser_state(initial_hardware_id)
+                if hardware_presets_visible
+                else None
+            ),
             storage_key='hunyuan3d.hardware-profile.v1',
         )
 
@@ -2070,19 +2200,24 @@ Fast for very complex cases, Standard seldom use.',
         with gr.Column(
             elem_id='rtx3090-modal',
             visible=hardware_presets_visible,
+            elem_classes=(
+                ['hardware-presets-enabled']
+                if hardware_presets_visible
+                else []
+            ),
         ):
             with gr.Column(elem_classes='rtx3090-modal-panel'):
                 gr.HTML("""
                 <div class="rtx3090-modal-header">
                     <div class="rtx3090-header-main">
                         <span class="rtx3090-header-icon ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></span>
-                        <h2 id="rtx3090-modal-title">GPU Presets · Cấu hình đề xuất</h2>
+                        <h2 id="rtx3090-modal-title">RTX 3090 · Cấu hình đề xuất</h2>
                         <span class="rtx3090-header-scope">1 ảnh &amp; 4 ảnh</span>
                     </div>
                     <div class="rtx3090-header-actions">
                         <span class="rtx3090-verified">
                             <i class="rtx3090-verified-dot"></i>
-                            Danh sách cục bộ
+                            Đã kiểm chứng
                         </span>
                         <span class="rtx3090-preset-count"><b>{hardware_count}</b> cấu hình · {preset_count} preset</span>
                         <button id="rtx3090-modal-close" type="button" aria-label="Đóng cửa sổ cấu hình">
@@ -2109,15 +2244,16 @@ Fast for very complex cases, Standard seldom use.',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>1. Chọn nhóm GPU/VRAM của máy.</b>
-                    <span>WebUI đã tự đề xuất theo GPU được phát hiện; bạn vẫn có thể chọn thủ công.</span>
+                    <b>1. Cấu hình GPU đã kiểm chứng trên máy này.</b>
+                    <span>Catalog hiện chỉ giữ RTX 3090 · 24 GB.</span>
                 </div>
                 """, elem_classes='rtx3090-section-one')
                 hardware_profile = gr.Dropdown(
                     choices=GPU_PRESET_CATALOG.choices(),
-                    value=initial_hardware.id,
+                    value=initial_hardware.id if hardware_presets_visible else None,
                     label='GPU / VRAM profile',
-                    info='Danh sách nằm trong webui/data/gpu_preset_catalog.json',
+                    interactive=hardware_profile_interactive,
+                    info='Profile duy nhất trong webui/data/gpu_preset_catalog.json',
                     elem_id='hardware-profile-select',
                     elem_classes='hardware-profile-select-control',
                 )
@@ -2126,12 +2262,13 @@ Fast for very complex cases, Standard seldom use.',
                         initial_hardware,
                         recommended_hardware_id=RUNTIME_HARDWARE_MATCH.hardware_id,
                     ),
+                    visible=False,
                     elem_classes='rtx3090-machine-block',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
                     <b>2. Chọn mức chất lượng rồi bấm Áp dụng.</b>
-                    <span>Mỗi nhóm GPU có hai preset riêng; thông số dùng chung cho chế độ 1 ảnh và 4 ảnh.</span>
+                    <span>Hai preset dùng chung cho chế độ 1 ảnh và 4 ảnh.</span>
                 </div>
                 """, elem_classes='rtx3090-section-two')
                 hardware_profile_cards = gr.HTML(
@@ -2141,16 +2278,15 @@ Fast for very complex cases, Standard seldom use.',
                 with gr.Row(elem_classes='rtx-preset-actions'):
                     rtx_safe_preset = gr.Button(
                         value=(
-                            f"Áp dụng · {initial_hardware.get_preset('safe').label}"
+                            f"Áp dụng · {initial_safe_preset.label}"
                         ),
                         min_width=160,
                         elem_id='rtx3090-safe-preset',
                     )
                     rtx_quality_preset = gr.Button(
                         value=(
-                            f"Áp dụng · {initial_hardware.get_preset('quality').label}"
+                            f"Áp dụng · {initial_quality_preset.label}"
                         ),
-                        variant='primary',
                         min_width=180,
                         elem_id='rtx3090-quality-preset',
                     )
@@ -2187,7 +2323,7 @@ Fast for very complex cases, Standard seldom use.',
             api_name=False,
         )
 
-        restore_event = demo.load(
+        demo.load(
             fn=restore_generation_from_request,
             inputs=[hardware_browser_preference],
             outputs=[

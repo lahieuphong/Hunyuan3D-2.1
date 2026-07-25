@@ -8,6 +8,9 @@
         let hardwareModalReturnFocus = null;
 
         const isHardwareModalView = (value) => hardwareModalViews.has(value);
+        const isHardwareModalEnabled = () => (
+            modal()?.classList.contains("hardware-presets-enabled") === true
+        );
 
         const setHardwareTriggerExpanded = (isOpen) => {
             [
@@ -21,11 +24,12 @@
         const setModalOpen = (isOpen, shouldFocusClose = false) => {
             const element = modal();
             if (!element) return;
-            element.classList.toggle("rtx-open", isOpen);
-            element.setAttribute("aria-hidden", String(!isOpen));
-            document.body.classList.toggle("rtx3090-modal-open", isOpen);
-            setHardwareTriggerExpanded(isOpen);
-            if (isOpen && shouldFocusClose) {
+            const nextOpen = isOpen && isHardwareModalEnabled();
+            element.classList.toggle("rtx-open", nextOpen);
+            element.setAttribute("aria-hidden", String(!nextOpen));
+            document.body.classList.toggle("rtx3090-modal-open", nextOpen);
+            setHardwareTriggerExpanded(nextOpen);
+            if (nextOpen && shouldFocusClose) {
                 window.setTimeout(() => {
                     document.getElementById("rtx3090-modal-close")?.focus();
                 }, 0);
@@ -119,7 +123,12 @@
                 window.history.replaceState(window.history.state, "", url);
                 view = "hardware";
             }
-            const shouldOpen = view === "hardware";
+            if (isHardwareModalView(view) && !isHardwareModalEnabled()) {
+                url.searchParams.delete("view");
+                window.history.replaceState(window.history.state, "", url);
+                view = null;
+            }
+            const shouldOpen = view === "hardware" && isHardwareModalEnabled();
             const wasOpen = modal()?.classList.contains("rtx-open") === true;
             setModalOpen(shouldOpen, shouldOpen && !wasOpen);
             if (!shouldOpen) {
@@ -129,6 +138,7 @@
         };
 
         const openModal = (event) => {
+            if (!isHardwareModalEnabled()) return;
             const url = currentAppUrl();
             const currentView = url.searchParams.get("view");
             hardwareModalReturnFocus = event?.currentTarget || document.activeElement;

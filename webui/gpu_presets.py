@@ -516,6 +516,7 @@ def match_runtime_hardware(
     for profile in catalog.hardware:
         if (
             profile.backend == runtime.backend
+            and profile.dtype == runtime.dtype
             and normalized_name in {
                 normalize_gpu_name(alias) for alias in profile.aliases
             }
@@ -526,6 +527,7 @@ def match_runtime_hardware(
     for profile in catalog.hardware:
         if (
             profile.backend == runtime.backend
+            and profile.dtype == runtime.dtype
             and not profile.aliases
             and _vram_in_profile(profile, total_vram_gb)
         ):
@@ -534,7 +536,11 @@ def match_runtime_hardware(
     generic_profiles = [
         profile
         for profile in catalog.hardware
-        if profile.backend == runtime.backend and not profile.aliases
+        if (
+            profile.backend == runtime.backend
+            and profile.dtype == runtime.dtype
+            and not profile.aliases
+        )
     ]
     if not generic_profiles:
         return HardwareMatch(None, "unavailable", False)
