@@ -27,6 +27,8 @@ from webui.hardware_templates import (
 
 
 GIB = 1024**3
+BLACKWELL_ID = "nvidia-rtx-pro-6000-blackwell-workstation-96gb"
+BLACKWELL_NAME = "NVIDIA RTX PRO 6000 Blackwell Workstation Edition"
 
 
 def catalog_payload() -> dict:
@@ -93,6 +95,7 @@ def runtime_gpu(
     *,
     backend: str = "cuda",
     detected: bool = True,
+    capability: str = "8.6",
 ) -> RuntimeHardware:
     return RuntimeHardware(
         requested_device="cuda:0",
@@ -100,7 +103,7 @@ def runtime_gpu(
         index=0,
         name=name,
         total_vram_bytes=round(vram_gb * GIB),
-        capability="8.6",
+        capability=capability,
         bf16_supported=True,
         dtype="float16",
         detected=detected,
@@ -113,8 +116,9 @@ class CatalogValidationTests(unittest.TestCase):
         catalog = load_gpu_preset_catalog()
 
         self.assertEqual(catalog.schema_version, 1)
-        self.assertEqual(len(catalog.hardware), 1)
-        self.assertEqual(catalog.preset_count, 2)
+        self.assertEqual(catalog.default_hardware_id, "nvidia-rtx-3090-24gb")
+        self.assertEqual(len(catalog.hardware), 2)
+        self.assertEqual(catalog.preset_count, 4)
         for profile in catalog.hardware:
             self.assertEqual({preset.id for preset in profile.presets}, {"safe", "quality"})
             self.assertIn(profile.default_preset_id, {"safe", "quality"})
@@ -122,12 +126,26 @@ class CatalogValidationTests(unittest.TestCase):
 
         verified = [profile.id for profile in catalog.hardware if profile.verification == "verified"]
         self.assertEqual(verified, ["nvidia-rtx-3090-24gb"])
+        runtime_verified = [
+            profile.id
+            for profile in catalog.hardware
+            if profile.verification == "runtime-verified"
+        ]
+        self.assertEqual(runtime_verified, [BLACKWELL_ID])
         verified_profile = catalog.get_hardware("nvidia-rtx-3090-24gb")
+        blackwell_profile = catalog.get_hardware(BLACKWELL_ID)
         self.assertIsNotNone(verified_profile)
+        self.assertIsNotNone(blackwell_profile)
         assert verified_profile is not None
+        assert blackwell_profile is not None
+        self.assertEqual(verified_profile.compute_capability, "8.6")
+        self.assertEqual(blackwell_profile.compute_capability, "12.0")
         self.assertTrue(
             all(preset.verified for preset in verified_profile.presets)
         )
+        self.assertTrue(verified_profile.presets_enabled)
+        self.assertTrue(blackwell_profile.presets_enabled)
+        self.assertTrue(all(not preset.verified for preset in blackwell_profile.presets))
         self.assertTrue(
             all(
                 not preset.verified
@@ -184,6 +202,12 @@ class CatalogValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "vram_min_gb"):
             parse_catalog(payload)
 
+    def test_compute_capability_uses_major_minor_format(self) -> None:
+        payload = catalog_payload()
+        payload["hardware"][0]["compute_capability"] = "sm_86"
+        with self.assertRaisesRegex(ValueError, "compute_capability"):
+            parse_catalog(payload)
+
     def test_verification_label_cannot_overstate_presets(self) -> None:
         payload = catalog_payload()
         payload["hardware"][0]["presets"][0]["verified"] = False
@@ -193,6 +217,15 @@ class CatalogValidationTests(unittest.TestCase):
         payload = catalog_payload()
         payload["hardware"][0]["verification"] = "estimated"
         with self.assertRaisesRegex(ValueError, "presets cannot be verified"):
+            parse_catalog(payload)
+
+    def test_runtime_verified_profile_requires_an_exact_alias(self) -> None:
+        payload = catalog_payload()
+        blackwell = next(
+            profile for profile in payload["hardware"] if profile["id"] == BLACKWELL_ID
+        )
+        blackwell["aliases"] = []
+        with self.assertRaisesRegex(ValueError, "must define an exact GPU alias"):
             parse_catalog(payload)
 
     def test_aliases_are_unique_after_exact_name_normalization(self) -> None:
@@ -237,6 +270,29 @@ class CatalogValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "overlapping generic VRAM ranges"):
             parse_catalog(payload)
 
+    def test_generic_vram_ranges_may_overlap_across_capabilities(self) -> None:
+        payload = catalog_payload()
+        verified = payload["hardware"][0]
+        first = synthetic_generic_profile(
+            verified,
+            profile_id="synthetic-generic-cc86",
+            vram_min_gb=8,
+            vram_max_gb=24,
+        )
+        second = synthetic_generic_profile(
+            verified,
+            profile_id="synthetic-generic-cc120",
+            vram_min_gb=8,
+            vram_max_gb=24,
+        )
+        second["compute_capability"] = "12.0"
+        payload["hardware"].extend((first, second))
+
+        catalog = parse_catalog(payload)
+
+        self.assertIsNotNone(catalog.get_hardware("synthetic-generic-cc86"))
+        self.assertIsNotNone(catalog.get_hardware("synthetic-generic-cc120"))
+
 
 class RuntimeMatchingTests(unittest.TestCase):
     @classmethod
@@ -250,6 +306,63 @@ class RuntimeMatchingTests(unittest.TestCase):
             self.catalog,
         )
         self.assertEqual(match, HardwareMatch("nvidia-rtx-3090-24gb", "exact", True))
+
+    def test_blackwell_workstation_uses_exact_runtime_verified_profile(self) -> None:
+        match = match_runtime_hardware(
+            runtime_gpu(
+                BLACKWELL_NAME,
+                97887 / 1024,
+                capability="12.0",
+            ),
+            self.catalog,
+        )
+        self.assertEqual(match, HardwareMatch(BLACKWELL_ID, "exact", True))
+
+    def test_blackwell_accepts_both_vram_boundaries_inside_half_open_range(self) -> None:
+        for vram_gib in (95.0, 96.999):
+            with self.subTest(vram_gib=vram_gib):
+                match = match_runtime_hardware(
+                    runtime_gpu(BLACKWELL_NAME, vram_gib, capability="12.0"),
+                    self.catalog,
+                )
+                self.assertEqual(
+                    match,
+                    HardwareMatch(BLACKWELL_ID, "exact", True),
+                )
+
+    def test_blackwell_match_rejects_other_names_vram_backend_and_dtype(self) -> None:
+        measured_vram_gib = 97887 / 1024
+        invalid_runtimes = (
+            runtime_gpu(
+                "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+                measured_vram_gib,
+                capability="12.0",
+            ),
+            runtime_gpu(
+                "NVIDIA RTX PRO 6000 Blackwell Max-Q Workstation Edition",
+                measured_vram_gib,
+                capability="12.0",
+            ),
+            runtime_gpu(BLACKWELL_NAME, 94.99, capability="12.0"),
+            runtime_gpu(BLACKWELL_NAME, 97.0, capability="12.0"),
+            runtime_gpu(
+                BLACKWELL_NAME,
+                measured_vram_gib,
+                backend="rocm",
+                capability="12.0",
+            ),
+            replace(
+                runtime_gpu(BLACKWELL_NAME, measured_vram_gib, capability="12.0"),
+                dtype="bfloat16",
+            ),
+            runtime_gpu(BLACKWELL_NAME, measured_vram_gib, capability="8.6"),
+        )
+        for runtime in invalid_runtimes:
+            with self.subTest(runtime=runtime):
+                self.assertEqual(
+                    match_runtime_hardware(runtime, self.catalog),
+                    HardwareMatch(None, "unavailable", False),
+                )
 
     def test_exact_alias_normalization_does_not_become_substring_matching(self) -> None:
         normalized_match = match_runtime_hardware(
@@ -321,6 +434,15 @@ class RuntimeMatchingTests(unittest.TestCase):
         self.assertEqual(
             nearest_match,
             HardwareMatch("synthetic-generic-1", "nearest", False),
+        )
+
+        wrong_capability = match_runtime_hardware(
+            runtime_gpu("Unlisted NVIDIA GPU", 16, capability="12.0"),
+            self.generic_catalog,
+        )
+        self.assertEqual(
+            wrong_capability,
+            HardwareMatch(None, "unavailable", False),
         )
 
     def test_preset_resolution_requires_finite_in_range_exact_values(self) -> None:
@@ -419,11 +541,13 @@ class TemplateTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.catalog = parse_catalog(catalog_payload())
         verified = cls.catalog.get_hardware("nvidia-rtx-3090-24gb")
+        blackwell = cls.catalog.get_hardware(BLACKWELL_ID)
         cls.generic_catalog = catalog_with_synthetic_generic_profiles((7.5, 28))
         estimated = cls.generic_catalog.get_hardware("synthetic-generic-1")
-        if verified is None or estimated is None:
+        if verified is None or blackwell is None or estimated is None:
             raise AssertionError("Expected test hardware profiles were not created")
         cls.verified: HardwareProfile = verified
+        cls.blackwell: HardwareProfile = blackwell
         cls.estimated: HardwareProfile = estimated
 
     def test_catalog_intro_distinguishes_compatible_from_nearest(self) -> None:
@@ -443,6 +567,25 @@ class TemplateTests(unittest.TestCase):
         )
         self.assertIn("Cấu hình gần nhất", nearest)
         self.assertIn("chọn thủ công", nearest)
+
+    def test_blackwell_intro_displays_measured_runtime_without_claiming_benchmark(self) -> None:
+        runtime = runtime_gpu(
+            BLACKWELL_NAME,
+            97887 / 1024,
+            capability="12.0",
+        )
+        rendered = render_catalog_intro(
+            runtime,
+            HardwareMatch(BLACKWELL_ID, "exact", True),
+            self.catalog,
+        )
+
+        self.assertIn("95.59 GiB VRAM", rendered)
+        self.assertIn("CC 12.0", rendered)
+        self.assertIn("2 cấu hình", rendered)
+        self.assertIn("ứng viên chờ benchmark", rendered)
+        self.assertIn("is-runtime-verified", rendered)
+        self.assertNotIn("Catalog hiện chỉ giữ cấu hình RTX 3090", rendered)
 
     def test_profile_summary_uses_catalog_vram_label_and_escapes_text(self) -> None:
         profile = replace(

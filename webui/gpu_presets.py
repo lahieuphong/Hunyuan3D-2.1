@@ -18,7 +18,14 @@ from typing import Any
 
 CATALOG_PATH = Path(__file__).with_name("data") / "gpu_preset_catalog.json"
 _VALID_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_VALID_VERIFICATION = {"verified", "estimated", "experimental"}
+_VALID_COMPUTE_CAPABILITY = re.compile(r"^[0-9]+\.[0-9]+$")
+_VALID_VERIFICATION = {
+    "verified",
+    "runtime-verified",
+    "estimated",
+    "experimental",
+}
+_PRESET_ENABLED_VERIFICATION = {"verified", "runtime-verified"}
 _VALID_BACKENDS = {"cuda", "rocm"}
 _VALID_DTYPES = {"float16", "bfloat16", "float32"}
 _REQUIRED_PRESET_IDS = frozenset({"safe", "quality"})
@@ -74,6 +81,7 @@ class HardwareProfile:
     aliases: tuple[str, ...]
     examples: tuple[str, ...]
     dtype: str
+    compute_capability: str
     verification: str
     verification_label: str
     summary: str
@@ -87,6 +95,11 @@ class HardwareProfile:
     @property
     def display_vram(self) -> str:
         return self.vram_label
+
+    @property
+    def presets_enabled(self) -> bool:
+        """Whether a compatible runtime match may expose this profile's actions."""
+        return self.verification in _PRESET_ENABLED_VERIFICATION
 
 
 @dataclass(frozen=True)
@@ -350,6 +363,14 @@ def _parse_hardware(value: Any) -> HardwareProfile:
             )
         )
     )
+    compute_capability = _require_text(
+        value.get("compute_capability"),
+        f"{hardware_id}.compute_capability",
+    )
+    if not _VALID_COMPUTE_CAPABILITY.fullmatch(compute_capability):
+        raise ValueError(
+            f"{hardware_id}.compute_capability must use major.minor format"
+        )
     verification = _require_id(
         value.get("verification"),
         f"{hardware_id}.verification",
@@ -357,6 +378,10 @@ def _parse_hardware(value: Any) -> HardwareProfile:
     if verification not in _VALID_VERIFICATION:
         raise ValueError(
             f"{hardware_id}.verification must be one of {sorted(_VALID_VERIFICATION)}"
+        )
+    if verification == "runtime-verified" and not aliases:
+        raise ValueError(
+            f"{hardware_id} is runtime-verified, so it must define an exact GPU alias"
         )
     preset_verification = {preset.verified for preset in parsed_presets}
     if verification == "verified" and preset_verification != {True}:
@@ -398,6 +423,7 @@ def _parse_hardware(value: Any) -> HardwareProfile:
         aliases=aliases,
         examples=examples,
         dtype=dtype,
+        compute_capability=compute_capability,
         verification=verification,
         verification_label=_require_text(
             value.get("verification_label"),
@@ -439,12 +465,22 @@ def parse_catalog(payload: Any) -> GpuPresetCatalog:
                 )
             aliases[normalized] = profile.id
 
-    for backend in _VALID_BACKENDS:
+    generic_keys = {
+        (profile.backend, profile.dtype, profile.compute_capability)
+        for profile in hardware
+        if not profile.aliases
+    }
+    for backend, dtype, compute_capability in sorted(generic_keys):
         generic_profiles = sorted(
             (
                 profile
                 for profile in hardware
-                if profile.backend == backend and not profile.aliases
+                if (
+                    profile.backend == backend
+                    and profile.dtype == dtype
+                    and profile.compute_capability == compute_capability
+                    and not profile.aliases
+                )
             ),
             key=lambda profile: profile.vram_min_gb,
         )
@@ -455,7 +491,8 @@ def parse_catalog(payload: Any) -> GpuPresetCatalog:
             ):
                 raise ValueError(
                     "GPU preset catalog contains overlapping generic VRAM ranges "
-                    f"for {previous.id} and {current.id}"
+                    f"for {previous.id} and {current.id} "
+                    f"on {backend}/{dtype}/CC {compute_capability}"
                 )
 
     default_id = payload.get("default_hardware_id")
@@ -497,6 +534,13 @@ def _vram_distance(profile: HardwareProfile, total_vram_gb: float) -> float:
     return 0.0
 
 
+def _capability_matches(
+    profile: HardwareProfile,
+    runtime: RuntimeHardware,
+) -> bool:
+    return runtime.capability == profile.compute_capability
+
+
 def match_runtime_hardware(
     runtime: RuntimeHardware,
     catalog: GpuPresetCatalog | None = None,
@@ -517,6 +561,7 @@ def match_runtime_hardware(
         if (
             profile.backend == runtime.backend
             and profile.dtype == runtime.dtype
+            and _capability_matches(profile, runtime)
             and normalized_name in {
                 normalize_gpu_name(alias) for alias in profile.aliases
             }
@@ -528,6 +573,7 @@ def match_runtime_hardware(
         if (
             profile.backend == runtime.backend
             and profile.dtype == runtime.dtype
+            and _capability_matches(profile, runtime)
             and not profile.aliases
             and _vram_in_profile(profile, total_vram_gb)
         ):
@@ -539,6 +585,7 @@ def match_runtime_hardware(
         if (
             profile.backend == runtime.backend
             and profile.dtype == runtime.dtype
+            and _capability_matches(profile, runtime)
             and not profile.aliases
         )
     ]

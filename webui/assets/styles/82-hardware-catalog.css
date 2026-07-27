@@ -372,3 +372,72 @@
             transition: none !important;
         }
     }
+
+    /* The modal header stays neutral because History may render a profile that
+       differs from the active runtime. The profile cards carry actual status. */
+    #rtx3090-modal .rtx3090-verified.is-catalog {
+        background: rgba(125, 140, 255, 0.11);
+        border-color: rgba(125, 140, 255, 0.3);
+        color: #aeb7ff !important;
+    }
+
+    #rtx3090-modal
+    .rtx3090-verified.is-catalog
+    .rtx3090-verified-dot {
+        background: var(--hardware-estimated);
+        box-shadow: 0 0 0 3px rgba(125, 140, 255, 0.13);
+    }
+
+    .hardware-runtime-strip.is-runtime-verified {
+        background: rgba(125, 140, 255, 0.08);
+        border-color: rgba(125, 140, 255, 0.3);
+    }
+
+    .hardware-runtime-strip.is-runtime-verified .hardware-runtime-icon {
+        background: rgba(125, 140, 255, 0.12);
+        color: var(--hardware-estimated);
+    }
+
+    .hardware-profile-summary.is-runtime-verified.is-runtime-match {
+        box-shadow: inset 3px 0 0 var(--hardware-estimated);
+    }
+
+    .hardware-profile-summary.is-runtime-verified .hardware-profile-verification {
+        background: rgba(125, 140, 255, 0.1);
+        border-color: rgba(125, 140, 255, 0.25);
+        color: #aeb7ff;
+    }
+
+    .hardware-profile-note.is-runtime-verified {
+        border-color: rgba(125, 140, 255, 0.25);
+    }
+
+    .rtx-preset-status.is-runtime-verified .rtx-preset-status-check {
+        background: var(--hardware-estimated);
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain
+    #rtx3090-modal .rtx3090-verified.is-catalog {
+        background: #eef0ff;
+        border-color: #c8cdfa;
+        color: #4d57bd !important;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain
+    .hardware-runtime-strip.is-runtime-verified {
+        background: #f3f4ff;
+        border-color: #c8cdfa;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain
+    .hardware-profile-summary.is-runtime-verified .hardware-profile-verification {
+        background: #eef0ff;
+        border-color: #c8cdfa;
+        color: #4d57bd;
+    }
+
+    body:not(.dark) .gradio-container.gradio-container .contain
+    .hardware-profile-note.is-runtime-verified {
+        background: linear-gradient(135deg, #f6f7ff, #fafbff);
+        border-color: #cdd1f4;
+    }

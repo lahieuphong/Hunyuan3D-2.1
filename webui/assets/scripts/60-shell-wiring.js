@@ -49,7 +49,7 @@
                 "aria-expanded",
                 String(modal()?.classList.contains("rtx-open") === true)
             );
-            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="memory"></span><span>RTX 3090 · Cấu hình đề xuất</span>';
+            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="memory"></span><span>GPU · Cấu hình đề xuất</span>';
             trigger.addEventListener("click", openModal);
 
             const divider = document.createElement("div");

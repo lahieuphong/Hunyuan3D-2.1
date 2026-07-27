@@ -161,18 +161,23 @@ def recommended_hardware_id():
 
 
 def get_compatible_runtime_profile():
-    """Return the catalog profile verified for the active runtime, if any."""
+    """Return the compatible catalog profile for the active runtime, if any."""
     if not RUNTIME_HARDWARE_MATCH.compatible:
         return None
     return GPU_PRESET_CATALOG.get_hardware(RUNTIME_HARDWARE_MATCH.hardware_id)
 
 
 def get_available_hardware_profile():
-    """Return the verified profile only when presets are enabled in this WebUI."""
+    """Return a preset-enabled profile compatible with the active runtime."""
     if not globals().get('MV_MODE', False):
         return None
     profile = get_compatible_runtime_profile()
-    if profile is None or profile.verification != 'verified':
+    if profile is None or not profile.presets_enabled:
+        return None
+    if (
+        profile.verification == 'runtime-verified'
+        and RUNTIME_HARDWARE_MATCH.method != 'exact'
+    ):
         return None
     return profile
 
@@ -207,6 +212,11 @@ def get_hardware_preset(hardware_id, preset_id, *, saved=False):
             saved=saved,
         ),
     )
+
+
+def hardware_preset_action_label(hardware, preset):
+    action = 'Áp dụng' if preset.verified else 'Áp dụng thử'
+    return f'{action} · {preset.label}'
 
 
 def get_hardware_status(
@@ -363,8 +373,14 @@ def get_hardware_ui_state(
         ),
         render_preset_cards(hardware, selected_preset_id),
         render_profile_note(hardware),
-        gr.update(value=f'Áp dụng · {safe.label}', interactive=interactive),
-        gr.update(value=f'Áp dụng · {quality.label}', interactive=interactive),
+        gr.update(
+            value=hardware_preset_action_label(hardware, safe),
+            interactive=interactive,
+        ),
+        gr.update(
+            value=hardware_preset_action_label(hardware, quality),
+            interactive=interactive,
+        ),
         get_hardware_status(
             hardware.id,
             steps,
@@ -431,6 +447,7 @@ def build_generation_hardware_metadata(hardware_id, params):
         'catalog_version': GPU_PRESET_CATALOG.schema_version,
         'id': hardware.id if hardware else None,
         'label': hardware.label if hardware else None,
+        'verification': hardware.verification if hardware else None,
         'selection_source': 'ui' if hardware else 'api',
         'runtime': RUNTIME_HARDWARE.snapshot(),
     }
@@ -438,6 +455,7 @@ def build_generation_hardware_metadata(hardware_id, params):
         'catalog_version': GPU_PRESET_CATALOG.schema_version,
         'hardware_id': hardware.id if hardware else None,
         'id': preset.id if preset else 'custom',
+        'verified': preset.verified if preset else False,
         'source': 'catalog' if preset else 'custom',
         'params_snapshot': {
             'steps': values[0],
@@ -949,9 +967,7 @@ def restore_generation_from_request(
         *fresh_values,
         interactive=hardware_controls_enabled,
     )
-    hardware_profile_interactive = (
-        hardware_controls_enabled and len(GPU_PRESET_CATALOG.hardware) > 1
-    )
+    hardware_profile_interactive = False
     fresh_browser_state = (
         hardware_browser_state(fresh_hardware.id, fresh_preset.id)
         if hardware_controls_enabled
@@ -1864,32 +1880,36 @@ def build_app():
     runtime_label = f'{runtime_device} {runtime_dtype}'
     runtime_profile = get_available_hardware_profile()
     hardware_presets_visible = runtime_profile is not None
-    hardware_profile_interactive = (
-        hardware_presets_visible and len(GPU_PRESET_CATALOG.hardware) > 1
-    )
+    hardware_profile_interactive = False
     initial_hardware_id = (
         runtime_profile.id if runtime_profile else recommended_hardware_id()
     )
     initial_hardware = get_hardware_profile(initial_hardware_id)
     initial_safe_preset = initial_hardware.get_preset('safe')
     initial_quality_preset = initial_hardware.get_preset('quality')
-    if initial_safe_preset is None or initial_quality_preset is None:
-        raise RuntimeError(
-            f"Hardware profile {initial_hardware.id!r} must define safe and quality"
-        )
-    initial_control_values = (
-        5 if TURBO_MODE else 30,
-        5.0,
-        256,
-        8000,
+    initial_default_preset = initial_hardware.get_preset(
+        initial_hardware.default_preset_id
     )
+    if (
+        initial_safe_preset is None
+        or initial_quality_preset is None
+        or initial_default_preset is None
+    ):
+        raise RuntimeError(
+            f"Hardware profile {initial_hardware.id!r} has an invalid preset contract"
+        )
+    initial_control_values = initial_default_preset.parameter_tuple
+    if TURBO_MODE:
+        initial_control_values = (5, *initial_control_values[1:])
     initial_preset_id = resolve_preset_id(
         initial_hardware.id,
         *initial_control_values,
         catalog=GPU_PRESET_CATALOG,
     )
     hardware_action_label = (
-        short_gpu_name(RUNTIME_HARDWARE.name)
+        runtime_profile.short_label
+        if runtime_profile is not None
+        else short_gpu_name(RUNTIME_HARDWARE.name)
         if RUNTIME_HARDWARE.detected
         else 'GPU Presets'
     )
@@ -2211,13 +2231,13 @@ Fast for very complex cases, Standard seldom use.',
                 <div class="rtx3090-modal-header">
                     <div class="rtx3090-header-main">
                         <span class="rtx3090-header-icon ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></span>
-                        <h2 id="rtx3090-modal-title">RTX 3090 · Cấu hình đề xuất</h2>
+                        <h2 id="rtx3090-modal-title">GPU · Cấu hình đề xuất</h2>
                         <span class="rtx3090-header-scope">1 ảnh &amp; 4 ảnh</span>
                     </div>
                     <div class="rtx3090-header-actions">
-                        <span class="rtx3090-verified">
+                        <span class="rtx3090-verified is-catalog">
                             <i class="rtx3090-verified-dot"></i>
-                            Đã kiểm chứng
+                            Trạng thái theo profile
                         </span>
                         <span class="rtx3090-preset-count"><b>{hardware_count}</b> cấu hình · {preset_count} preset</span>
                         <button id="rtx3090-modal-close" type="button" aria-label="Đóng cửa sổ cấu hình">
@@ -2244,16 +2264,18 @@ Fast for very complex cases, Standard seldom use.',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>1. Cấu hình GPU đã kiểm chứng trên máy này.</b>
-                    <span>Catalog hiện chỉ giữ RTX 3090 · 24 GB.</span>
+                    <b>1. Cấu hình GPU đang được hiển thị.</b>
+                    <span>{profile_count} profile trong catalog; bình thường khóa theo runtime, khi xem lịch sử sẽ hiển thị profile đã lưu.</span>
                 </div>
-                """, elem_classes='rtx3090-section-one')
+                """.format(
+                    profile_count=len(GPU_PRESET_CATALOG.hardware),
+                ), elem_classes='rtx3090-section-one')
                 hardware_profile = gr.Dropdown(
                     choices=GPU_PRESET_CATALOG.choices(),
                     value=initial_hardware.id if hardware_presets_visible else None,
                     label='GPU / VRAM profile',
                     interactive=hardware_profile_interactive,
-                    info='Profile duy nhất trong webui/data/gpu_preset_catalog.json',
+                    info='Tự động khóa theo GPU, VRAM, backend, dtype và compute capability',
                     elem_id='hardware-profile-select',
                     elem_classes='hardware-profile-select-control',
                 )
@@ -2262,7 +2284,7 @@ Fast for very complex cases, Standard seldom use.',
                         initial_hardware,
                         recommended_hardware_id=RUNTIME_HARDWARE_MATCH.hardware_id,
                     ),
-                    visible=False,
+                    visible=True,
                     elem_classes='rtx3090-machine-block',
                 )
                 gr.HTML("""
@@ -2277,16 +2299,12 @@ Fast for very complex cases, Standard seldom use.',
                 )
                 with gr.Row(elem_classes='rtx-preset-actions'):
                     rtx_safe_preset = gr.Button(
-                        value=(
-                            f"Áp dụng · {initial_safe_preset.label}"
-                        ),
+                        value=hardware_preset_action_label(initial_hardware, initial_safe_preset),
                         min_width=160,
                         elem_id='rtx3090-safe-preset',
                     )
                     rtx_quality_preset = gr.Button(
-                        value=(
-                            f"Áp dụng · {initial_quality_preset.label}"
-                        ),
+                        value=hardware_preset_action_label(initial_hardware, initial_quality_preset),
                         min_width=180,
                         elem_id='rtx3090-quality-preset',
                     )

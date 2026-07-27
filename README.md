@@ -113,6 +113,27 @@ cd ../..
 wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P hy3dpaint/ckpt
 ```
 
+#### RTX PRO 6000 Blackwell on Windows (shape-only)
+
+The generic `cu124` command above is not suitable for this Blackwell profile.
+On the target workstation, use the already prepared `.venv-blackwell`, which
+was checked with Python 3.11, PyTorch 2.7.1+cu128, torchvision 0.22.1+cu128,
+CUDA 12.8, and compute capability 12.0. The lightweight
+`requirements-windows-multiview-ui.txt` file contains only UI packages; it is
+not a complete recipe for creating the shape environment from scratch.
+
+```powershell
+Set-Location -LiteralPath "F:\AI\Hunyuan3D-2.1"
+$py = (Resolve-Path ".\.venv-blackwell\Scripts\python.exe").Path
+& $py -m pip check
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\start_windows_multiview_webui.ps1" -PythonExecutable $py -PreflightOnly
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\start_windows_multiview_webui.ps1" -PythonExecutable $py -Background -OpenBrowser
+```
+
+This setup targets shape-only inference. Blackwell generation remains
+unbenchmarked, and the candidate presets stay marked as trial actions. The RTX
+3090 training instructions remain pinned to the Torch 2.5/cu124 stack.
+
 ### Code Usage
 
 We designed a diffusers-like API to use our shape generation model - Hunyuan3D-Shape and texture synthesis model -

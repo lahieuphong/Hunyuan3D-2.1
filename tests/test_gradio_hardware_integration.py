@@ -5,9 +5,14 @@ import tempfile
 import unittest
 import uuid
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 
 import gradio_app as app
+from webui.gpu_presets import GpuPresetCatalog
+
+
+BLACKWELL_ID = "nvidia-rtx-pro-6000-blackwell-workstation-96gb"
 
 
 class _Request:
@@ -42,6 +47,74 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             (hardware_id, "quality"),
         )
 
+    def test_browser_state_remembers_blackwell_trial_tier(self):
+        state = app.hardware_browser_state(BLACKWELL_ID, "quality")
+
+        self.assertEqual(
+            app.resolve_browser_hardware_selection(state),
+            (BLACKWELL_ID, "quality"),
+        )
+
+    def test_runtime_verified_blackwell_exposes_only_its_trial_presets(self):
+        with runtime_match(app.HardwareMatch(BLACKWELL_ID, "exact", True)):
+            profile = app.get_available_hardware_profile()
+            applied = app.apply_hardware_preset(BLACKWELL_ID, "quality")
+            hardware, preset = app.build_generation_hardware_metadata(
+                BLACKWELL_ID,
+                {
+                    "steps": 30,
+                    "guidance_scale": 5.0,
+                    "octree_resolution": 384,
+                    "num_chunks": 8000,
+                },
+            )
+            ui_state = app.get_hardware_ui_state(
+                BLACKWELL_ID,
+                30,
+                5.0,
+                384,
+                8000,
+            )
+
+        self.assertIsNotNone(profile)
+        assert profile is not None
+        self.assertEqual(profile.verification, "runtime-verified")
+        self.assertEqual(applied[:4], (30, 5.0, 384, 8000))
+        self.assertEqual(applied[-1]["hardware_id"], BLACKWELL_ID)
+        self.assertEqual(hardware["id"], BLACKWELL_ID)
+        self.assertEqual(hardware["verification"], "runtime-verified")
+        self.assertEqual(preset["id"], "quality")
+        self.assertFalse(preset["verified"])
+        self.assertTrue(ui_state[3]["value"].startswith("Áp dụng thử ·"))
+        self.assertTrue(ui_state[4]["value"].startswith("Áp dụng thử ·"))
+        self.assertIn("Đang dùng thử", ui_state[5])
+
+        with runtime_match(app.HardwareMatch(BLACKWELL_ID, "nearest", True)):
+            self.assertIsNone(app.get_available_hardware_profile())
+
+    def test_verified_generic_profile_remains_available_for_vram_match(self):
+        source = app.GPU_PRESET_CATALOG.get_hardware("nvidia-rtx-3090-24gb")
+        self.assertIsNotNone(source)
+        assert source is not None
+        generic = replace(
+            source,
+            id="generic-verified-24gb",
+            label="Generic verified 24 GB",
+            aliases=(),
+        )
+        catalog = GpuPresetCatalog(
+            schema_version=1,
+            default_hardware_id=generic.id,
+            hardware=(generic,),
+        )
+        previous_catalog = app.GPU_PRESET_CATALOG
+        app.GPU_PRESET_CATALOG = catalog
+        try:
+            with runtime_match(app.HardwareMatch(generic.id, "vram", True)):
+                self.assertEqual(app.get_available_hardware_profile(), generic)
+        finally:
+            app.GPU_PRESET_CATALOG = previous_catalog
+
     def test_empty_restore_keeps_turbo_generation_default(self):
         hardware_id = "nvidia-rtx-3090-24gb"
         browser_state = app.hardware_browser_state(hardware_id, "quality")
@@ -63,6 +136,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertEqual(restored[10]["value"], 5)
         self.assertEqual(restored[20]["value"], "Turbo")
         self.assertEqual(restored[12]["value"], 384)
+        self.assertFalse(restored[24]["interactive"])
 
     def test_generation_metadata_uses_actual_form_values(self):
         hardware_id = "nvidia-rtx-3090-24gb"
@@ -78,8 +152,10 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             )
 
         self.assertEqual(hardware["id"], hardware_id)
+        self.assertEqual(hardware["verification"], "verified")
         self.assertEqual(hardware["selection_source"], "ui")
         self.assertEqual(preset["id"], "quality")
+        self.assertTrue(preset["verified"])
         self.assertEqual(preset["params_snapshot"]["octree_resolution"], 384)
 
     def test_incompatible_runtime_clears_profile_state_and_metadata(self):
@@ -145,6 +221,10 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertIn(
             "#rtx3090-modal:not(.hardware-presets-enabled).rtx-open",
             custom_css,
+        )
+        self.assertIn("GPU · Cấu hình đề xuất", custom_js)
+        self.assertNotIn(
+            "<span>RTX 3090 · Cấu hình đề xuất</span>", custom_js
         )
 
     def test_form_sync_keeps_legacy_history_label(self):

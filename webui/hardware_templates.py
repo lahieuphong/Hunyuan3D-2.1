@@ -36,10 +36,30 @@ def render_catalog_intro(
     matched_profile = catalog.get_hardware(match.hardware_id)
     runtime_name = short_gpu_name(runtime.name)
     vram = runtime.total_vram_gb
-    vram_label = f"{vram:.0f} GB VRAM" if vram is not None else "VRAM chưa xác định"
+    vram_label = (
+        f"{vram:.2f} GiB VRAM"
+        if vram is not None
+        else "VRAM chưa xác định"
+    )
     backend_label = runtime.backend.upper() if runtime.backend else "LOCAL"
+    capability_label = (
+        f"CC {runtime.capability}"
+        if runtime.capability
+        else "CC chưa xác định"
+    )
     if matched_profile and match.compatible:
-        detected_copy = f"Tự đề xuất: {matched_profile.label}"
+        if matched_profile.verification == "verified":
+            detected_copy = f"Tự đề xuất: {matched_profile.label}"
+        elif matched_profile.verification == "runtime-verified":
+            detected_copy = (
+                f"Đã nhận diện: {matched_profile.label}. "
+                "Preset đang ở trạng thái ứng viên chờ benchmark."
+            )
+        else:
+            detected_copy = (
+                f"Đã nhận diện: {matched_profile.label}. "
+                "Profile chưa được bật để áp dụng."
+            )
     elif matched_profile:
         detected_copy = (
             f"Cấu hình gần nhất: {matched_profile.label}. "
@@ -47,19 +67,45 @@ def render_catalog_intro(
         )
     else:
         detected_copy = "GPU hiện tại chưa có cấu hình đã kiểm chứng trong catalog."
-    match_class = "is-compatible" if match.compatible else "is-warning"
-    match_icon = "check" if match.compatible else "warning"
+    runtime_verified = (
+        matched_profile is not None
+        and matched_profile.verification == "runtime-verified"
+        and match.compatible
+    )
+    match_class = (
+        "is-runtime-verified"
+        if runtime_verified
+        else "is-compatible"
+        if match.compatible
+        else "is-warning"
+    )
+    match_icon = (
+        "info"
+        if runtime_verified
+        else "check"
+        if match.compatible
+        else "warning"
+    )
+    verified_count = sum(
+        profile.verification == "verified" for profile in catalog.hardware
+    )
+    runtime_verified_count = sum(
+        profile.verification == "runtime-verified" for profile in catalog.hardware
+    )
     return f"""
     <div class="rtx3090-api-intro hardware-catalog-intro">
         <div class="rtx3090-context-tabs">
             <span class="active"><i class="ui-icon-slot" data-ui-icon="memory" aria-hidden="true"></i>{_text(runtime_name)}</span>
             <span>{_text(vram_label)}</span>
             <span>{_text(backend_label)} · {_text(runtime.dtype.upper())}</span>
+            <span>{_text(capability_label)}</span>
             <span>1 ảnh</span>
             <span>4 ảnh</span>
         </div>
         <p>
-            Catalog hiện chỉ giữ cấu hình RTX 3090 · 24 GB đã được kiểm chứng.
+            Catalog có <strong>{len(catalog.hardware)} cấu hình</strong>:
+            {verified_count} đã kiểm chứng end-to-end và
+            {runtime_verified_count} đã xác nhận runtime.
             Các giá trị được cập nhật trực tiếp vào <strong>Advanced Options</strong>.
         </p>
         <div class="hardware-runtime-strip {match_class}" data-runtime-fingerprint="{_text(runtime.fingerprint)}">
@@ -84,6 +130,7 @@ def render_profile_summary(
     match_class = "is-runtime-match" if selected_matches_runtime else "is-manual"
     icon = {
         "verified": "check",
+        "runtime-verified": "info",
         "estimated": "info",
         "experimental": "warning",
     }[profile.verification]
@@ -102,7 +149,7 @@ def render_profile_summary(
     >
         <div class="rtx3090-machine-badge">{_text(profile.vram_label)}</div>
         <div class="rtx3090-machine-copy">
-            <strong>{_text(profile.display_name)} · {_text(profile.backend.upper())} · {_text(profile.dtype.upper())}</strong>
+            <strong>{_text(profile.display_name)} · {_text(profile.backend.upper())} · {_text(profile.dtype.upper())} · CC {_text(profile.compute_capability)}</strong>
             <span>{_text(profile.summary)}</span>
             <small>{_text(examples)}</small>
         </div>
@@ -123,6 +170,7 @@ def render_preset_cards(
         is_selected = preset.id == selected_preset_id
         selected_class = " is-selected" if is_selected else ""
         aria_pressed = "true" if is_selected else "false"
+        action_label = "Áp dụng" if preset.verified else "Áp dụng thử"
         cards.append(
             f"""
             <article
@@ -134,7 +182,7 @@ def render_preset_cards(
                 tabindex="0"
                 aria-pressed="{aria_pressed}"
                 aria-controls="advanced-settings-form"
-                aria-label="Áp dụng {_text(preset.label)} cho {_text(profile.label)}"
+                aria-label="{_text(action_label)} {_text(preset.label)} cho {_text(profile.label)}"
             >
                 <div class="rtx3090-profile-heading">
                     <h3>{_text(preset.label)}</h3>
@@ -159,7 +207,11 @@ def render_preset_cards(
 
 
 def render_profile_note(profile: HardwareProfile) -> str:
-    icon = "warning" if profile.verification != "verified" else "info"
+    icon = (
+        "info"
+        if profile.verification in {"verified", "runtime-verified"}
+        else "warning"
+    )
     return f"""
     <div class="rtx3090-modal-note hardware-profile-note is-{_text(profile.verification)}">
         <span class="rtx3090-note-icon ui-icon-slot" data-ui-icon="{icon}" aria-hidden="true"></span>
@@ -202,7 +254,7 @@ def render_preset_status(
         profile_class = preset.tone
         preset_id = preset.id
         title = preset.label
-        icon = "check"
+        icon = "check" if preset.verified else "info"
         displayed_values = preset.parameter_tuple
     else:
         profile_class = "custom"
@@ -224,7 +276,11 @@ def render_preset_status(
     elif saved:
         current_label = "Đã lưu"
     else:
-        current_label = "Đang dùng"
+        current_label = (
+            "Đang dùng thử"
+            if preset is not None and not preset.verified
+            else "Đang dùng"
+        )
 
     normalized = normalize_control_tuple(*displayed_values)
     if normalized:
@@ -233,7 +289,7 @@ def render_preset_status(
         display_steps, display_guidance, display_octree, display_chunks = displayed_values
     return f"""
     <div
-        class="rtx-preset-status {profile_class}"
+        class="rtx-preset-status {profile_class} is-{_text(profile.verification)}"
         data-hardware-id="{_text(display_hardware_id)}"
         data-profile="{_text(preset_id)}"
     >

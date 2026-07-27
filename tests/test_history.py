@@ -58,6 +58,7 @@ class GenerationHistoryMetadataTests(unittest.TestCase):
                     "catalog_version": 1,
                     "id": "nvidia-rtx-3090-24gb",
                     "label": "NVIDIA RTX 3090 · 24 GB",
+                    "verification": "verified",
                     "selection_source": "ui",
                     "private_value": "must-not-leak",
                     "runtime": {
@@ -74,6 +75,7 @@ class GenerationHistoryMetadataTests(unittest.TestCase):
                     "catalog_version": 1,
                     "hardware_id": "nvidia-rtx-3090-24gb",
                     "id": "quality",
+                    "verified": True,
                     "source": "catalog",
                     "params_snapshot": {
                         "steps": 5,
@@ -103,6 +105,7 @@ class GenerationHistoryMetadataTests(unittest.TestCase):
                     "id": "nvidia-rtx-3090-24gb",
                     "label": "NVIDIA RTX 3090 · 24 GB",
                     "catalog_version": 1,
+                    "verification": "verified",
                     "selection_source": "ui",
                     "runtime": {
                         "name": "NVIDIA GeForce RTX 3090",
@@ -120,6 +123,7 @@ class GenerationHistoryMetadataTests(unittest.TestCase):
                     "id": "quality",
                     "hardware_id": "nvidia-rtx-3090-24gb",
                     "catalog_version": 1,
+                    "verified": True,
                     "source": "catalog",
                 },
             )

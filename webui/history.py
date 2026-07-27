@@ -78,6 +78,10 @@ def _hardware_summary(manifest: dict[str, Any]) -> dict[str, Any] | None:
         "id": _text(hardware.get("id"), 96),
         "label": _text(hardware.get("label")),
         "catalog_version": _integer(hardware.get("catalog_version")),
+        "verification": _choice(
+            hardware.get("verification"),
+            {"verified", "runtime-verified", "estimated", "experimental"},
+        ),
         "selection_source": _choice(
             hardware.get("selection_source"),
             {"ui", "api"},
@@ -95,6 +99,11 @@ def _preset_summary(manifest: dict[str, Any]) -> dict[str, Any] | None:
         "id": _text(preset.get("id"), 96),
         "hardware_id": _text(preset.get("hardware_id"), 96),
         "catalog_version": _integer(preset.get("catalog_version")),
+        "verified": (
+            preset.get("verified")
+            if isinstance(preset.get("verified"), bool)
+            else None
+        ),
         "source": _choice(preset.get("source"), {"catalog", "custom"}),
     })
 

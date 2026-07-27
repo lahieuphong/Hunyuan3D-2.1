@@ -15,6 +15,7 @@
       "aliases": ["NVIDIA GeForce RTX 3090"],
       "examples": ["NVIDIA GeForce RTX 3090 24 GB"],
       "dtype": "float16",
+      "compute_capability": "8.6",
       "verification": "verified",
       "verification_label": "Đã kiểm tra end-to-end",
       "summary": "Profile chuẩn của máy hiện tại, đã chạy thành công với cả đầu vào 1 ảnh và 4 ảnh.",
@@ -40,6 +41,54 @@
           "description": "Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.",
           "tone": "quality",
           "verified": true,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 384,
+            "num_chunks": 8000
+          }
+        }
+      ]
+    },
+    {
+      "id": "nvidia-rtx-pro-6000-blackwell-workstation-96gb",
+      "label": "RTX PRO 6000 Blackwell · 96 GB",
+      "display_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "short_label": "RTX PRO 6000 Blackwell",
+      "vendor": "NVIDIA",
+      "backend": "cuda",
+      "vram_min_gb": 95.0,
+      "vram_max_gb": 97.0,
+      "vram_label": "96 GB",
+      "aliases": ["NVIDIA RTX PRO 6000 Blackwell Workstation Edition"],
+      "examples": ["NVIDIA RTX PRO 6000 Blackwell Workstation Edition · 95.59 GiB"],
+      "dtype": "float16",
+      "compute_capability": "12.0",
+      "verification": "runtime-verified",
+      "verification_label": "Đã xác nhận runtime · Chưa kiểm chứng generation",
+      "summary": "Đã vượt qua CUDA 12.8, compute capability 12.0, BF16 smoke test, kiểm tra dependency và WebUI preflight trên máy đích.",
+      "note": "Hai preset tạm dùng đúng các giá trị đã hoàn tất run 1 ảnh và 4 ảnh trên RTX 3090; chưa được xem là benchmark end-to-end của Blackwell cho đến khi hoàn tất generation 1 ảnh và 4 ảnh trên máy này.",
+      "default_preset_id": "safe",
+      "presets": [
+        {
+          "id": "safe",
+          "label": "256 · Cấu hình cơ sở",
+          "description": "Ứng viên thận trọng cho lần generation đầu tiên trên Blackwell.",
+          "tone": "safe",
+          "verified": false,
+          "params": {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 256,
+            "num_chunks": 8000
+          }
+        },
+        {
+          "id": "quality",
+          "label": "384 · Độ phân giải cao (ứng viên)",
+          "description": "Dùng để benchmark mesh dày hơn sau khi cấu hình cơ sở đã hoàn tất.",
+          "tone": "quality",
+          "verified": false,
           "params": {
             "steps": 30,
             "guidance_scale": 5.0,

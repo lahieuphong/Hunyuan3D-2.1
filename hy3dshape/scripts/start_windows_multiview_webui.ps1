@@ -136,14 +136,26 @@ $env:HF_HOME = Join-Path $RepoRoot ".cache\huggingface"
 $env:HY3DGEN_MODELS = $ModelsRoot
 $env:U2NET_HOME = Join-Path $RepoRoot ".cache\rembg"
 
-& $Python -c "import gradio, fastapi, uvicorn; print(f'UI dependencies: gradio={gradio.__version__}, fastapi={fastapi.__version__}, uvicorn={uvicorn.__version__}')"
-if ($LASTEXITCODE -ne 0) {
-    throw "Web UI dependencies are missing. Install them with: `"$Python`" -m pip install -r `"$RequirementsFile`""
-}
+$ShapeImportCheck = "import sys; from torchvision_fix import apply_fix; apply_fix(); sys.path.insert(0,'./hy3dshape'); import torch, gradio, diffusers, transformers, trimesh, cv2, skimage, timm; from hy3dshape import Hunyuan3DDiTFlowMatchingPipeline; print('Shape/WebUI dependency import test passed.')"
+Push-Location $RepoRoot
+try {
+    & $Python -c "import gradio, fastapi, uvicorn; print(f'UI dependencies: gradio={gradio.__version__}, fastapi={fastapi.__version__}, uvicorn={uvicorn.__version__}')"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Web UI dependencies are missing. Install them with: `"$Python`" -m pip install -r `"$RequirementsFile`""
+    }
 
-& $Python -c "import torch; assert torch.cuda.is_available(), 'CUDA is unavailable'; print(f'GPU: {torch.cuda.get_device_name(0)} | CUDA: {torch.version.cuda}')"
-if ($LASTEXITCODE -ne 0) {
-    throw "CUDA preflight failed."
+    & $Python -c "import torch; assert torch.cuda.is_available(), 'CUDA is unavailable'; print(f'GPU: {torch.cuda.get_device_name(0)} | CUDA: {torch.version.cuda}')"
+    if ($LASTEXITCODE -ne 0) {
+        throw "CUDA preflight failed."
+    }
+
+    & $Python -c $ShapeImportCheck
+    if ($LASTEXITCODE -ne 0) {
+        throw "Shape dependencies are incomplete. Restore the prepared environment or install the full shape dependency set; requirements-windows-multiview-ui.txt contains only the UI packages."
+    }
+}
+finally {
+    Pop-Location
 }
 
 Write-Host "Model: $Model/$Subfolder"

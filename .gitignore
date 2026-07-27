@@ -132,6 +132,7 @@ celerybeat.pid
 .env
 .venv
 .venv-win/
+.venv-blackwell/
 env/
 venv/
 ENV/
@@ -171,6 +172,9 @@ gradio_cache/
 
 
 
+
+# Local hardware diagnostics
+hardware-report-*.zip
 
 hy3dshape/tools/cmd*.sh
 hy3dshape/output_folder/
