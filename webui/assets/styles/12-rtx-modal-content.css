@@ -262,7 +262,8 @@
     }
 
     #rtx3090-modal > .rtx3090-modal-panel > .rtx3090-status-block {
-        margin-top: 29px !important;
+        display: none !important;
+        margin: 0 !important;
     }
 
     .rtx-preset-status {

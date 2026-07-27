@@ -23,6 +23,12 @@ backend/dtype/compute-capability group. A `runtime-verified`
 profile always requires an exact alias. The selector stays locked to the active
 runtime except while displaying the immutable profile saved in History.
 
+The WebUI always lists every catalog profile. The exact runtime match appears
+first with a current check; every other profile remains visible for comparison
+but is marked unavailable, uses a prohibited cursor/hover treatment, and cannot
+be submitted. A saved History profile may receive a separate read-only badge,
+but that badge never changes which runtime profile is allowed to apply presets.
+
 ## Verification states
 
 - `verified`: both presets completed end-to-end generation and therefore have

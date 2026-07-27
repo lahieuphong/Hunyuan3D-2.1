@@ -3,6 +3,7 @@
             terminal: '<path d="m5 7 5 5-5 5"></path><path d="M12 19h7"></path>',
             zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"></path>',
             x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
+            ban: '<circle cx="12" cy="12" r="9"></circle><path d="m5.65 5.65 12.7 12.7"></path>',
             check: '<path d="m5 12 4 4L19 6"></path>',
             info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path>',
             warning: '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>',

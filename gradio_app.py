@@ -66,11 +66,11 @@ from webui.gpu_presets import (
 )
 from webui.hardware_templates import (
     render_catalog_intro,
+    render_hardware_profile_block,
     render_legacy_profile_notice,
     render_preset_cards,
     render_preset_status,
     render_profile_note,
-    render_profile_summary,
 )
 from webui.history import list_generation_history
 
@@ -352,7 +352,18 @@ def get_hardware_ui_state(
     legacy_hardware_label=None,
     legacy_hardware_id=None,
 ):
-    hardware = get_hardware_profile(hardware_id)
+    runtime_profile = get_available_hardware_profile()
+    history_read_only = saved or legacy
+    if not history_read_only and runtime_profile is not None:
+        hardware = runtime_profile
+    else:
+        hardware = get_hardware_profile(hardware_id)
+    controls_interactive = bool(
+        interactive
+        and not history_read_only
+        and runtime_profile is not None
+        and hardware.id == runtime_profile.id
+    )
     selected_preset_id = resolve_preset_id(
         hardware.id,
         steps,
@@ -366,20 +377,26 @@ def get_hardware_ui_state(
     if safe is None or quality is None:
         raise RuntimeError(f"Hardware profile {hardware.id!r} must define safe and quality")
     return (
-        render_profile_summary(
+        render_hardware_profile_block(
+            GPU_PRESET_CATALOG,
             hardware,
-            recommended_hardware_id=RUNTIME_HARDWARE_MATCH.hardware_id,
+            runtime_hardware_id=(
+                runtime_profile.id if runtime_profile is not None else None
+            ),
+            saved=saved,
             legacy=legacy,
+            legacy_hardware_label=legacy_hardware_label,
+            legacy_hardware_id=legacy_hardware_id,
         ),
         render_preset_cards(hardware, selected_preset_id),
         render_profile_note(hardware),
         gr.update(
             value=hardware_preset_action_label(hardware, safe),
-            interactive=interactive,
+            interactive=controls_interactive,
         ),
         gr.update(
             value=hardware_preset_action_label(hardware, quality),
-            interactive=interactive,
+            interactive=controls_interactive,
         ),
         get_hardware_status(
             hardware.id,
@@ -393,7 +410,6 @@ def get_hardware_ui_state(
             legacy_hardware_id=legacy_hardware_id,
         ),
     )
-
 
 def select_hardware_profile(
     hardware_id,
@@ -2232,14 +2248,9 @@ Fast for very complex cases, Standard seldom use.',
                     <div class="rtx3090-header-main">
                         <span class="rtx3090-header-icon ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></span>
                         <h2 id="rtx3090-modal-title">GPU · Cấu hình đề xuất</h2>
-                        <span class="rtx3090-header-scope">1 ảnh &amp; 4 ảnh</span>
                     </div>
                     <div class="rtx3090-header-actions">
-                        <span class="rtx3090-verified is-catalog">
-                            <i class="rtx3090-verified-dot"></i>
-                            Trạng thái theo profile
-                        </span>
-                        <span class="rtx3090-preset-count"><b>{hardware_count}</b> cấu hình · {preset_count} preset</span>
+                        <span class="rtx3090-preset-count"><b>{hardware_count}</b> GPU · {tier_count} mức</span>
                         <button id="rtx3090-modal-close" type="button" aria-label="Đóng cửa sổ cấu hình">
                             <svg class="rtx3090-close-icon" width="100%" height="100%" viewBox="0 0 5 5" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill: currentcolor; fill-rule: evenodd; clip-rule: evenodd; stroke-linejoin: round; stroke-miterlimit: 2;" aria-hidden="true" focusable="false">
                                 <g>
@@ -2252,7 +2263,7 @@ Fast for very complex cases, Standard seldom use.',
                 </div>
                 """.format(
                     hardware_count=len(GPU_PRESET_CATALOG.hardware),
-                    preset_count=GPU_PRESET_CATALOG.preset_count,
+                    tier_count=len(initial_hardware.presets),
                 ), elem_classes='rtx3090-modal-header-block')
                 gr.HTML(
                     render_catalog_intro(
@@ -2264,33 +2275,37 @@ Fast for very complex cases, Standard seldom use.',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>1. Cấu hình GPU đang được hiển thị.</b>
-                    <span>{profile_count} profile trong catalog; bình thường khóa theo runtime, khi xem lịch sử sẽ hiển thị profile đã lưu.</span>
+                    <b>Cấu hình GPU</b>
+                    <span>Profile khớp máy được ưu tiên; profile còn lại chỉ để đối chiếu.</span>
                 </div>
-                """.format(
-                    profile_count=len(GPU_PRESET_CATALOG.hardware),
-                ), elem_classes='rtx3090-section-one')
+                """, elem_classes='rtx3090-section-one')
                 hardware_profile = gr.Dropdown(
                     choices=GPU_PRESET_CATALOG.choices(),
                     value=initial_hardware.id if hardware_presets_visible else None,
                     label='GPU / VRAM profile',
                     interactive=hardware_profile_interactive,
+                    visible=False,
                     info='Tự động khóa theo GPU, VRAM, backend, dtype và compute capability',
                     elem_id='hardware-profile-select',
                     elem_classes='hardware-profile-select-control',
                 )
                 hardware_profile_summary = gr.HTML(
-                    render_profile_summary(
+                    render_hardware_profile_block(
+                        GPU_PRESET_CATALOG,
                         initial_hardware,
-                        recommended_hardware_id=RUNTIME_HARDWARE_MATCH.hardware_id,
+                        runtime_hardware_id=(
+                            runtime_profile.id
+                            if runtime_profile is not None
+                            else None
+                        ),
                     ),
                     visible=True,
                     elem_classes='rtx3090-machine-block',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>2. Chọn mức chất lượng rồi bấm Áp dụng.</b>
-                    <span>Hai preset dùng chung cho chế độ 1 ảnh và 4 ảnh.</span>
+                    <b>Mức chất lượng</b>
+                    <span>Chọn preset để cập nhật trực tiếp Advanced Options.</span>
                 </div>
                 """, elem_classes='rtx3090-section-two')
                 hardware_profile_cards = gr.HTML(
@@ -2313,13 +2328,14 @@ Fast for very complex cases, Standard seldom use.',
                         initial_hardware.id,
                         *initial_control_values,
                     ),
+                    visible=False,
+                    elem_id='hardware-preset-status-state',
                     elem_classes='rtx3090-status-block',
                 )
                 hardware_profile_note = gr.HTML(
                     render_profile_note(initial_hardware),
                     elem_classes='rtx3090-note-block',
                 )
-
         assert file_out is not None and file_out2 is not None
 
         tab_ip.select(
@@ -2389,28 +2405,6 @@ Fast for very complex cases, Standard seldom use.',
             rtx_preset_status,
             hardware_browser_preference,
         ]
-        hardware_profile.input(
-            fn=select_hardware_profile,
-            inputs=[
-                hardware_profile,
-                num_steps,
-                cfg_scale,
-                octree_resolution,
-                num_chunks,
-            ],
-            outputs=[
-                hardware_browser_preference,
-                hardware_profile_summary,
-                hardware_profile_cards,
-                hardware_profile_note,
-                rtx_safe_preset,
-                rtx_quality_preset,
-                rtx_preset_status,
-            ],
-            queue=False,
-            show_progress='hidden',
-            api_name=False,
-        )
         rtx_quality_preset.click(
             fn=lambda hardware_id: apply_hardware_preset(hardware_id, 'quality'),
             inputs=[hardware_profile],

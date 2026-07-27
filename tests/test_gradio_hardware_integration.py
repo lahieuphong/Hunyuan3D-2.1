@@ -55,6 +55,55 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             (BLACKWELL_ID, "quality"),
         )
 
+    def test_forged_browser_state_is_clamped_to_runtime_profile(self):
+        rtx_3090_id = "nvidia-rtx-3090-24gb"
+        for runtime_id, forged_id in (
+            (BLACKWELL_ID, rtx_3090_id),
+            (rtx_3090_id, BLACKWELL_ID),
+        ):
+            with self.subTest(runtime_id=runtime_id, forged_id=forged_id):
+                forged_state = app.hardware_browser_state(forged_id, "quality")
+                self.assertEqual(
+                    forged_state["runtime_fingerprint"],
+                    app.RUNTIME_HARDWARE.fingerprint,
+                )
+                with runtime_match(app.HardwareMatch(runtime_id, "exact", True)):
+                    restored = app.restore_generation_from_request(
+                        forged_state,
+                        _Request("http://127.0.0.1:8080/?tab=multi-view"),
+                    )
+
+                self.assertEqual(restored[23]["hardware_id"], runtime_id)
+                self.assertEqual(restored[23]["preset_id"], "safe")
+                self.assertEqual(restored[24]["value"], runtime_id)
+                self.assertIn(f'data-hardware-id="{runtime_id}"', restored[25])
+                self.assertIn(f'data-hardware-id="{forged_id}"', restored[25])
+                self.assertIn('aria-current="true"', restored[25])
+                self.assertIn('aria-disabled="true"', restored[25])
+
+    def test_normal_ui_state_clamps_forged_profile_and_omits_duplicate_summary(self):
+        rtx_3090_id = "nvidia-rtx-3090-24gb"
+        with runtime_match(app.HardwareMatch(BLACKWELL_ID, "exact", True)):
+            ui_state = app.get_hardware_ui_state(
+                rtx_3090_id,
+                30,
+                5.0,
+                384,
+                8000,
+            )
+
+        profile_block, preset_cards = ui_state[:2]
+        self.assertIn(f'data-hardware-id="{BLACKWELL_ID}"', profile_block)
+        self.assertIn('aria-current="true"', profile_block)
+        self.assertNotIn("hardware-profile-detail-heading", profile_block)
+        self.assertNotIn("hardware-profile-summary", profile_block)
+        self.assertEqual(preset_cards.count('role="button"'), 2)
+        self.assertNotIn(f'data-hardware-id="{rtx_3090_id}"', preset_cards)
+        self.assertTrue(ui_state[3]["interactive"])
+        self.assertTrue(ui_state[4]["interactive"])
+        self.assertTrue(ui_state[3]["value"].startswith("Áp dụng thử ·"))
+        self.assertTrue(ui_state[4]["value"].startswith("Áp dụng thử ·"))
+
     def test_runtime_verified_blackwell_exposes_only_its_trial_presets(self):
         with runtime_match(app.HardwareMatch(BLACKWELL_ID, "exact", True)):
             profile = app.get_available_hardware_profile()
@@ -88,9 +137,81 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertTrue(ui_state[3]["value"].startswith("Áp dụng thử ·"))
         self.assertTrue(ui_state[4]["value"].startswith("Áp dụng thử ·"))
         self.assertIn("Đang dùng thử", ui_state[5])
+        self.assertEqual(ui_state[0].count('role="listitem"'), 2)
+        self.assertIn(f'data-hardware-id="{BLACKWELL_ID}"', ui_state[0])
+        self.assertIn('data-hardware-id="nvidia-rtx-3090-24gb"', ui_state[0])
+        self.assertIn('data-runtime-current="true"', ui_state[0])
+        self.assertIn('aria-disabled="true"', ui_state[0])
 
         with runtime_match(app.HardwareMatch(BLACKWELL_ID, "nearest", True)):
             self.assertIsNone(app.get_available_hardware_profile())
+
+    def test_runtime_gate_rejects_other_catalog_gpu_in_both_directions(self):
+        rtx_3090_id = "nvidia-rtx-3090-24gb"
+        params = {
+            "steps": 30,
+            "guidance_scale": 5.0,
+            "octree_resolution": 384,
+            "num_chunks": 8000,
+        }
+        for runtime_id, blocked_id in (
+            (BLACKWELL_ID, rtx_3090_id),
+            (rtx_3090_id, BLACKWELL_ID),
+        ):
+            with self.subTest(runtime_id=runtime_id, blocked_id=blocked_id):
+                with runtime_match(app.HardwareMatch(runtime_id, "exact", True)):
+                    with self.assertRaises(app.gr.Error):
+                        app.apply_hardware_preset(blocked_id, "quality")
+                    with self.assertRaises(app.gr.Error):
+                        app.select_hardware_profile(
+                            blocked_id,
+                            30,
+                            5.0,
+                            384,
+                            8000,
+                        )
+                    hardware, preset = app.build_generation_hardware_metadata(
+                        blocked_id,
+                        params,
+                    )
+                    ui_state = app.get_hardware_ui_state(
+                        runtime_id,
+                        30,
+                        5.0,
+                        384,
+                        8000,
+                    )
+
+                self.assertIsNone(hardware["id"])
+                self.assertEqual(hardware["selection_source"], "api")
+                self.assertIsNone(preset["hardware_id"])
+                self.assertEqual(preset["id"], "custom")
+                self.assertIn(f'data-hardware-id="{runtime_id}"', ui_state[0])
+                self.assertIn(f'data-hardware-id="{blocked_id}"', ui_state[0])
+                self.assertIn('aria-current="true"', ui_state[0])
+                self.assertIn('aria-disabled="true"', ui_state[0])
+
+    def test_saved_foreign_profile_stays_disabled_beside_current_runtime(self):
+        rtx_3090_id = "nvidia-rtx-3090-24gb"
+        with runtime_match(app.HardwareMatch(BLACKWELL_ID, "exact", True)):
+            ui_state = app.get_hardware_ui_state(
+                rtx_3090_id,
+                30,
+                5.0,
+                384,
+                8000,
+                saved=True,
+            )
+
+        rendered = ui_state[0]
+        self.assertIn("is-runtime-current", rendered)
+        self.assertIn("is-history-saved", rendered)
+        self.assertIn("Bản ghi đã lưu · Chỉ đọc", rendered)
+        self.assertIn('aria-disabled="true"', rendered)
+        self.assertIn("Chi tiết cấu hình của bản ghi đã lưu", rendered)
+        self.assertIn("hardware-profile-summary", rendered)
+        self.assertFalse(ui_state[3]["interactive"])
+        self.assertFalse(ui_state[4]["interactive"])
 
     def test_verified_generic_profile_remains_available_for_vram_match(self):
         source = app.GPU_PRESET_CATALOG.get_hardware("nvidia-rtx-3090-24gb")
@@ -216,6 +337,27 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
     def test_modal_bundle_requires_server_enabled_marker(self):
         custom_css, custom_js = app.load_ui_assets()
 
+        self.assertIn(".hardware-catalog-card.is-disabled", custom_css)
+        self.assertIn("cursor: not-allowed", custom_css)
+        self.assertIn(
+            ".hardware-catalog-card.is-disabled:hover .hardware-catalog-disabled-overlay",
+            custom_css,
+        )
+        self.assertIn("ban:", custom_js)
+        self.assertIn("@media (hover: none), (pointer: coarse)", custom_css)
+        self.assertRegex(
+            custom_css,
+            r"(?s)#rtx3090-modal\s*>\s*\.rtx3090-modal-panel\s*>\s*"
+            r"\.rtx3090-status-block\s*\{[^}]*display:\s*none\s*!important",
+        )
+        self.assertRegex(
+            custom_css,
+            r"(?s)#rtx3090-modal\s*>\s*\.rtx3090-modal-panel\s*>\s*"
+            r"\.rtx-preset-actions\s*\{[^}]*display:\s*none\s*!important",
+        )
+        self.assertIn("Compact hardware modal", custom_css)
+        self.assertNotIn("inset: auto 8px 8px", custom_css)
+
         self.assertIn("isHardwareModalEnabled", custom_js)
         self.assertIn("if (!isHardwareModalEnabled() || !modal()) return;", custom_js)
         self.assertIn(
@@ -223,9 +365,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             custom_css,
         )
         self.assertIn("GPU · Cấu hình đề xuất", custom_js)
-        self.assertNotIn(
-            "<span>RTX 3090 · Cấu hình đề xuất</span>", custom_js
-        )
+        self.assertNotIn("<span>RTX 3090 · Cấu hình đề xuất</span>", custom_js)
 
     def test_form_sync_keeps_legacy_history_label(self):
         _, _, status = app.get_hardware_form_state(
@@ -313,11 +453,14 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertIn('data-profile="quality"', restored[17])
         self.assertIn("Đã lưu", restored[17])
         self.assertIn('data-history-review-active="true"', restored[22])
+        self.assertIn("Bản ghi đã lưu · Chỉ đọc", restored[25])
+        self.assertIn("Bản ghi lịch sử này chỉ đọc", restored[25])
+        self.assertIn("Bản ghi đã lưu, chỉ đọc.", restored[25])
+        self.assertNotIn("có thể áp dụng preset", restored[25])
         self.assertEqual(restored[23], browser_state)
         self.assertEqual(restored[24]["value"], hardware_id)
         self.assertFalse(restored[24]["interactive"])
         self.assertIn("quality is-selected", restored[26])
-
 
     def test_removed_profile_history_keeps_saved_identity(self):
         generation_uid = str(uuid.uuid4())
@@ -376,9 +519,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             try:
                 restored = app.restore_generation_from_request(
                     None,
-                    _Request(
-                        f"http://127.0.0.1:8080/?generation={generation_uid}"
-                    ),
+                    _Request(f"http://127.0.0.1:8080/?generation={generation_uid}"),
                 )
             finally:
                 for name, value in original_values.items():
@@ -394,7 +535,11 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertEqual(restored[19]["value"], "Preset cũ · Không khả dụng")
         self.assertIsNone(restored[24]["value"])
         self.assertIn(removed_hardware_label, restored[26])
+        self.assertIn(removed_hardware_label, restored[25])
+        self.assertIn("không phải GPU của bản ghi", restored[25])
+        self.assertNotIn("Bản ghi cũ không lưu GPU", restored[25])
         self.assertNotIn("RTX 3090", restored[26])
+
 
 if __name__ == "__main__":
     unittest.main()
