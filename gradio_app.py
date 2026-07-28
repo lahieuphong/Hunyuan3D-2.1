@@ -41,7 +41,7 @@ from glob import glob
 from html import escape
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import gradio as gr
 import torch
@@ -73,6 +73,12 @@ from webui.hardware_templates import (
     render_profile_note,
 )
 from webui.history import list_generation_history
+from webui.model_viewer import (
+    VARIANT_ORDER,
+    render_model_viewer_document as render_variant_model_viewer_document,
+    resolve_generation_assets,
+    stored_generation_file as resolve_stored_generation_file,
+)
 
 MAX_SEED = 10_000_000
 HAS_REMBG = importlib.util.find_spec('rembg') is not None
@@ -828,6 +834,11 @@ def export_mesh(mesh, save_folder, textured=False, type='glb'):
         path = os.path.join(save_folder, f'white_mesh.{type}')
     if type not in ['glb', 'obj']:
         mesh.export(path)
+    elif type == 'glb':
+        # Geometry-only previews still need vertex normals. Omitting NORMAL from
+        # the GLB leaves shading up to the viewer and makes a dense indexed mesh
+        # look visibly faceted even though its topology has not changed.
+        mesh.export(path, include_normals=True)
     else:
         mesh.export(path, include_normals=textured)
     return path
@@ -855,34 +866,63 @@ def randomize_seed_fn(seed: int, randomize_seed: bool) -> int:
 
 
 def render_model_viewer_document(mesh_src, height, width, textured=False):
-    template_name = (
-        './assets/modelviewer-textured-template.html'
-        if textured
-        else './assets/modelviewer-template.html'
+    """Compatibility wrapper for callers that provide one standalone GLB."""
+    mode = 'original' if textured else 'white'
+    return render_variant_model_viewer_document(
+        {mode: mesh_src},
+        mode,
+        height,
+        width,
     )
-    with open(os.path.join(CURRENT_DIR, template_name), 'r', encoding='utf-8') as f:
-        template_html = f.read()
-    return (
-        template_html
-        .replace('var(--viewer-height, 650px)', f'{height}px')
-        .replace('#width#', str(width))
-        .replace('#src#', mesh_src)
-    )
+
+
+def viewer_variant_sources(viewer_assets, base_url):
+    """Build cache-safe URLs for already validated generation assets."""
+    return {
+        mode: f'{base_url}/{quote(variant.filename)}?v={variant.cache_key}'
+        for mode, variant in viewer_assets.variants.items()
+    }
+
+
+def generation_viewer_outputs(
+    viewer_assets,
+    mesh_filename='white_mesh.glb',
+    viewer_filename='white_mesh.html',
+):
+    """Serialize validated viewer assets into the schema-v1 manifest."""
+    return {
+        'mesh': mesh_filename,
+        'viewer': viewer_filename,
+        'default_variant': viewer_assets.default_mode,
+        'variants': {
+            mode: {
+                'file': variant.filename,
+                'render_mode': variant.render_mode,
+            }
+            for mode, variant in viewer_assets.variants.items()
+        },
+    }
 
 
 def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
     if textured:
-        related_path = "./textured_mesh.glb"
         output_html_path = os.path.join(save_folder, 'textured_mesh.html')
     else:
-        related_path = "./white_mesh.glb"
         output_html_path = os.path.join(save_folder, 'white_mesh.html')
+
+    viewer_assets = resolve_generation_assets(
+        save_folder,
+        ensure_wireframe=True,
+    )
+    if viewer_assets is None:
+        return HTML_OUTPUT_PLACEHOLDER
+
     offset = 50 if textured else 10
-    template_html = render_model_viewer_document(
-        related_path,
+    template_html = render_variant_model_viewer_document(
+        viewer_variant_sources(viewer_assets, '.'),
+        viewer_assets.default_mode,
         height - offset,
         width,
-        textured=textured,
     )
 
     with open(output_html_path, 'w', encoding='utf-8') as f:
@@ -902,36 +942,23 @@ height="{height}" width="100%" frameborder="0" title="Generated 3D mesh preview"
 
 
 def stored_generation_file(save_folder, filename):
-    """Resolve a manifest filename without allowing it outside its generation folder."""
-    if not filename or os.path.basename(str(filename)) != str(filename):
-        return None
-    raw_save_folder = os.path.abspath(save_folder)
-    raw_candidate = os.path.abspath(os.path.join(raw_save_folder, str(filename)))
-    if os.path.islink(raw_save_folder) or os.path.islink(raw_candidate):
-        return None
-    save_folder = os.path.realpath(raw_save_folder)
-    candidate = os.path.realpath(raw_candidate)
-    try:
-        if (
-            os.path.commonpath([save_folder, candidate]) != save_folder
-            or os.path.dirname(candidate) != save_folder
-        ):
-            return None
-    except ValueError:
-        return None
-    return candidate if os.path.isfile(candidate) else None
+    """Backward-compatible string wrapper around the shared safe resolver."""
+    path = resolve_stored_generation_file(save_folder, filename)
+    return str(path) if path is not None else None
 
 
 def build_stored_model_viewer_html(save_folder, mesh_filename, height=660):
-    """Embed a saved mesh through the current viewer UI without changing the GLB."""
-    mesh_path = stored_generation_file(save_folder, mesh_filename)
-    if not mesh_path:
+    """Embed all available variants through the current dynamic viewer UI."""
+    viewer_assets = resolve_generation_assets(
+        save_folder,
+        ensure_wireframe=False,
+    )
+    if viewer_assets is None:
         return HTML_OUTPUT_PLACEHOLDER
 
     generation_uid = os.path.basename(os.path.abspath(save_folder))
-    cache_key = os.stat(mesh_path).st_mtime_ns
     iframe_tag = (
-        f'<iframe src="/generation-viewer/{generation_uid}?v={cache_key}" '
+        f'<iframe src="/generation-viewer/{generation_uid}?v={viewer_assets.cache_key}" '
         f'height="{height}" width="100%" frameborder="0" title="Generated 3D mesh preview" '
         f'allow="fullscreen" allowfullscreen></iframe>'
     )
@@ -1106,9 +1133,15 @@ def restore_generation_from_request(
     left_image = input_path(inputs.get('left'), 'input_left.png')
     right_image = input_path(inputs.get('right'), 'input_right.png')
 
-    mesh_path = stored_generation_file(
+    saved_viewer_assets = resolve_generation_assets(
         save_folder,
-        outputs.get('mesh') or 'white_mesh.glb',
+        manifest=manifest,
+        ensure_wireframe=False,
+    )
+    mesh_path = (
+        str(saved_viewer_assets.primary.path)
+        if saved_viewer_assets is not None
+        else None
     )
     viewer_html = (
         build_stored_model_viewer_html(
@@ -1116,7 +1149,7 @@ def restore_generation_from_request(
             outputs.get('mesh') or 'white_mesh.glb',
             HTML_HEIGHT,
         )
-        if mesh_path
+        if saved_viewer_assets is not None
         else HTML_OUTPUT_PLACEHOLDER
     )
 
@@ -1810,6 +1843,13 @@ def shape_generation(
     outputs = {
         'mesh': 'white_mesh.glb',
         'viewer': 'white_mesh.html',
+        'default_variant': 'white',
+        'variants': {
+            'white': {
+                'file': 'white_mesh.glb',
+                'render_mode': 'clay',
+            },
+        },
     }
     stats['generation'].update({
         'status': 'completed',
@@ -1821,6 +1861,18 @@ def shape_generation(
     try:
         update_generation_stage(save_folder, 'exporting_glb')
         path = export_mesh(mesh, save_folder, textured=False)
+        viewer_assets = resolve_generation_assets(
+            save_folder,
+            ensure_wireframe=True,
+        )
+        if viewer_assets is not None:
+            outputs = generation_viewer_outputs(viewer_assets)
+            stats['generation']['outputs'] = outputs
+        if viewer_assets is None or 'wireframe' not in viewer_assets.variants:
+            logger.warning(
+                "Could not build the optional wireframe GLB for %s",
+                generation_uid,
+            )
         update_generation_stage(save_folder, 'building_preview')
         model_viewer_html = build_model_viewer_html(
             save_folder,
@@ -2667,7 +2719,6 @@ if __name__ == '__main__':
     SAVE_DIR = args.cache_path
     os.makedirs(SAVE_DIR, exist_ok=True)
 
-    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
     MV_MODE = 'mv' in f'{args.model_path}/{args.subfolder}'.lower()
     TURBO_MODE = 'turbo' in args.subfolder
 
@@ -2813,24 +2864,33 @@ if __name__ == '__main__':
         )
 
     @app.get('/generation-viewer/{generation_uid}', response_class=HTMLResponse)
-    def generation_viewer(generation_uid: str):
+    def generation_viewer(generation_uid: str, variant: str | None = None):
         try:
             generation_uid = str(uuid.UUID(generation_uid))
         except (ValueError, AttributeError, TypeError) as exc:
             raise HTTPException(status_code=404, detail='Generation not found') from exc
 
-        mesh_path = stored_generation_file(
+        viewer_assets = resolve_generation_assets(
             os.path.join(SAVE_DIR, generation_uid),
-            'white_mesh.glb',
+            ensure_wireframe=False,
         )
-        if not mesh_path:
+        if viewer_assets is None:
             raise HTTPException(status_code=404, detail='Generated mesh not found')
+        if variant is not None and (
+            variant not in VARIANT_ORDER
+            or variant not in viewer_assets.variants
+        ):
+            raise HTTPException(status_code=404, detail='Model variant not found')
+        initial_mode = variant or viewer_assets.default_mode
 
-        document = render_model_viewer_document(
-            f'/static/{generation_uid}/white_mesh.glb',
+        document = render_variant_model_viewer_document(
+            viewer_variant_sources(
+                viewer_assets,
+                f'/static/{generation_uid}',
+            ),
+            initial_mode,
             HTML_HEIGHT - 10,
             HTML_WIDTH,
-            textured=False,
         )
         return HTMLResponse(
             document,

@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from .model_viewer import resolve_generation_assets, stored_generation_file
+
 _MAX_HISTORY_ITEMS = 200
 _MAX_MANIFEST_BYTES = 1024 * 1024
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
@@ -120,16 +122,7 @@ def _read_manifest(folder: Path) -> dict[str, Any]:
 
 
 def _regular_file(folder: Path, filename: str) -> Path | None:
-    if not filename or Path(filename).name != filename:
-        return None
-    candidate = folder / filename
-    try:
-        if candidate.is_symlink() or not candidate.is_file():
-            return None
-        resolved = candidate.resolve(strict=True)
-    except OSError:
-        return None
-    return resolved if resolved.parent == folder else None
+    return stored_generation_file(folder, filename)
 
 
 def _thumbnail_filename(folder: Path, manifest: dict[str, Any]) -> str | None:
@@ -177,12 +170,17 @@ def _model_name(manifest: dict[str, Any], stats: dict[str, Any]) -> str | None:
 
 
 def _history_item(folder: Path) -> tuple[dict[str, Any], float] | None:
-    mesh = _regular_file(folder, "white_mesh.glb")
-    if not mesh:
+    manifest = _read_manifest(folder)
+    viewer_assets = resolve_generation_assets(
+        folder,
+        manifest=manifest,
+        ensure_wireframe=False,
+    )
+    if viewer_assets is None:
         return None
+    mesh = viewer_assets.primary.path
     mesh_stat = mesh.stat()
 
-    manifest = _read_manifest(folder)
     params = _mapping(manifest.get("params"))
     stats = _mapping(manifest.get("stats"))
     if not params:
@@ -232,6 +230,16 @@ def _history_item(folder: Path) -> tuple[dict[str, Any], float] | None:
     if vertices is None:
         vertices = _number(stats.get("number_of_vertices"))
 
+    variant_assets = {}
+    for mode, variant in viewer_assets.variants.items():
+        asset_url = f"/static/{generation_uid}/{quote(variant.filename)}"
+        variant_assets[mode] = {
+            "url": asset_url,
+            "download_url": asset_url,
+            "render_mode": variant.render_mode,
+        }
+    default_asset_url = variant_assets[viewer_assets.default_mode]["url"]
+
     item = {
         "generation_uid": generation_uid,
         "status": status,
@@ -259,7 +267,9 @@ def _history_item(folder: Path) -> tuple[dict[str, Any], float] | None:
                 f"/static/{generation_uid}/{quote(thumbnail)}" if thumbnail else None
             ),
             "viewer_url": f"/generation-viewer/{generation_uid}",
-            "download_url": f"/static/{generation_uid}/white_mesh.glb",
+            "download_url": default_asset_url,
+            "default_variant": viewer_assets.default_mode,
+            "variants": variant_assets,
         },
     }
     hardware = _hardware_summary(manifest)

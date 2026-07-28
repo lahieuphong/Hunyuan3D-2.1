@@ -447,6 +447,10 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
                         setattr(app, name, value)
 
         self.assertEqual(len(restored), 28)
+        self.assertIn(
+            f'/generation-viewer/{generation_uid}?v=',
+            restored[7],
+        )
         self.assertEqual(restored[10]["value"], 30)
         self.assertEqual(restored[12]["value"], 384)
         self.assertFalse(restored[12]["interactive"])

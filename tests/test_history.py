@@ -139,6 +139,73 @@ class GenerationHistoryMetadataTests(unittest.TestCase):
             self.assertFalse(item["legacy"])
             self.assertNotIn("hardware", item)
             self.assertNotIn("preset", item)
+            self.assertEqual(item["assets"]["default_variant"], "white")
+            self.assertEqual(list(item["assets"]["variants"]), ["white"])
+
+    def test_history_exposes_explicit_original_and_white_variants(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            generation_uid = self._create_generation(
+                root,
+                outputs={
+                    "mesh": "white_mesh.glb",
+                    "default_variant": "original",
+                    "variants": {
+                        "original": {
+                            "file": "colored_mesh.glb",
+                            "render_mode": "embedded",
+                        },
+                        "white": {
+                            "file": "white_mesh.glb",
+                            "render_mode": "clay",
+                        },
+                    },
+                },
+            )
+            folder = root / generation_uid
+            (folder / "colored_mesh.glb").write_bytes(b"glTF-colored-test")
+
+            item = list_generation_history(root)["items"][0]
+
+            self.assertEqual(item["assets"]["default_variant"], "original")
+            self.assertEqual(
+                list(item["assets"]["variants"]),
+                ["original", "white"],
+            )
+            self.assertEqual(
+                item["assets"]["download_url"],
+                f"/static/{generation_uid}/colored_mesh.glb",
+            )
+
+    def test_colored_only_generation_remains_visible(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            generation_uid = self._create_generation(
+                root,
+                status="failed",
+                outputs={
+                    "mesh": "colored_mesh.glb",
+                    "default_variant": "original",
+                    "variants": {
+                        "original": {
+                            "file": "colored_mesh.glb",
+                            "render_mode": "embedded",
+                        },
+                    },
+                },
+            )
+            folder = root / generation_uid
+            (folder / "white_mesh.glb").unlink()
+            (folder / "colored_mesh.glb").write_bytes(b"glTF-colored-test")
+
+            result = list_generation_history(root)
+
+            self.assertEqual(result["total"], 1)
+            self.assertEqual(result["items"][0]["status"], "failed")
+            self.assertEqual(
+                result["items"][0]["assets"]["default_variant"],
+                "original",
+            )
 
     def test_invalid_optional_metadata_is_ignored(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
