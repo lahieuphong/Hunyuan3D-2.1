@@ -5,6 +5,7 @@
             installAdvancedOptionsDisclosure();
             installSmoothThemeSwitching();
             installStableUploadPreviews();
+            installTenViewInputs();
             wireTopbar();
             wireModal();
             wirePresetCards();
@@ -23,6 +24,7 @@
         installAdvancedOptionsDisclosure();
         installSmoothThemeSwitching();
         installStableUploadPreviews();
+        installTenViewInputs();
         wireTopbar();
         wireModal();
         wirePresetCards();

@@ -205,7 +205,10 @@
             const download = document.createElement("a");
             download.className = "generation-history-action generation-history-download";
             download.href = item.assets.download_url;
-            download.download = "white_mesh_" + item.generation_uid.slice(0, 8) + ".glb";
+            const downloadPath = String(item.assets.download_url || "").split("?", 1)[0];
+            const resolvedFilename = downloadPath.split("/").pop() || "model.glb";
+            const downloadStem = resolvedFilename.replace(/\.glb$/i, "");
+            download.download = downloadStem + "_" + item.generation_uid.slice(0, 8) + ".glb";
             download.insertAdjacentHTML("afterbegin", uiIconMarkup("download"));
             const downloadLabel = document.createElement("span");
             downloadLabel.textContent = "Download";

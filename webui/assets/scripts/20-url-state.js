@@ -2,6 +2,7 @@
         const tabRoutes = [
             {slug: "single-view", index: 0},
             {slug: "multi-view", index: 1},
+            {slug: "ten-view", index: 2},
         ];
         let tabRouteInitialized = false;
 

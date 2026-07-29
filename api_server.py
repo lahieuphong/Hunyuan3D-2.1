@@ -18,9 +18,7 @@ A model worker executes the model.
 import argparse
 import asyncio
 import base64
-import logging
 import os
-import sys
 import threading
 import traceback
 import uuid
@@ -28,7 +26,7 @@ from typing import Optional
 
 import torch # type: ignore
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 
@@ -47,8 +45,20 @@ worker_id = str(uuid.uuid4())[:6]
 logger = build_logger("controller", f"{SAVE_DIR}/controller.log")
 
 # Global worker and semaphore instances
-worker = None
-model_semaphore = None
+worker: Optional[ModelWorker] = None
+model_semaphore: Optional[asyncio.Semaphore] = None
+
+
+def _require_worker() -> ModelWorker:
+    """Return the initialized model worker or fail with a clear API error."""
+
+    current_worker = worker
+    if current_worker is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model worker is not initialized",
+        )
+    return current_worker
 
 
 app = FastAPI(
@@ -81,14 +91,15 @@ async def generate_3d_model(request: GenerationRequest):
     Returns:
         FileResponse: The generated 3D model file (GLB or OBJ format)
     """
+    current_worker = _require_worker()
     logger.info("Worker generating...")
     
     # Convert Pydantic model to dict for compatibility
-    params = request.dict()
+    params = request.model_dump()
     
     uid = uuid.uuid4()
     try:
-        file_path, uid = worker.generate(uid, params)
+        file_path, uid = current_worker.generate(uid, params)
         return FileResponse(file_path)
     except ValueError as e:
         traceback.print_exc()
@@ -126,14 +137,18 @@ async def send_generation_task(request: GenerationRequest):
     Returns:
         GenerationResponse: Contains the unique task identifier
     """
+    current_worker = _require_worker()
     logger.info("Worker send...")
     
     # Convert Pydantic model to dict for compatibility
-    params = request.dict()
+    params = request.model_dump()
     
     uid = uuid.uuid4()
     try:
-        threading.Thread(target=worker.generate, args=(uid, params,)).start()
+        threading.Thread(
+            target=current_worker.generate,
+            args=(uid, params),
+        ).start()
         ret = {"uid": str(uid)}
         return JSONResponse(ret, status_code=200)
     except Exception as e:
@@ -150,7 +165,13 @@ async def health_check():
     Returns:
         HealthResponse: Service health status and worker identifier
     """
-    return JSONResponse({"status": "healthy", "worker_id": worker_id}, status_code=200)
+    is_ready = worker is not None
+    response = {
+        "status": "healthy" if is_ready else "unavailable",
+        "worker_id": worker_id,
+    }
+    status_code = 200 if is_ready else 503
+    return JSONResponse(response, status_code=status_code)
 
 
 @app.get("/status/{uid}", response_model=StatusResponse, tags=["status"])

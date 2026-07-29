@@ -56,6 +56,8 @@ def main() -> None:
         "tile_size": tile_size,
         "views": {},
     }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.metadata.parent.mkdir(parents=True, exist_ok=True)
 
     for view in VIEW_ORDER:
         source = Image.open(getattr(args, view)).convert("RGBA")
@@ -64,6 +66,13 @@ def main() -> None:
         rows, columns = np.nonzero(mask_2d)
         if not len(rows):
             raise ValueError(f"{view} image has an empty alpha mask")
+        alpha_mask_path = args.output.with_name(
+            f"{args.output.stem}_{view}_alpha.png"
+        )
+        Image.fromarray(
+            np.where(mask_2d > 127, 255, 0).astype(np.uint8),
+            mode="L",
+        ).save(alpha_mask_path, format="PNG", optimize=True)
         background = mask_2d <= 127
         _, nearest = distance_transform_edt(background, return_indices=True)
         padded_image = image.copy()
@@ -110,6 +119,7 @@ def main() -> None:
         atlas.paste(Image.fromarray(image, mode="RGB"), (tile_x * tile_size, tile_y * tile_size))
         metadata["views"][view] = {
             "source": str(getattr(args, view).resolve()),
+            "alpha_mask": str(alpha_mask_path.resolve()),
             "tile": [tile_x, tile_y],
             "bbox": [
                 int(columns.min()),
@@ -119,8 +129,6 @@ def main() -> None:
             ],
         }
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.metadata.parent.mkdir(parents=True, exist_ok=True)
     hair_mask_path = args.output.with_name(f"{args.output.stem}_hair_mask.png")
     hair_atlas.save(hair_mask_path, format="PNG", optimize=True)
     metadata["hair_mask"] = str(hair_mask_path.resolve())

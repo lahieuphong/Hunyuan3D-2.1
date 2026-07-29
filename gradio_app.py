@@ -55,6 +55,7 @@ import numpy as np
 
 from hy3dshape.utils import logger
 from webui import load_ui_assets, render_history_modal, render_topbar
+from webui.ten_view_templates import render_ten_view_panel
 from webui.gpu_presets import (
     HardwareMatch,
     RuntimeHardware,
@@ -2088,6 +2089,16 @@ def build_app():
                             <span class="input-upload-meta-subtitle">PNG or JPG · Front, Back, Left and Right</span>
                         </div>
                         """)
+
+                    with gr.Tab(
+                        '10 Views',
+                        id='tab_ten_prompt',
+                        visible=MV_MODE,
+                    ):
+                        gr.HTML(
+                            render_ten_view_panel(),
+                            elem_id='ten-view-ui-host',
+                        )
 
                 with gr.Row(elem_classes='generate-actions'):
                     btn = gr.Button(
