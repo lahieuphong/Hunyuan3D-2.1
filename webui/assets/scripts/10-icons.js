@@ -27,15 +27,26 @@
                 + paths + '</svg>';
         };
 
-        const syncGenerateButtonCopy = (forcedMultiView = null) => {
+        const syncGenerateButtonCopy = (forcedMode = null) => {
             const generateButton = document.getElementById("generate-3d-button");
             if (!generateButton) return;
 
-            const isMultiView = typeof forcedMultiView === "boolean"
-                ? forcedMultiView
-                : document.querySelector(
-                    '#prompt-mode-tabs button[data-tab-id="tab_mv_prompt"]'
-                )?.getAttribute("aria-selected") === "true";
+            const normalizeUiMode = (value) => {
+                if (value === "ten" || value === "ten-view") return "ten";
+                if (value === "four" || value === "multi-view") return "four";
+                return "single";
+            };
+            const selectedTabId = document.querySelector(
+                '#prompt-mode-tabs button[role="tab"][aria-selected="true"]'
+            )?.dataset.tabId;
+            const detectedMode = selectedTabId === "tab_ten_prompt"
+                ? "ten"
+                : selectedTabId === "tab_mv_prompt" ? "four" : "single";
+            const mode = typeof forcedMode === "string"
+                ? normalizeUiMode(forcedMode)
+                : typeof forcedMode === "boolean"
+                    ? (forcedMode ? "four" : "single")
+                    : detectedMode;
             let copy = generateButton.querySelector(".generate-button-copy");
             if (!copy) {
                 copy = document.createElement("span");
@@ -47,9 +58,11 @@
             }
             const title = copy.querySelector("strong");
             const subtitle = copy.querySelector("small");
-            const nextSubtitle = isMultiView
-                ? "4 synchronized views"
-                : "1 front image";
+            const nextSubtitle = mode === "ten"
+                ? "10 views · experimental 10→4 fusion"
+                : mode === "four"
+                    ? "4 synchronized views"
+                    : "1 front image";
             if (title.textContent !== "Generate 3D") {
                 title.textContent = "Generate 3D";
             }

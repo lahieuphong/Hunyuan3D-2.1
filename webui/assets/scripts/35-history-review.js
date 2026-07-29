@@ -30,10 +30,11 @@
             const reviewState = historyReviewState();
             if (!historyReviewRouteUid || !reviewState) return;
 
-            const expectedTabIndex = reviewState.dataset.inputMode === "four" ? 1 : 0;
-            const expectedTabSlug = expectedTabIndex === 1
-                ? "multi-view"
-                : "single-view";
+            const reviewMode = reviewState.dataset.inputMode;
+            const expectedTabIndex = reviewMode === "ten"
+                ? 2
+                : reviewMode === "four" ? 1 : 0;
+            const expectedTabSlug = tabRoutes[expectedTabIndex].slug;
             const reviewUrl = currentAppUrl();
             if (reviewUrl.searchParams.get("tab") !== expectedTabSlug) {
                 reviewUrl.searchParams.set("tab", expectedTabSlug);

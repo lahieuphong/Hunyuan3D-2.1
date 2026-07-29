@@ -32,7 +32,9 @@ from transformers import (
     Dinov2Model,
     Dinov2Config,
 )
-from transformers import AutoImageProcessor, AutoModel
+from transformers import AutoModel
+
+from .feature_fusion import fuse_multiview_features
 
 
 def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
@@ -153,7 +155,14 @@ class DinoImageEncoderMV(DinoImageEncoder):
         view_embedding = view_embedding.unsqueeze(1).repeat(1, self.num_patches, 1)
         self.view_embed = view_embedding.unsqueeze(0)
 
-    def forward(self, image, mask=None, value_range=(-1, 1), view_idxs=None):
+    def forward(
+        self,
+        image,
+        mask=None,
+        value_range=(-1, 1),
+        view_idxs=None,
+        view_blend_weights=None,
+    ):
         if value_range is not None:
             low, high = value_range
             image = (image - low) / (high - low)
@@ -164,13 +173,27 @@ class DinoImageEncoderMV(DinoImageEncoder):
         image = image.view(bs * num_views, c, h, w)
 
         inputs = self.transform(image)
-        outputs = self.model(inputs)
-
-        last_hidden_state = outputs.last_hidden_state
+        if num_views > self.view_num:
+            # DINO is the only stage that sees all ten source cameras.  Chunk
+            # it at the checkpoint's native four-view batch to bound VRAM.
+            hidden_chunks = [
+                self.model(chunk).last_hidden_state
+                for chunk in inputs.split(self.view_num, dim=0)
+            ]
+            last_hidden_state = torch.cat(hidden_chunks, dim=0)
+        else:
+            last_hidden_state = self.model(inputs).last_hidden_state
         last_hidden_state = last_hidden_state.view(
             bs, num_views, last_hidden_state.shape[-2],
             last_hidden_state.shape[-1]
         )
+
+        if view_blend_weights is not None:
+            last_hidden_state = fuse_multiview_features(
+                last_hidden_state,
+                view_blend_weights,
+            )
+        conditioned_views = last_hidden_state.shape[1]
 
         view_embedding = self.view_embed.to(last_hidden_state.dtype).to(last_hidden_state.device)
         if view_idxs is not None:
@@ -178,14 +201,14 @@ class DinoImageEncoderMV(DinoImageEncoder):
             view_embeddings = []
             for i in range(bs):
                 view_idx = view_idxs[i]
-                assert num_views == len(view_idx)
+                assert conditioned_views == len(view_idx)
                 view_embeddings.append(self.view_embed[:, view_idx, ...])
             view_embedding = torch.cat(view_embeddings, 0).to(last_hidden_state.dtype).to(last_hidden_state.device)
 
-        if num_views != self.view_num:
-            view_embedding = view_embedding[:, :num_views, ...]
+        if conditioned_views != self.view_num:
+            view_embedding = view_embedding[:, :conditioned_views, ...]
         last_hidden_state = last_hidden_state + view_embedding
-        last_hidden_state = last_hidden_state.view(bs, num_views * last_hidden_state.shape[-2],
+        last_hidden_state = last_hidden_state.reshape(bs, conditioned_views * last_hidden_state.shape[-2],
                                                    last_hidden_state.shape[-1])
         return last_hidden_state
 

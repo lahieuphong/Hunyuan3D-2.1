@@ -112,7 +112,12 @@
 
         const resetGenerationDetails = (mode = "") => {
             setGenerationDetail("generation-info-model", "—");
-            setGenerationDetail("generation-info-views", mode === "4-VIEW" ? "4" : mode === "1-VIEW" ? "1" : "—");
+            setGenerationDetail(
+                "generation-info-views",
+                mode === "10-VIEW"
+                    ? "10"
+                    : mode === "4-VIEW" ? "4" : mode === "1-VIEW" ? "1" : "—"
+            );
             setGenerationDetail("generation-info-time", "—");
             setGenerationDetail("generation-info-resolution", "—");
             setGenerationDetail("generation-info-polygons", "—");
@@ -125,9 +130,12 @@
             const stats = manifest.stats || {};
             const rawModel = manifest.model?.shapegen || stats.model?.shapegen || "";
             const modelName = String(rawModel).split("/").filter(Boolean).at(-1) || "—";
-            const viewCount = Array.isArray(params.views_used)
-                ? params.views_used.length
-                : params.input_mode === "four" ? 4 : params.input_mode ? 1 : "—";
+            const viewList = Array.isArray(params.views_provided)
+                ? params.views_provided
+                : params.views_used;
+            const viewCount = Array.isArray(viewList)
+                ? viewList.length
+                : params.input_mode === "ten" ? 10 : params.input_mode === "four" ? 4 : params.input_mode ? 1 : "—";
             const totalSeconds = Number(stats.time?.total);
             const faces = stats.number_of_faces ?? manifest.number_of_faces;
             const vertices = stats.number_of_vertices ?? manifest.number_of_vertices;
@@ -307,7 +315,12 @@
             if (log) log.replaceChildren();
             const job = generationConsoleElement("generation-console-job");
             if (job) job.textContent = "generation/" + uid;
-            const mode = currentAppUrl().searchParams.get("tab") === "multi-view" ? "4-VIEW" : "1-VIEW";
+            const inputTab = currentAppUrl().searchParams.get("tab");
+            const mode = inputTab === "ten-view"
+                ? "10-VIEW"
+                : inputTab === "multi-view"
+                    ? "4-VIEW"
+                    : "1-VIEW";
             const modeElement = generationConsoleElement("generation-console-mode");
             if (modeElement) modeElement.textContent = mode;
             const clock = generationConsoleElement("generation-console-clock");

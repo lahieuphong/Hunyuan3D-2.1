@@ -53,9 +53,23 @@ from fastapi.staticfiles import StaticFiles
 import uuid
 import numpy as np
 
+from hy3dshape.ten_view import TEN_VIEW_KEYS
 from hy3dshape.utils import logger
 from webui import load_ui_assets, render_history_modal, render_topbar
-from webui.ten_view_templates import render_ten_view_panel
+from webui.generation_inputs import (
+    GenerationInputError,
+    build_generation_input_bundle,
+    image_has_opaque_alpha,
+    normalize_input_mode,
+    ordered_ten_view_images,
+)
+from webui.ten_view_inputs import (
+    TEN_VIEW_DEFINITIONS,
+    render_ten_view_guide,
+    render_ten_view_progress,
+    render_ten_view_slot_header,
+    render_ten_view_summary,
+)
 from webui.gpu_presets import (
     HardwareMatch,
     RuntimeHardware,
@@ -491,7 +505,7 @@ def build_generation_hardware_metadata(hardware_id, params):
 
 
 def get_background_remover():
-    """Load rembg only when the user explicitly requests background removal."""
+    """Load rembg for explicit or ten-view automatic background removal."""
     global _RMBG_WORKER
     if _RMBG_WORKER is None:
         try:
@@ -1055,6 +1069,8 @@ def restore_generation_from_request(
         fresh_ui[0],
         fresh_ui[1],
         fresh_ui[2],
+    ) + tuple(
+        gr.update(interactive=True) for _ in TEN_VIEW_KEYS
     )
     try:
         generation_uid = generation_uid_query_from_request(request)
@@ -1095,13 +1111,15 @@ def restore_generation_from_request(
     outputs: dict[str, Any] = raw_outputs if isinstance(raw_outputs, dict) else {}
     stats: dict[str, Any] = raw_stats if isinstance(raw_stats, dict) else {}
     raw_input_mode = manifest.get('input_mode') or params.get('input_mode') or 'single'
-    input_mode = (
-        'four'
-        if isinstance(raw_input_mode, str)
-        and raw_input_mode in {'four', '4-view', 'multi-view'}
-        else 'single'
-    )
-    if input_mode == 'four' and not MV_MODE:
+    try:
+        input_mode = normalize_input_mode(raw_input_mode)
+    except GenerationInputError:
+        logger.warning(
+            "Saved generation has an unknown input mode: %r",
+            raw_input_mode,
+        )
+        input_mode = 'single'
+    if input_mode in {'four', 'ten'} and not MV_MODE:
         logger.warning(
             "Cannot restore a multi-view generation in single-view mode: %s",
             generation_uid,
@@ -1133,6 +1151,10 @@ def restore_generation_from_request(
     back_image = input_path(inputs.get('back'), 'input_back.png')
     left_image = input_path(inputs.get('left'), 'input_left.png')
     right_image = input_path(inputs.get('right'), 'input_right.png')
+    ten_view_paths = {
+        key: input_path(inputs.get(key), f'input_{key}.png')
+        for key in TEN_VIEW_KEYS
+    }
 
     saved_viewer_assets = resolve_generation_assets(
         save_folder,
@@ -1274,7 +1296,8 @@ def restore_generation_from_request(
         gr.update(value=randomize_seed_value, interactive=False),
         gr.update(
             value=(
-                'Generate 3D · 4 Images' if input_mode == 'four'
+                'Generate 3D · 10 Images' if input_mode == 'ten'
+                else 'Generate 3D · 4 Images' if input_mode == 'four'
                 else 'Generate 3D · 1 Image'
             ),
             interactive=False,
@@ -1293,6 +1316,12 @@ def restore_generation_from_request(
         history_ui[0],
         history_profile_cards,
         history_profile_note,
+    ) + tuple(
+        gr.update(
+            value=ten_view_paths[key] if input_mode == 'ten' else None,
+            interactive=False,
+        )
+        for key in TEN_VIEW_KEYS
     )
 
 @spaces_api.GPU(duration=60)
@@ -1314,6 +1343,7 @@ def _gen_shape(
     generation_uid=None,
     hardware_metadata=None,
     preset_metadata=None,
+    ten_view_images=None,
 ):
     tracking_enabled = generation_uid is not None and bool(str(generation_uid).strip())
     save_folder = None
@@ -1345,29 +1375,32 @@ def _gen_shape(
 
     if not MV_MODE and image is None and caption is None:
         raise gr.Error("Please provide either a caption or an image.")
+    provided_images = image
+    input_metadata = {
+        'views_provided': ['image'],
+        'views_used': ['image'],
+        'conditioned_view_count': 1,
+        'conditioning_strategy': 'native-single-view',
+    }
     if MV_MODE:
-        if input_mode == 'single':
-            if image is None:
-                raise gr.Error("Tab 1 ẢNH cần một ảnh chính diện của vật thể.")
-            image = {'front': image}
-        elif input_mode == 'four':
-            multi_view_images = {
+        try:
+            input_bundle = build_generation_input_bundle(
+                input_mode,
+                image,
+                {
                 'front': mv_image_front,
                 'left': mv_image_left,
                 'back': mv_image_back,
                 'right': mv_image_right,
-            }
-            missing_views = [
-                name.title() for name, view in multi_view_images.items() if view is None
-            ]
-            if missing_views:
-                raise gr.Error(
-                    "Tab 4 ẢNH cần đủ Front, Back, Left và Right. Còn thiếu: "
-                    + ", ".join(missing_views)
-                )
-            image = multi_view_images
-        else:
-            raise gr.Error("Chế độ ảnh không hợp lệ. Hãy tải lại trang Web UI.")
+                },
+                ten_view_images,
+            )
+        except GenerationInputError as error:
+            raise gr.Error(str(error)) from error
+        input_mode = input_bundle.mode
+        provided_images = dict(input_bundle.provided_images)
+        image = dict(input_bundle.conditioning_images)
+        input_metadata = dict(input_bundle.metadata)
     else:
         input_mode = 'single'
 
@@ -1376,6 +1409,7 @@ def _gen_shape(
             save_folder,
             'input_validated',
             input_mode=input_mode,
+            conditioning=input_metadata,
         )
 
     seed = int(randomize_seed_fn(seed, randomize_seed))
@@ -1393,7 +1427,7 @@ def _gen_shape(
         'params': {
             'caption': caption,
             'input_mode': input_mode,
-            'views_used': list(image) if isinstance(image, dict) else ['image'],
+            **input_metadata,
             'steps': steps,
             'guidance_scale': guidance_scale,
             'seed': seed,
@@ -1423,10 +1457,13 @@ def _gen_shape(
         except Exception:
             raise gr.Error("Text to 3D is disable. \
             Please enable it by `python gradio_app.py --enable_t23d`.")
+        provided_images = image
         time_meta['text2image'] = time.time() - start_time
 
     if tracking_enabled:
-        input_files = save_generation_inputs(save_folder, image)
+        input_files = save_generation_inputs(
+            save_folder, provided_images if MV_MODE else image
+        )
         stats['generation']['inputs'] = input_files
         update_generation_stage(
             save_folder,
@@ -1445,12 +1482,21 @@ def _gen_shape(
         if not isinstance(image, dict):
             raise gr.Error("Multi-view input must contain named images.")
         start_time = time.time()
+        automatic_background_views = []
         for k, v in image.items():
             if v is None:
                 raise gr.Error(f"Missing image for the {k} view.")
-            if check_box_rembg or v.mode == "RGB":
+            automatic_rembg = (
+                input_mode == 'ten'
+                and image_has_opaque_alpha(v)
+            )
+            if check_box_rembg or v.mode == "RGB" or automatic_rembg:
                 img = get_background_remover()(v.convert('RGB'))
                 image[k] = img
+                if automatic_rembg and not check_box_rembg:
+                    automatic_background_views.append(k)
+        if automatic_background_views:
+            stats['params']['automatic_background_removal'] = automatic_background_views
         time_meta['remove background'] = time.time() - start_time
     else:
         if image is None or isinstance(image, dict):
@@ -1713,6 +1759,16 @@ def generation_all(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
+    ten_image_front=None,
+    ten_image_front_right=None,
+    ten_image_right=None,
+    ten_image_back_right=None,
+    ten_image_back=None,
+    ten_image_back_left=None,
+    ten_image_left=None,
+    ten_image_front_left=None,
+    ten_image_high_front=None,
+    ten_image_high_back=None,
 ):
     start_time_0 = time.time()
     mesh, image, save_folder, stats, seed = _gen_shape(
@@ -1730,6 +1786,18 @@ def generation_all(
         check_box_rembg=check_box_rembg,
         num_chunks=num_chunks,
         randomize_seed=randomize_seed,
+        ten_view_images=ordered_ten_view_images((
+            ten_image_front,
+            ten_image_front_right,
+            ten_image_right,
+            ten_image_back_right,
+            ten_image_back,
+            ten_image_back_left,
+            ten_image_left,
+            ten_image_front_left,
+            ten_image_high_front,
+            ten_image_high_back,
+        )),
     )
     path = export_mesh(mesh, save_folder, textured=False)
     
@@ -1799,6 +1867,16 @@ def shape_generation(
     num_chunks=200000,
     randomize_seed: bool = False,
     hardware_profile_id=None,
+    ten_image_front=None,
+    ten_image_front_right=None,
+    ten_image_right=None,
+    ten_image_back_right=None,
+    ten_image_back=None,
+    ten_image_back_left=None,
+    ten_image_left=None,
+    ten_image_front_left=None,
+    ten_image_high_front=None,
+    ten_image_high_back=None,
     request: gr.Request | None = None,
 ):
     start_time_0 = time.time()
@@ -1831,6 +1909,18 @@ def shape_generation(
             generation_uid=generation_uid,
             hardware_metadata=hardware_metadata,
             preset_metadata=preset_metadata,
+            ten_view_images=ordered_ten_view_images((
+                ten_image_front,
+                ten_image_front_right,
+                ten_image_right,
+                ten_image_back_right,
+                ten_image_back,
+                ten_image_back_left,
+                ten_image_left,
+                ten_image_front_left,
+                ten_image_high_front,
+                ten_image_high_back,
+            )),
         )
     except GenerationUidConflictError as exc:
         raise gr.Error(str(exc)) from exc
@@ -1926,7 +2016,7 @@ def mount_gradio_at_root(app: FastAPI, demo: gr.Blocks) -> FastAPI:
 def build_app():
     title = 'Hunyuan3D-2: High Resolution Textured 3D Assets Generation'
     if MV_MODE:
-        title = 'Hunyuan3D-2mv: Image to 3D Generation with 1–4 Views'
+        title = 'Hunyuan3D-2mv: Image to 3D Generation with 1–10 Views'
     if 'mini' in args.subfolder:
         title = 'Hunyuan3D-2mini: Strong 0.6B Image to Shape Generator'
 
@@ -2094,11 +2184,50 @@ def build_app():
                         '10 Views',
                         id='tab_ten_prompt',
                         visible=MV_MODE,
-                    ):
+                    ) as tab_ten:
                         gr.HTML(
-                            render_ten_view_panel(),
-                            elem_id='ten-view-ui-host',
+                            render_ten_view_guide(),
+                            elem_id='ten-view-guide-host',
                         )
+                        ten_view_progress = gr.HTML(
+                            render_ten_view_progress(),
+                            elem_id='ten-view-progress-host',
+                        )
+                        ten_view_components = {}
+                        for row_start in range(0, len(TEN_VIEW_DEFINITIONS), 2):
+                            with gr.Row(elem_classes='ten-view-upload-row'):
+                                for index in range(
+                                    row_start,
+                                    min(row_start + 2, len(TEN_VIEW_DEFINITIONS)),
+                                ):
+                                    definition = TEN_VIEW_DEFINITIONS[index]
+                                    with gr.Column(
+                                        min_width=100,
+                                        elem_classes='ten-view-slot',
+                                    ):
+                                        gr.HTML(
+                                            render_ten_view_slot_header(
+                                                index + 1,
+                                                definition,
+                                            ),
+                                            elem_classes='ten-view-slot-header-host',
+                                        )
+                                        ten_view_components[definition.key] = gr.Image(
+                                            label=definition.label,
+                                            show_label=False,
+                                            type='pil',
+                                            image_mode='RGBA',
+                                            height=180,
+                                            min_width=100,
+                                            interactive=False,
+                                            elem_id=f'ten-image-{definition.key}',
+                                            elem_classes=['ten-view-image', 'ui-upload'],
+                                        )
+                        gr.HTML(
+                            render_ten_view_summary(),
+                            elem_id='ten-view-summary-host',
+                        )
+                    ten_view_inputs = list(ten_view_components.values())
 
                 with gr.Row(elem_classes='generate-actions'):
                     btn = gr.Button(
@@ -2116,6 +2245,11 @@ def build_app():
                         value='Shape Generation API',
                         visible=False,
                         elem_id='shape-generation-api-bridge',
+                    )
+                    ten_shape_generation_api_bridge = gr.Button(
+                        value='Ten-view Shape Generation API',
+                        visible=False,
+                        elem_id='ten-shape-generation-api-bridge',
                     )
 
                 if not MV_MODE:
@@ -2419,6 +2553,25 @@ Fast for very complex cases, Standard seldom use.',
             queue=False,
             api_name=False,
         )
+        tab_ten.select(
+            fn=lambda: (
+                'ten',
+                gr.update(value='Generate 3D · 10 Images'),
+            ),
+            outputs=[input_mode, btn],
+            queue=False,
+            api_name=False,
+        )
+
+        for ten_view_input in ten_view_inputs:
+            ten_view_input.change(
+                fn=render_ten_view_progress,
+                inputs=ten_view_inputs,
+                outputs=[ten_view_progress],
+                queue=False,
+                show_progress='hidden',
+                api_name=False,
+            )
 
         demo.load(
             fn=restore_generation_from_request,
@@ -2452,6 +2605,7 @@ Fast for very complex cases, Standard seldom use.',
                 hardware_profile_summary,
                 hardware_profile_cards,
                 hardware_profile_note,
+                *ten_view_inputs,
             ],
             queue=False,
             show_progress='hidden',
@@ -2527,6 +2681,7 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
                 hardware_profile,
+                *ten_view_inputs,
             ],
             outputs=[file_out, html_gen_mesh, stats, seed],
             show_progress='hidden' if MV_MODE else 'full',
@@ -2565,6 +2720,31 @@ Fast for very complex cases, Standard seldom use.',
             api_name='shape_generation',
         )
 
+        ten_shape_generation_api_bridge.click(
+            shape_generation,
+            inputs=[
+                caption,
+                input_mode,
+                image,
+                mv_image_front,
+                mv_image_back,
+                mv_image_left,
+                mv_image_right,
+                num_steps,
+                cfg_scale,
+                seed,
+                octree_resolution,
+                check_box_rembg,
+                num_chunks,
+                randomize_seed,
+                hardware_profile,
+                *ten_view_inputs,
+            ],
+            outputs=[file_out, html_gen_mesh, stats, seed],
+            show_progress='hidden' if MV_MODE else 'full',
+            api_name='shape_generation_ten',
+        )
+
         btn_all.click(
             generation_all,
             inputs=[
@@ -2582,6 +2762,7 @@ Fast for very complex cases, Standard seldom use.',
                 check_box_rembg,
                 num_chunks,
                 randomize_seed,
+                *ten_view_inputs,
             ],
             outputs=[file_out, file_out2, html_gen_mesh, stats, seed],
             show_progress='full',

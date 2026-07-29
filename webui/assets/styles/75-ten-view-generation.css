@@ -1,0 +1,213 @@
+    /* Native Gradio ten-view inputs and experimental adapter disclosure. */
+
+    #ten-view-guide-host,
+    #ten-view-progress-host,
+    #ten-view-summary-host,
+    .ten-view-slot-header-host {
+        background: transparent !important;
+        border: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .ten-view-guide {
+        align-items: center;
+        gap: 10px;
+    }
+
+    .ten-view-guide .input-mode-copy {
+        min-width: 0;
+    }
+
+    .ten-view-experimental-badge {
+        align-items: center;
+        background: color-mix(in srgb, #7c6cff 14%, transparent);
+        border: 1px solid color-mix(in srgb, #8c7fff 48%, transparent);
+        border-radius: 999px;
+        color: #c8c2ff;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: .035em;
+        line-height: 1;
+        padding: 6px 8px;
+        text-transform: uppercase;
+    }
+
+    .ten-view-progress {
+        align-items: center;
+        background: color-mix(in srgb, var(--body-background-fill) 82%, #11182a);
+        border: 1px solid var(--border-color-primary);
+        border-radius: 10px;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(96px, auto) minmax(80px, 1fr);
+        margin: 8px 0 10px;
+        padding: 8px 10px;
+    }
+
+    .ten-view-progress > span:first-child {
+        align-items: baseline;
+        display: flex;
+        gap: 7px;
+        min-width: 0;
+    }
+
+    .ten-view-progress strong {
+        color: var(--body-text-color);
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    .ten-view-progress small {
+        color: var(--body-text-color-subdued);
+        font-size: 9px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ten-view-progress.is-complete strong,
+    .ten-view-progress.is-complete small {
+        color: #55dfa0;
+    }
+
+    .ten-view-progress-track {
+        background: color-mix(in srgb, var(--border-color-primary) 70%, transparent);
+        border-radius: 999px;
+        display: block;
+        height: 5px;
+        overflow: hidden;
+    }
+
+    .ten-view-progress-track i {
+        background: linear-gradient(90deg, #6f63ff, #50d9a0);
+        border-radius: inherit;
+        display: block;
+        height: 100%;
+        transition: width 180ms ease;
+    }
+
+    .ten-view-upload-row {
+        gap: 8px !important;
+        margin: 0 0 8px !important;
+    }
+
+    .ten-view-slot {
+        background: color-mix(in srgb, var(--body-background-fill) 90%, #11182a);
+        border: 1px solid var(--border-color-primary);
+        border-radius: 10px;
+        gap: 6px !important;
+        min-width: 0 !important;
+        overflow: hidden;
+        padding: 7px !important;
+    }
+
+    .ten-view-slot:focus-within {
+        border-color: #7c72ff;
+        box-shadow: 0 0 0 1px color-mix(in srgb, #7c72ff 35%, transparent);
+    }
+
+    .ten-view-slot-header {
+        align-items: center;
+        display: grid;
+        gap: 7px;
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+        min-height: 30px;
+    }
+
+    .ten-view-slot-index {
+        align-items: center;
+        background: color-mix(in srgb, #7669ff 18%, transparent);
+        border: 1px solid color-mix(in srgb, #887eff 45%, transparent);
+        border-radius: 6px;
+        color: #d7d3ff;
+        display: inline-flex;
+        font-size: 9px;
+        font-weight: 800;
+        height: 22px;
+        justify-content: center;
+        width: 22px;
+    }
+
+    .ten-view-slot-header > span:nth-child(2) {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .ten-view-slot-header strong {
+        color: var(--body-text-color);
+        font-size: 10px;
+        line-height: 1.25;
+    }
+
+    .ten-view-slot-header small {
+        color: var(--body-text-color-subdued);
+        font-size: 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ten-view-slot-header em {
+        color: #aaa4ef;
+        font-size: 8px;
+        font-style: normal;
+        white-space: nowrap;
+    }
+
+    .ten-view-image {
+        min-width: 0 !important;
+    }
+
+    .ten-view-image > .wrap,
+    .ten-view-image .image-container {
+        border-radius: 7px !important;
+        min-height: 150px;
+    }
+
+    .ten-view-summary {
+        align-items: flex-start;
+        background: color-mix(in srgb, #4f77d8 10%, transparent);
+        border: 1px dashed color-mix(in srgb, #7096ef 36%, transparent);
+        border-radius: 9px;
+        color: var(--body-text-color-subdued);
+        display: flex;
+        font-size: 9px;
+        gap: 8px;
+        line-height: 1.45;
+        margin-top: 2px;
+        padding: 8px 9px;
+    }
+
+    .ten-view-summary .ui-icon {
+        color: #9db8ff;
+        height: 14px;
+        margin-top: 1px;
+        width: 14px;
+    }
+
+    @media (max-width: 430px) {
+        .ten-view-experimental-badge {
+            display: none;
+        }
+
+        .ten-view-progress {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 360px) {
+        .ten-view-upload-row {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .ten-view-progress-track i {
+            transition: none;
+        }
+    }

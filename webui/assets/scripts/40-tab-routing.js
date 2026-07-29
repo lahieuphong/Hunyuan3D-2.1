@@ -20,7 +20,7 @@
             if (target.getAttribute("aria-selected") !== "true") {
                 target.click();
             }
-            window.setTimeout(() => syncGenerateButtonCopy(route.index === 1), 0);
+            window.setTimeout(() => syncGenerateButtonCopy(route.slug), 0);
             return true;
         };
 
@@ -34,7 +34,7 @@
                 button.addEventListener("click", () => {
                     const slug = tabRoutes[index].slug;
                     const url = currentAppUrl();
-                    window.setTimeout(() => syncGenerateButtonCopy(index === 1), 0);
+                    window.setTimeout(() => syncGenerateButtonCopy(slug), 0);
                     if (url.searchParams.get("tab") === slug) {
                         if (url.href !== window.location.href) {
                             window.history.replaceState({}, "", url);

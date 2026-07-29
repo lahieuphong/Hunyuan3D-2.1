@@ -18,6 +18,12 @@ import torch
 from PIL import Image
 from einops import repeat, rearrange
 
+from .ten_view import (
+    CANONICAL_VIEW_KEYS,
+    TEN_VIEW_KEYS,
+    normalized_ten_view_blend_weights,
+)
+
 
 def array_to_tensor(np_array):
     image_pt = torch.tensor(np_array).float()
@@ -136,18 +142,40 @@ class MVImageProcessorV2(ImageProcessorV2):
         if self.border_ratio is not None:
             border_ratio = self.border_ratio
 
+        is_ten_view = set(image_dict) == set(TEN_VIEW_KEYS)
+        if is_ten_view:
+            ordered_items = (
+                (view_tag, image_dict[view_tag])
+                for view_tag in TEN_VIEW_KEYS
+            )
+        else:
+            unknown_views = set(image_dict) - set(self.view2idx)
+            if unknown_views:
+                raise ValueError(
+                    "Unsupported multi-view camera keys: "
+                    + ", ".join(sorted(unknown_views))
+                )
+            ordered_items = image_dict.items()
+
         images = []
         masks = []
         view_idxs = []
-        for idx, (view_tag, image) in enumerate(image_dict.items()):
-            view_idxs.append(self.view2idx[view_tag])
+        for view_tag, image in ordered_items:
+            if not is_ten_view:
+                view_idxs.append(self.view2idx[view_tag])
             image, mask = self.load_image(image, border_ratio=border_ratio, to_tensor=to_tensor)
             images.append(image)
             masks.append(mask)
 
-        zipped_lists = zip(view_idxs, images, masks)
-        sorted_zipped_lists = sorted(zipped_lists)
-        view_idxs, images, masks = zip(*sorted_zipped_lists)
+        if is_ten_view:
+            view_idxs = tuple(
+                self.view2idx[key]
+                for key in CANONICAL_VIEW_KEYS
+            )
+        else:
+            zipped_lists = zip(view_idxs, images, masks)
+            sorted_zipped_lists = sorted(zipped_lists)
+            view_idxs, images, masks = zip(*sorted_zipped_lists)
 
         image = torch.cat(images, 0).unsqueeze(0)
         mask = torch.cat(masks, 0).unsqueeze(0)
@@ -156,6 +184,11 @@ class MVImageProcessorV2(ImageProcessorV2):
             'mask': mask,
             'view_idxs': view_idxs
         }
+        if is_ten_view:
+            outputs['view_blend_weights'] = torch.tensor(
+                normalized_ten_view_blend_weights(),
+                dtype=torch.float32,
+            ).unsqueeze(0)
         return outputs
 
 

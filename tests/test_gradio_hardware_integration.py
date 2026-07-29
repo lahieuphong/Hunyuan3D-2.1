@@ -253,7 +253,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             else:
                 app.TURBO_MODE = previous_turbo_mode
 
-        self.assertEqual(len(restored), 28)
+        self.assertEqual(len(restored), 38)
         self.assertEqual(restored[10]["value"], 5)
         self.assertEqual(restored[20]["value"], "Turbo")
         self.assertEqual(restored[12]["value"], 384)
@@ -446,7 +446,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
                     else:
                         setattr(app, name, value)
 
-        self.assertEqual(len(restored), 28)
+        self.assertEqual(len(restored), 38)
         self.assertIn(
             f'/generation-viewer/{generation_uid}?v=',
             restored[7],
