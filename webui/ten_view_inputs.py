@@ -59,7 +59,7 @@ def render_ten_view_guide() -> str:
                     transparent background in every camera.
                 </span>
             </div>
-            <span class="ten-view-experimental-badge">Experimental 10→4 fusion</span>
+            <span class="ten-view-experimental-badge">Native 4-view shape · 10-view texture/RC</span>
         </section>
     """
 
@@ -118,10 +118,11 @@ def render_ten_view_summary() -> str:
         >
             <span class="ui-icon-slot" data-ui-icon="info" aria-hidden="true"></span>
             <span>
-                All 10 images are encoded. Their visual features are blended
-                into the checkpoint's four trained camera slots, keeping the
-                native diffusion context size. This is an experimental adapter,
-                not a natively trained 10-camera checkpoint.
+                All 10 images are validated and saved. Shape generation uses
+                only the checkpoint's native Front, Left, Back and Right
+                cameras. Diagonal and high-angle views are reserved for
+                texture projection and RC quality scoring, avoiding unsupported
+                10-to-4 feature fusion during shape generation.
             </span>
         </div>
     """

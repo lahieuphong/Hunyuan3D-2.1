@@ -63,7 +63,14 @@ class ImageProcessorV2:
         size = max(H, W)
         result = np.zeros((size, size, C), dtype=np.uint8)
 
-        coords = np.nonzero(mask)
+        # Ignore nearly transparent glow/compression speckles when fitting the
+        # subject crop. They can sit at the canvas edge and make the actual
+        # character several times smaller in the model input. Keep a fallback
+        # for unusual assets whose entire alpha channel is intentionally faint.
+        crop_mask = mask > 8
+        if not np.any(crop_mask):
+            crop_mask = mask > 0
+        coords = np.nonzero(crop_mask)
         x_min, x_max = coords[0].min(), coords[0].max()
         y_min, y_max = coords[1].min(), coords[1].max()
         h = x_max - x_min

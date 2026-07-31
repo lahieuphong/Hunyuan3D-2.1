@@ -54,6 +54,10 @@ import uuid
 import numpy as np
 
 from hy3dshape.ten_view import TEN_VIEW_KEYS
+from hy3dshape.texture_bake.generation import create_original_variant
+from hy3dshape.texture_bake.rc_evaluator import (
+    FaceHairRCCandidateEvaluator,
+)
 from hy3dshape.utils import logger
 from webui import load_ui_assets, render_history_modal, render_topbar
 from webui.generation_inputs import (
@@ -519,6 +523,67 @@ def get_background_remover():
     return _RMBG_WORKER
 
 
+def _preprocess_multiview_image_sets(
+    input_mode,
+    conditioning_images,
+    provided_images,
+    *,
+    remove_background,
+):
+    """Prepare separate shape and texture image mappings.
+
+    Ten-view shape inference intentionally consumes only the four native
+    cardinal cameras. Texture baking and RC evaluation must retain all ten
+    processed references, including diagonal and elevated cameras.
+    """
+
+    if not isinstance(conditioning_images, dict):
+        raise gr.Error("Multi-view conditioning must contain named images.")
+    if not isinstance(provided_images, dict):
+        raise gr.Error("Multi-view input must contain named images.")
+
+    processed_images = {}
+    automatic_background_views = []
+    background_remover = None
+    for name, source_image in provided_images.items():
+        if source_image is None:
+            raise gr.Error(f"Missing image for the {name} view.")
+        automatic_rembg = (
+            input_mode == 'ten'
+            and image_has_opaque_alpha(source_image)
+        )
+        should_remove = (
+            remove_background
+            or source_image.mode == "RGB"
+            or automatic_rembg
+        )
+        processed_image = source_image
+        if should_remove:
+            if background_remover is None:
+                background_remover = get_background_remover()
+            processed_image = background_remover(source_image.convert('RGB'))
+            if automatic_rembg and not remove_background:
+                automatic_background_views.append(name)
+        processed_images[name] = processed_image
+
+    missing_conditioning = [
+        name for name in conditioning_images if name not in processed_images
+    ]
+    if missing_conditioning:
+        raise gr.Error(
+            "Missing processed conditioning views: "
+            + ", ".join(missing_conditioning)
+        )
+    processed_conditioning = {
+        name: processed_images[name] for name in conditioning_images
+    }
+    return (
+        processed_conditioning,
+        processed_images,
+        automatic_background_views,
+    )
+
+
 def get_postprocessors():
     """Load PyMeshLab postprocessors only for optional transform operations."""
     global _POSTPROCESSORS
@@ -662,7 +727,12 @@ GENERATION_STAGE_PROGRESS = {
     'trimesh_conversion': 92,
     'extracting_mesh': 92,
     'mesh_ready': 93,
-    'exporting_glb': 95,
+    'exporting_glb': 94,
+    'preparing_texture_inputs': 95,
+    'baking_original': 96,
+    'coloring_original_fallback': 96,
+    'scoring_original': 97,
+    'original_ready': 97,
     'building_preview': 98,
     'completed': 100,
     'failed': 100,
@@ -693,7 +763,12 @@ GENERATION_STAGE_MESSAGES = {
     'trimesh_conversion': 'Converting generated surface to Trimesh',
     'extracting_mesh': 'Converting generated surface to Trimesh',
     'mesh_ready': 'Mesh geometry is ready',
-    'exporting_glb': 'Exporting binary GLB',
+    'exporting_glb': 'Exporting white GLB',
+    'preparing_texture_inputs': 'Preparing images for color projection',
+    'baking_original': 'Baking the colored Original GLB',
+    'coloring_original_fallback': 'Building the colored Original fallback',
+    'scoring_original': 'Scoring face and hair consistency before publication',
+    'original_ready': 'Colored Original GLB is ready',
     'building_preview': 'Building interactive 3D preview',
     'completed': 'Generation completed successfully',
     'failed': 'Generation failed',
@@ -1479,24 +1554,21 @@ def _gen_shape(
         update_generation_stage(save_folder, 'preprocessing_input')
 
     if MV_MODE:
-        if not isinstance(image, dict):
-            raise gr.Error("Multi-view input must contain named images.")
         start_time = time.time()
-        automatic_background_views = []
-        for k, v in image.items():
-            if v is None:
-                raise gr.Error(f"Missing image for the {k} view.")
-            automatic_rembg = (
-                input_mode == 'ten'
-                and image_has_opaque_alpha(v)
-            )
-            if check_box_rembg or v.mode == "RGB" or automatic_rembg:
-                img = get_background_remover()(v.convert('RGB'))
-                image[k] = img
-                if automatic_rembg and not check_box_rembg:
-                    automatic_background_views.append(k)
+        (
+            image,
+            processed_images,
+            automatic_background_views,
+        ) = _preprocess_multiview_image_sets(
+            input_mode,
+            image,
+            provided_images,
+            remove_background=check_box_rembg,
+        )
         if automatic_background_views:
-            stats['params']['automatic_background_removal'] = automatic_background_views
+            stats['params']['automatic_background_removal'] = (
+                automatic_background_views
+            )
         time_meta['remove background'] = time.time() - start_time
     else:
         if image is None or isinstance(image, dict):
@@ -1505,6 +1577,7 @@ def _gen_shape(
             start_time = time.time()
             image = get_background_remover()(image.convert('RGB'))
             time_meta['remove background'] = time.time() - start_time
+        processed_images = {'front': image}
 
     if tracking_enabled:
         update_generation_stage(save_folder, 'input_ready')
@@ -1740,8 +1813,11 @@ def _gen_shape(
         )
 
     stats['time'] = time_meta
-    main_image = image if not MV_MODE else image.get('front', next(iter(image.values())))
-    return mesh, main_image, save_folder, stats, seed
+    if isinstance(image, dict):
+        main_image = image.get('front', next(iter(image.values())))
+    else:
+        main_image = image
+    return mesh, main_image, save_folder, stats, seed, processed_images
 
 @spaces_api.GPU(duration=60)
 def generation_all(
@@ -1771,7 +1847,7 @@ def generation_all(
     ten_image_high_back=None,
 ):
     start_time_0 = time.time()
-    mesh, image, save_folder, stats, seed = _gen_shape(
+    mesh, image, save_folder, stats, seed, _ = _gen_shape(
         caption=caption,
         input_mode=input_mode,
         image=image,
@@ -1850,7 +1926,7 @@ def generation_all(
         seed,
     )
 
-@spaces_api.GPU(duration=60)
+@spaces_api.GPU(duration=120)
 def shape_generation(
     caption=None,
     input_mode='single',
@@ -1928,9 +2004,7 @@ def shape_generation(
         mark_generation_failed(generation_uid, exc)
         raise
 
-    mesh, image, save_folder, stats, seed = result
-    stats['time']['total'] = time.time() - start_time_0
-    completed_at = utc_now_iso()
+    mesh, image, save_folder, stats, seed, texture_images = result
     outputs = {
         'mesh': 'white_mesh.glb',
         'viewer': 'white_mesh.html',
@@ -1942,34 +2016,103 @@ def shape_generation(
             },
         },
     }
-    stats['generation'].update({
-        'status': 'completed',
-        'completed_at': completed_at,
-        'outputs': outputs,
-    })
+    stats['generation']['outputs'] = outputs
     mesh.metadata['extras'] = stats
 
     try:
         update_generation_stage(save_folder, 'exporting_glb')
-        path = export_mesh(mesh, save_folder, textured=False)
+        white_path = export_mesh(mesh, save_folder, textured=False)
+
+        texture_started = time.time()
+
+        def report_texture_stage(stage, message):
+            update_generation_stage(
+                save_folder,
+                stage,
+                message=message,
+            )
+
+        ten_view_mode = normalize_input_mode(input_mode) == 'ten'
+        quality_evaluator = (
+            FaceHairRCCandidateEvaluator()
+            if ten_view_mode
+            else None
+)
+        original_result = create_original_variant(
+            white_path,
+            texture_images,
+            save_folder,
+            stage_callback=report_texture_stage,
+            prefer_ten_view=ten_view_mode,
+            quality_evaluator=quality_evaluator,
+        )
+        stats['time']['texture generation'] = time.time() - texture_started
+        texture_metadata = original_result.to_metadata()
+        stats['texture'] = texture_metadata
+        outputs = {
+            'mesh': original_result.output_path.name,
+            'viewer': 'white_mesh.html',
+            'default_variant': 'original',
+            'variants': {
+                'original': {
+                    'file': original_result.output_path.name,
+                    'render_mode': 'embedded',
+                },
+                'white': {
+                    'file': 'white_mesh.glb',
+                    'render_mode': 'clay',
+                },
+            },
+        }
+        stats['generation']['outputs'] = outputs
+        update_generation_stage(
+            save_folder,
+            'original_ready',
+            event_details=texture_metadata,
+            texture=texture_metadata,
+            outputs=outputs,
+        )
+
         viewer_assets = resolve_generation_assets(
             save_folder,
             ensure_wireframe=True,
         )
-        if viewer_assets is not None:
-            outputs = generation_viewer_outputs(viewer_assets)
-            stats['generation']['outputs'] = outputs
-        if viewer_assets is None or 'wireframe' not in viewer_assets.variants:
-            logger.warning(
-                "Could not build the optional wireframe GLB for %s",
-                generation_uid,
+        available_variants = (
+            set(viewer_assets.variants)
+            if viewer_assets is not None
+            else set()
+        )
+        missing_variants = [
+            mode for mode in VARIANT_ORDER
+            if mode not in available_variants
+        ]
+        if viewer_assets is None or missing_variants:
+            raise RuntimeError(
+                "Generation did not produce all required model variants: "
+                + ", ".join(missing_variants)
             )
-        update_generation_stage(save_folder, 'building_preview')
+        outputs = generation_viewer_outputs(
+            viewer_assets,
+            mesh_filename=viewer_assets.variants['original'].filename,
+        )
+        stats['generation']['outputs'] = outputs
+        update_generation_stage(
+            save_folder,
+            'building_preview',
+            outputs=outputs,
+        )
         model_viewer_html = build_model_viewer_html(
             save_folder,
             height=HTML_HEIGHT,
             width=HTML_WIDTH,
         )
+        completed_at = utc_now_iso()
+        stats['time']['total'] = time.time() - start_time_0
+        stats['generation'].update({
+            'status': 'completed',
+            'completed_at': completed_at,
+            'outputs': outputs,
+        })
         update_generation_stage(
             save_folder,
             'completed',
@@ -1986,6 +2129,7 @@ def shape_generation(
 
     if args.low_vram_mode:
         torch.cuda.empty_cache()
+    path = str(original_result.output_path)
     return (
         gr.update(value=path),
         model_viewer_html,

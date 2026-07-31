@@ -1,8 +1,8 @@
 
         const tabRoutes = [
-            {slug: "single-view", index: 0},
-            {slug: "multi-view", index: 1},
-            {slug: "ten-view", index: 2},
+            {slug: "single-view", index: 0, tabId: "tab_single_prompt", label: "Single View"},
+            {slug: "multi-view", index: 1, tabId: "tab_mv_prompt", label: "Multi View (1–4)"},
+            {slug: "ten-view", index: 2, tabId: "tab_ten_prompt", label: "10 Views"},
         ];
         let tabRouteInitialized = false;
 

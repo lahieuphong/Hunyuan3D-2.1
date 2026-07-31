@@ -48,11 +48,13 @@ class TenViewDefinitionTests(unittest.TestCase):
     def test_summary_discloses_the_experimental_adapter(self):
         summary = render_ten_view_summary()
         self.assertIn(
-            'data-conditioning-strategy="experimental-feature-fusion-10-to-4"',
+            'data-conditioning-strategy="native-cardinal-shape-with-ten-view-texture-rc"',
             summary,
         )
-        self.assertIn("All 10 images are encoded", summary)
-        self.assertIn("not a natively trained 10-camera checkpoint", summary)
+        self.assertIn("All 10 images are validated and saved", summary)
+        self.assertIn("Front, Left, Back and Right", summary)
+        self.assertIn("reserved for", summary)
+        self.assertIn("RC quality scoring", summary)
 
 
 class TenViewAssetContractTests(unittest.TestCase):
@@ -70,6 +72,19 @@ class TenViewAssetContractTests(unittest.TestCase):
         self.assertIn('slug: "ten-view"', javascript)
         self.assertIn('mode === "ten"', javascript)
         self.assertIn('"10-VIEW"', javascript)
+
+    def test_tab_routing_supports_gradio_overflow_menu(self):
+        _, javascript = load_ui_assets()
+
+        self.assertIn('tabId: "tab_ten_prompt"', javascript)
+        self.assertIn('label: "10 Views"', javascript)
+        self.assertIn("const promptOverflowTabButton", javascript)
+        self.assertIn(".overflow-dropdown button", javascript)
+        self.assertIn("activatePromptTab(expectedRoute)", javascript)
+        self.assertLess(
+            javascript.index("activatePromptTab(expectedRoute)"),
+            javascript.index('document.body.classList.add("is-history-review")'),
+        )
 
     def test_generation_contract_uses_native_gradio_images_and_callbacks(self):
         application = (REPOSITORY_ROOT / "gradio_app.py").read_text(

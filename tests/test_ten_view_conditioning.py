@@ -11,6 +11,7 @@ from hy3dshape.models.feature_fusion import fuse_multiview_features
 from hy3dshape.preprocessors import MVImageProcessorV2
 from hy3dshape.ten_view import (
     CANONICAL_VIEW_KEYS,
+    TEN_VIEW_AUXILIARY_KEYS,
     TEN_VIEW_KEYS,
     normalized_ten_view_blend_weights,
 )
@@ -38,11 +39,32 @@ class TenViewInputContractTests(unittest.TestCase):
 
         self.assertEqual(tuple(mapping), TEN_VIEW_KEYS)
         self.assertEqual(tuple(bundle.provided_images), TEN_VIEW_KEYS)
-        self.assertEqual(tuple(bundle.conditioning_images), TEN_VIEW_KEYS)
+        self.assertEqual(tuple(bundle.conditioning_images), CANONICAL_VIEW_KEYS)
+        self.assertEqual(
+            list(bundle.conditioning_images.values()),
+            [mapping[key] for key in CANONICAL_VIEW_KEYS],
+        )
         self.assertEqual(bundle.primary_image, images[0])
         self.assertEqual(bundle.metadata["conditioned_view_count"], 4)
-        self.assertEqual(bundle.metadata["views_used"], list(TEN_VIEW_KEYS))
-        self.assertTrue(bundle.metadata["experimental_conditioning"])
+        self.assertEqual(
+            bundle.metadata["views_used"],
+            list(CANONICAL_VIEW_KEYS),
+        )
+        self.assertEqual(
+            bundle.metadata["texture_rc_views"],
+            list(TEN_VIEW_KEYS),
+        )
+        self.assertEqual(
+            bundle.metadata["auxiliary_views_reserved_for_texture_rc"],
+            list(TEN_VIEW_AUXILIARY_KEYS),
+        )
+        self.assertFalse(bundle.metadata["experimental_conditioning"])
+
+    def test_diagonal_and_high_views_never_condition_the_shape_model(self):
+        mapping = {key: _opaque_image(index) for index, key in enumerate(TEN_VIEW_KEYS)}
+        bundle = build_generation_input_bundle("ten", None, {}, mapping)
+
+        self.assertTrue(set(bundle.conditioning_images).isdisjoint(TEN_VIEW_AUXILIARY_KEYS))
 
     def test_reports_the_exact_missing_camera(self):
         mapping = {key: _opaque_image() for key in TEN_VIEW_KEYS if key != "high_back"}

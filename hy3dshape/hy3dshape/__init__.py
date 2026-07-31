@@ -12,8 +12,18 @@
 # fine-tuning enabling code and other elements of the foregoing made publicly available
 # by Tencent in accordance with TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT.
 
+from pathlib import Path
+
 from .pipelines import Hunyuan3DDiTPipeline, Hunyuan3DDiTFlowMatchingPipeline
 from .preprocessors import ImageProcessorV2, IMAGE_PROCESSORS, DEFAULT_IMAGEPROCESSOR
+
+
+# ``gradio_app.py`` adds the outer hy3dshape directory to sys.path for
+# upstream compatibility. Also expose repository extensions that live beside
+# the core package, such as ``hy3dshape.texture_bake``.
+_EXTENSION_PACKAGE_PATH = Path(__file__).resolve().parent.parent
+if str(_EXTENSION_PACKAGE_PATH) not in __path__:
+    __path__.append(str(_EXTENSION_PACKAGE_PATH))
 
 
 _POSTPROCESSOR_NAMES = {
@@ -22,6 +32,14 @@ _POSTPROCESSOR_NAMES = {
     "DegenerateFaceRemover",
     "MeshSimplifier",
 }
+
+__all__ = [
+    "DEFAULT_IMAGEPROCESSOR",
+    "Hunyuan3DDiTFlowMatchingPipeline",
+    "Hunyuan3DDiTPipeline",
+    "IMAGE_PROCESSORS",
+    "ImageProcessorV2",
+]
 
 
 def __getattr__(name):

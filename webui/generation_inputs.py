@@ -9,6 +9,7 @@ from PIL import Image
 
 from hy3dshape.ten_view import (
     CANONICAL_VIEW_KEYS,
+    TEN_VIEW_AUXILIARY_KEYS,
     TEN_VIEW_CONDITIONING_STRATEGY,
     TEN_VIEW_KEYS,
 )
@@ -155,18 +156,26 @@ def build_generation_input_bundle(
         )
 
     validated_ten = _validate_ten_view_images(ten_view_images or {})
+    cardinal_conditioning = {
+        key: validated_ten[key] for key in CANONICAL_VIEW_KEYS
+    }
     return GenerationInputBundle(
         mode=mode,
         provided_images=validated_ten,
-        conditioning_images=dict(validated_ten),
+        conditioning_images=cardinal_conditioning,
         primary_image=validated_ten["front"],
         metadata={
             "views_provided": list(TEN_VIEW_KEYS),
-            "views_used": list(TEN_VIEW_KEYS),
+            "views_used": list(CANONICAL_VIEW_KEYS),
+            "shape_views_used": list(CANONICAL_VIEW_KEYS),
             "conditioned_view_count": len(CANONICAL_VIEW_KEYS),
             "conditioning_strategy": TEN_VIEW_CONDITIONING_STRATEGY,
             "model_native_view_limit": len(CANONICAL_VIEW_KEYS),
-            "experimental_conditioning": True,
+            "texture_rc_views": list(TEN_VIEW_KEYS),
+            "auxiliary_views_reserved_for_texture_rc": list(
+                TEN_VIEW_AUXILIARY_KEYS
+            ),
+            "experimental_conditioning": False,
         },
     )
 

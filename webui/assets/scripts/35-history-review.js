@@ -31,20 +31,21 @@
             if (!historyReviewRouteUid || !reviewState) return;
 
             const reviewMode = reviewState.dataset.inputMode;
-            const expectedTabIndex = reviewMode === "ten"
-                ? 2
-                : reviewMode === "four" ? 1 : 0;
-            const expectedTabSlug = tabRoutes[expectedTabIndex].slug;
+            const expectedRoute = reviewMode === "ten"
+                ? tabRoutes[2]
+                : reviewMode === "four" ? tabRoutes[1] : tabRoutes[0];
             const reviewUrl = currentAppUrl();
-            if (reviewUrl.searchParams.get("tab") !== expectedTabSlug) {
-                reviewUrl.searchParams.set("tab", expectedTabSlug);
+            if (reviewUrl.searchParams.get("tab") !== expectedRoute.slug) {
+                reviewUrl.searchParams.set("tab", expectedRoute.slug);
                 window.history.replaceState(window.history.state, "", reviewUrl);
             }
-            const expectedTab = document.querySelectorAll(
-                '#prompt-mode-tabs button[role="tab"]'
-            )[expectedTabIndex];
-            if (expectedTab?.getAttribute("aria-selected") !== "true") {
-                expectedTab?.click();
+
+            // Gradio moves tabs that do not fit the narrow desktop rail into an
+            // overflow menu. Select the saved route before read-only controls
+            // are disabled so a ten-view History snapshot cannot be locked on
+            // the default Single View panel.
+            if (!promptRouteIsActive(expectedRoute)) {
+                activatePromptTab(expectedRoute);
             }
 
             document.body.classList.add("is-history-review");

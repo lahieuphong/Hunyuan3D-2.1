@@ -63,7 +63,13 @@ def main() -> None:
         source = Image.open(getattr(args, view)).convert("RGBA")
         image, mask = processor.load_image(source, to_tensor=False)
         mask_2d = mask[..., 0] if mask.ndim == 3 else mask
-        rows, columns = np.nonzero(mask_2d)
+        # Use the same foreground threshold for calibration and the alpha mask
+        # consumed by the Blender baker. Generated PNGs can contain a handful
+        # of nearly transparent glow pixels at the canvas edge; treating every
+        # non-zero alpha value as foreground expands the projection bbox by
+        # several times while visibility still uses ``> 127``.
+        foreground = mask_2d > 127
+        rows, columns = np.nonzero(foreground)
         if not len(rows):
             raise ValueError(f"{view} image has an empty alpha mask")
         alpha_mask_path = args.output.with_name(
@@ -73,7 +79,7 @@ def main() -> None:
             np.where(mask_2d > 127, 255, 0).astype(np.uint8),
             mode="L",
         ).save(alpha_mask_path, format="PNG", optimize=True)
-        background = mask_2d <= 127
+        background = ~foreground
         _, nearest = distance_transform_edt(background, return_indices=True)
         padded_image = image.copy()
         padded_image[background] = image[nearest[0][background], nearest[1][background]]
