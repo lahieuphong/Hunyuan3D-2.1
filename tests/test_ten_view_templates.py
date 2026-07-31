@@ -64,11 +64,24 @@ class TenViewAssetContractTests(unittest.TestCase):
             STYLE_FRAGMENTS.index("styles/70-left-rail-settings.css"),
         )
         self.assertNotIn("scripts/18-ten-view-inputs.js", SCRIPT_FRAGMENTS)
+        self.assertIn("scripts/18-ten-view-loading.js", SCRIPT_FRAGMENTS)
+        self.assertGreater(
+            SCRIPT_FRAGMENTS.index("scripts/18-ten-view-loading.js"),
+            SCRIPT_FRAGMENTS.index("scripts/15-upload-previews.js"),
+        )
 
         css, javascript = load_ui_assets()
         self.assertIn(".ten-view-upload-row", css)
         self.assertIn(".ten-view-experimental-badge", css)
+        self.assertIn('data-ten-view-preview-state="loading"', css)
+        self.assertNotIn('data-ten-view-loading-state="loading"', css)
         self.assertNotIn("const installTenViewInputs", javascript)
+        self.assertIn("const installTenViewHistoryLoading", javascript)
+        self.assertIn('image.loading = "eager"', javascript)
+        self.assertIn("image.fetchPriority = priority", javascript)
+        self.assertIn("await image.decode()", javascript)
+        self.assertIn("tenViewHistoryPreviewState.slots", javascript)
+        self.assertNotIn("Promise.all(", javascript)
         self.assertIn('slug: "ten-view"', javascript)
         self.assertIn('mode === "ten"', javascript)
         self.assertIn('"10-VIEW"', javascript)
@@ -96,9 +109,17 @@ class TenViewAssetContractTests(unittest.TestCase):
         self.assertIn("type='pil'", application)
         self.assertIn("image_mode='RGBA'", application)
         self.assertIn("tab_ten.select(", application)
+        self.assertIn("ten_view_input.input(", application)
+        self.assertNotIn("ten_view_input.change(", application)
+        self.assertIn("preprocess=False", application)
         self.assertEqual(application.count("*ten_view_inputs"), 4)
         self.assertIn("api_name='shape_generation_ten'", application)
         self.assertIn("api_name='shape_generation'", application)
+        gallery_guard = application.index("# A hidden gr.Examples")
+        gallery_end = application.index("with gr.Column(", gallery_guard + 1)
+        gallery_setup = application[gallery_guard:gallery_end]
+        self.assertIn("if not MV_MODE:", gallery_setup)
+        self.assertNotIn("visible=not MV_MODE", gallery_setup)
         self.assertNotIn("render_ten_view_panel", application)
         self.assertNotIn("data-ui-only", application)
 

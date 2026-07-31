@@ -37,6 +37,7 @@ SCRIPT_FRAGMENTS: Final[tuple[str, ...]] = (
     "scripts/10-icons.js",
     "scripts/12-advanced-options.js",
     "scripts/15-upload-previews.js",
+    "scripts/18-ten-view-loading.js",
     "scripts/20-url-state.js",
     "scripts/25-theme-switching.js",
     "scripts/30-generation-console.js",

@@ -1,5 +1,5 @@
 
-        const observer = new MutationObserver(() => {
+        const syncMountedUi = () => {
             installFooterItem();
             installUnifiedIcons();
             installAdvancedOptionsDisclosure();
@@ -12,28 +12,24 @@
             syncPresetSelection();
             installTabRouting();
             installHistoryReviewMode();
+            installTenViewHistoryLoading();
             installGenerationRouting();
             syncGenerationHistoryFromUrl();
             syncGenerationConsoleFromUrl();
-        });
+        };
+        let mountedUiSyncFrame = 0;
+        const scheduleMountedUiSync = () => {
+            if (mountedUiSyncFrame) return;
+            mountedUiSyncFrame = window.requestAnimationFrame(() => {
+                mountedUiSyncFrame = 0;
+                syncMountedUi();
+            });
+        };
+        const observer = new MutationObserver(scheduleMountedUiSync);
         observer.observe(document.body, {childList: true, subtree: true});
 
-        installFooterItem();
-        installUnifiedIcons();
-        installAdvancedOptionsDisclosure();
-        installSmoothThemeSwitching();
-        installStableUploadPreviews();
-        wireTopbar();
-        wireModal();
-        wirePresetCards();
-        wireGenerationHistoryModal();
-        syncPresetSelection();
-        installTabRouting();
-        installHistoryReviewMode();
-        installGenerationRouting();
+        syncMountedUi();
         syncFromUrl();
-        syncGenerationHistoryFromUrl();
-        syncGenerationConsoleFromUrl();
 
         window.addEventListener("popstate", () => {
             const nextGenerationUid = currentAppUrl().searchParams.get("generation");

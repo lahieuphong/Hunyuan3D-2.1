@@ -1,27 +1,12 @@
 
     /* Keep multi-view thumbnails visible while Gradio replaces its native
        preview with upload progress. This layer never changes component data. */
-    :where(
-        #mv-image-front,
-        #mv-image-back,
-        #mv-image-left,
-        #mv-image-right
-    ) [data-testid="image"],
-    :where(
-        #mv-image-front,
-        #mv-image-back,
-        #mv-image-left,
-        #mv-image-right
-    ) .upload-container {
+    :where(.mv-image, .ten-view-image) [data-testid="image"],
+    :where(.mv-image, .ten-view-image) .upload-container {
         position: relative;
     }
 
-    :where(
-        #mv-image-front,
-        #mv-image-back,
-        #mv-image-left,
-        #mv-image-right
-    ) .upload-container {
+    :where(.mv-image, .ten-view-image) .upload-container {
         min-width: 0;
         overflow: hidden;
     }
@@ -32,17 +17,25 @@
         height: 100%;
         inset: 0;
         object-fit: scale-down;
+        opacity: 1;
         pointer-events: none;
         position: absolute;
+        transition: opacity 180ms cubic-bezier(.22, 1, .36, 1);
         width: 100%;
         z-index: 2;
     }
 
-    .mv-image:is(
+    :is(.mv-image, .ten-view-image).is-upload-preview-settling
+    .mv-upload-local-preview {
+        opacity: 0;
+    }
+
+    :is(.mv-image, .ten-view-image):is(
         .is-uploading-preview,
         .is-upload-preview-error
     ) > .wrap.default.full,
-    .mv-image > .wrap.default.full.mv-native-upload-status-suppressed {
+    :is(.mv-image, .ten-view-image)
+    > .wrap.default.full.mv-native-upload-status-suppressed {
         opacity: 0 !important;
         pointer-events: none !important;
         visibility: hidden !important;
@@ -82,13 +75,15 @@
         width: 9px;
     }
 
-    .mv-image.is-upload-preview-error .mv-upload-preview-status {
+    :is(.mv-image, .ten-view-image).is-upload-preview-error
+    .mv-upload-preview-status {
         background: rgba(50, 18, 29, 0.92);
         border-color: rgba(255, 111, 143, 0.5);
         color: #ffc2d0;
     }
 
-    .mv-image.is-upload-preview-error .mv-upload-preview-status::before {
+    :is(.mv-image, .ten-view-image).is-upload-preview-error
+    .mv-upload-preview-status::before {
         animation: none;
         border: 0;
         color: #ff7897;
@@ -106,7 +101,9 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+        .mv-upload-local-preview,
         .mv-upload-preview-status::before {
             animation: none;
+            transition: none;
         }
     }

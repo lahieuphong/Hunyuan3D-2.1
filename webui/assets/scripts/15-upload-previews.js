@@ -4,11 +4,22 @@
             "mv-image-back",
             "mv-image-left",
             "mv-image-right",
+            "ten-image-front",
+            "ten-image-front_right",
+            "ten-image-right",
+            "ten-image-back_right",
+            "ten-image-back",
+            "ten-image-back_left",
+            "ten-image-left",
+            "ten-image-front_left",
+            "ten-image-high_front",
+            "ten-image-high_back",
         ];
         const stableUploadPreviewRetryDelays = [250, 700, 1500];
         const stableUploadPreviewStates = new Map();
         const stableUploadDeadlineMs = 300000;
         const stableNativePreviewDeadlineMs = 5000;
+        const stableUploadPreviewFadeMs = 180;
 
         const uploadPreviewHost = (tile) => (
             tile.querySelector('[data-testid="image"] .upload-container')
@@ -109,8 +120,10 @@
         const cancelUploadPreviewTimers = (state) => {
             window.clearTimeout(state.reconcileTimer);
             window.clearTimeout(state.retryTimer);
+            window.clearTimeout(state.settleTimer);
             state.reconcileTimer = 0;
             state.retryTimer = 0;
+            state.settleTimer = 0;
         };
 
         const resetStableUploadPreview = (state) => {
@@ -136,7 +149,8 @@
             state.tile.classList.remove(
                 "is-uploading-preview",
                 "is-upload-preview-error",
-                "is-upload-preview-local"
+                "is-upload-preview-local",
+                "is-upload-preview-settling"
             );
             removeUploadPreviewNodes(state);
             releaseUploadPreviewUrl(state);
@@ -210,9 +224,41 @@
         };
 
         const finishStableUploadPreview = (state, runId) => {
-            if (state.runId !== runId) return;
+            if (state.runId !== runId || state.mode === "settling") return;
+            const nativeImage = state.nativeListenerImage;
+            if (!nativeImage || !nativePreviewIsReady(nativeImage)) return;
+            state.mode = "settling";
+            cancelUploadPreviewTimers(state);
             suppressStaleNativeUploadStatus(state.tile);
-            resetStableUploadPreview(state);
+            state.status?.remove();
+            state.status = null;
+            void (async () => {
+                if (typeof nativeImage.decode === "function") {
+                    try {
+                        await nativeImage.decode();
+                    } catch (_error) {
+                        // The load event already confirmed a usable image.
+                    }
+                }
+                await new Promise((resolve) => {
+                    window.requestAnimationFrame(() => {
+                        window.requestAnimationFrame(resolve);
+                    });
+                });
+                if (
+                    state.runId !== runId
+                    || state.nativeListenerImage !== nativeImage
+                    || !nativePreviewIsReady(nativeImage)
+                ) return;
+                state.tile.classList.add("is-upload-preview-settling");
+                const reduceMotion = window.matchMedia(
+                    "(prefers-reduced-motion: reduce)"
+                ).matches;
+                state.settleTimer = window.setTimeout(() => {
+                    state.settleTimer = 0;
+                    if (state.runId === runId) resetStableUploadPreview(state);
+                }, reduceMotion ? 0 : stableUploadPreviewFadeMs);
+            })();
         };
 
         const scheduleUploadPreviewReconcile = (state, runId, delay = 0) => {
@@ -495,6 +541,7 @@
                 sawNativeAbsent: false,
                 sawRemoveAbsent: false,
                 sawUploadProgress: false,
+                settleTimer: 0,
                 startedAt: 0,
                 status: null,
                 tile,

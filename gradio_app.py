@@ -31,6 +31,7 @@ except Exception as e:
 
 import json
 import math
+import mimetypes
 import os
 import random
 import shutil
@@ -48,10 +49,11 @@ import torch
 import trimesh
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import uuid
 import numpy as np
+from PIL import Image
 
 from hy3dshape.ten_view import TEN_VIEW_KEYS
 from hy3dshape.texture_bake.generation import create_original_variant
@@ -100,9 +102,25 @@ from webui.model_viewer import (
 )
 
 MAX_SEED = 10_000_000
+HISTORY_INPUT_PREVIEW_MAX_EDGE = 384
+HISTORY_INPUT_PREVIEW_QUALITY = 88
+mimetypes.add_type('image/webp', '.webp')
 HAS_REMBG = importlib.util.find_spec('rembg') is not None
 HAS_PYMESHLAB = importlib.util.find_spec('pymeshlab') is not None
 ENV = "Local" # "Huggingface"
+
+
+class GenerationStaticFiles(StaticFiles):
+    """Serve immutable per-generation thumbnails with browser caching."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if path.replace('\\', '/').endswith('.preview.webp'):
+            response.headers['Cache-Control'] = (
+                'public, max-age=31536000, immutable'
+            )
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
 
 GPU_PRESET_CATALOG = load_gpu_preset_catalog()
 GENERATION_MODES = {5: 'Turbo', 10: 'Fast', 30: 'Standard'}
@@ -817,6 +835,78 @@ def update_generation_stage(
     return write_generation_manifest(save_folder, **updates)
 
 
+def ensure_history_input_preview(save_folder, source_path):
+    """Return a compact cached WebP for read-only history input previews."""
+    source = Path(source_path)
+    temporary_path = None
+    try:
+        folder = Path(save_folder).absolute()
+        if folder.is_symlink() or source.is_symlink():
+            return str(source)
+        resolved_folder = folder.resolve(strict=True)
+        resolved_source = source.absolute().resolve(strict=True)
+        if (
+            resolved_source.parent != resolved_folder
+            or not resolved_source.is_file()
+        ):
+            return str(source)
+
+        preview_path = resolved_folder / (
+            f'{resolved_source.stem}.preview.webp'
+        )
+        if preview_path.is_symlink():
+            return str(resolved_source)
+        if preview_path.is_file():
+            source_stat = resolved_source.stat()
+            preview_stat = preview_path.stat()
+            if (
+                preview_stat.st_size > 0
+                and preview_stat.st_mtime_ns >= source_stat.st_mtime_ns
+            ):
+                return str(preview_path)
+
+        temporary_path = preview_path.with_name(
+            f'.{preview_path.name}.{uuid.uuid4().hex}.tmp'
+        )
+        with Image.open(resolved_source) as stored_image:
+            preview_mode = (
+                'RGBA' if 'A' in stored_image.getbands() else 'RGB'
+            )
+            preview_image = stored_image.convert(preview_mode)
+            try:
+                preview_image.thumbnail(
+                    (
+                        HISTORY_INPUT_PREVIEW_MAX_EDGE,
+                        HISTORY_INPUT_PREVIEW_MAX_EDGE,
+                    ),
+                    Image.Resampling.LANCZOS,
+                )
+                preview_image.save(
+                    temporary_path,
+                    format='WEBP',
+                    quality=HISTORY_INPUT_PREVIEW_QUALITY,
+                    method=4,
+                )
+            finally:
+                preview_image.close()
+        os.replace(temporary_path, preview_path)
+        temporary_path = None
+        return str(preview_path)
+    except (OSError, RuntimeError, ValueError) as exc:
+        logger.warning(
+            'Could not build history input preview for %s: %s',
+            source,
+            exc,
+        )
+        return str(source)
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def save_generation_inputs(save_folder, image):
     input_files = {}
     images = image if isinstance(image, dict) else {'image': image}
@@ -828,11 +918,14 @@ def save_generation_inputs(save_folder, image):
             if character.isalnum() or character in ('-', '_')
         ) or 'image'
         filename = f"input_{safe_view_name}.png"
+        output_path = os.path.join(save_folder, filename)
         try:
-            view_image.save(os.path.join(save_folder, filename), format='PNG')
+            view_image.save(output_path, format='PNG')
             input_files[str(view_name)] = filename
         except Exception as exc:
             logger.warning("Could not save generation input %s: %s", view_name, exc)
+            continue
+        ensure_history_input_preview(save_folder, output_path)
     return input_files
 
 
@@ -1144,6 +1237,7 @@ def restore_generation_from_request(
         fresh_ui[0],
         fresh_ui[1],
         fresh_ui[2],
+        render_ten_view_progress(),
     ) + tuple(
         gr.update(interactive=True) for _ in TEN_VIEW_KEYS
     )
@@ -1226,9 +1320,17 @@ def restore_generation_from_request(
     back_image = input_path(inputs.get('back'), 'input_back.png')
     left_image = input_path(inputs.get('left'), 'input_left.png')
     right_image = input_path(inputs.get('right'), 'input_right.png')
-    ten_view_paths = {
+    ten_view_source_paths = {
         key: input_path(inputs.get(key), f'input_{key}.png')
         for key in TEN_VIEW_KEYS
+    }
+    ten_view_paths = {
+        key: (
+            ensure_history_input_preview(save_folder, source_path)
+            if source_path
+            else None
+        )
+        for key, source_path in ten_view_source_paths.items()
     }
 
     saved_viewer_assets = resolve_generation_assets(
@@ -1391,6 +1493,10 @@ def restore_generation_from_request(
         history_ui[0],
         history_profile_cards,
         history_profile_note,
+        render_ten_view_progress(*(
+            ten_view_paths[key] if input_mode == 'ten' else None
+            for key in TEN_VIEW_KEYS
+        )),
     ) + tuple(
         gr.update(
             value=ten_view_paths[key] if input_mode == 'ten' else None,
@@ -2565,14 +2671,20 @@ Fast for very complex cases, Standard seldom use.',
                         )
                         file_out2 = gr.File(label="File", visible=False)
 
-            with gr.Column(scale=2, visible=not MV_MODE):
-                with gr.Tabs(selected='tab_img_gallery'):
-                    with gr.Tab('Image to 3D Gallery', 
-                                id='tab_img_gallery', 
-                                visible=not MV_MODE):
-                        with gr.Row():
-                            gr.Examples(examples=example_is, inputs=[image],
-                                        label=None, examples_per_page=18)
+            # A hidden gr.Examples still mounts and downloads every thumbnail.
+            # Do not construct it in multi-view mode: those images otherwise
+            # compete with restored 10-view previews during the first paint.
+            if not MV_MODE:
+                with gr.Column(scale=2):
+                    with gr.Tabs(selected='tab_img_gallery'):
+                        with gr.Tab('Image to 3D Gallery', id='tab_img_gallery'):
+                            with gr.Row():
+                                gr.Examples(
+                                    examples=example_is,
+                                    inputs=[image],
+                                    label=None,
+                                    examples_per_page=18,
+                                )
 
         with gr.Column(
             elem_id='rtx3090-modal',
@@ -2708,12 +2820,13 @@ Fast for very complex cases, Standard seldom use.',
         )
 
         for ten_view_input in ten_view_inputs:
-            ten_view_input.change(
+            ten_view_input.input(
                 fn=render_ten_view_progress,
                 inputs=ten_view_inputs,
                 outputs=[ten_view_progress],
                 queue=False,
                 show_progress='hidden',
+                preprocess=False,
                 api_name=False,
             )
 
@@ -2749,6 +2862,7 @@ Fast for very complex cases, Standard seldom use.',
                 hardware_profile_summary,
                 hardware_profile_cards,
                 hardware_profile_note,
+                ten_view_progress,
                 *ten_view_inputs,
             ],
             queue=False,
@@ -3181,6 +3295,21 @@ if __name__ == '__main__':
     # create a FastAPI app
     app = FastAPI()
 
+    @app.middleware('http')
+    async def cache_gradio_history_previews(request: Request, call_next):
+        response = await call_next(request)
+        request_path = request.url.path.lower()
+        if (
+            response.status_code == 200
+            and request_path.startswith('/gradio_api/file')
+            and request_path.endswith('.preview.webp')
+        ):
+            response.headers['Cache-Control'] = (
+                'public, max-age=31536000, immutable'
+            )
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
     @app.get('/health')
     def health():
         return {
@@ -3236,7 +3365,41 @@ if __name__ == '__main__':
     # create a static directory to store the static files
     static_dir = Path(SAVE_DIR).absolute()
     static_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/static", StaticFiles(directory=static_dir, html=True), name="static")
+    gradio_fonts_dir = (
+        Path(gr.__file__).resolve().parent
+        / 'templates'
+        / 'frontend'
+        / 'static'
+        / 'fonts'
+    )
+    if gradio_fonts_dir.is_dir():
+        @app.get('/static/fonts/ui-sans-serif/{filename}')
+        def ui_sans_serif_font(filename: str):
+            aliases = {
+                'ui-sans-serif-Regular.woff2': 'IBMPlexSans-Regular.woff2',
+                'ui-sans-serif-Bold.woff2': 'IBMPlexSans-Bold.woff2',
+            }
+            source_name = aliases.get(filename)
+            if source_name is None:
+                raise HTTPException(status_code=404, detail='Font not found')
+            source_path = gradio_fonts_dir / 'IBMPlexSans' / source_name
+            return FileResponse(
+                source_path,
+                media_type='font/woff2',
+                headers={'Cache-Control': 'public, max-age=31536000, immutable'},
+            )
+
+        # This specific mount must precede the generation-wide /static mount.
+        app.mount(
+            '/static/fonts',
+            StaticFiles(directory=gradio_fonts_dir),
+            name='gradio-fonts',
+        )
+    app.mount(
+        "/static",
+        GenerationStaticFiles(directory=static_dir, html=True),
+        name="static",
+    )
     shutil.copytree('./assets/env_maps', os.path.join(static_dir, 'env_maps'), dirs_exist_ok=True)
 
     if args.low_vram_mode:

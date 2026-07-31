@@ -83,6 +83,14 @@ class TenViewRestoreTests(unittest.TestCase):
                         f"?tab=ten-view&generation={generation_uid}"
                     ),
                 )
+                restored_preview_paths = [
+                    Path(update["value"])
+                    for update in restored[29:]
+                ]
+                restored_preview_sizes = []
+                for preview_path in restored_preview_paths:
+                    with Image.open(preview_path) as preview_image:
+                        restored_preview_sizes.append(preview_image.size)
                 history_item = list_generation_history(root)["items"][0]
             finally:
                 for name, value in original_values.items():
@@ -91,17 +99,20 @@ class TenViewRestoreTests(unittest.TestCase):
                     else:
                         setattr(app, name, value)
 
-        self.assertEqual(len(restored), 38)
+        self.assertEqual(len(restored), 39)
         self.assertEqual(restored[0], "ten")
         for legacy_image_update in restored[1:6]:
             self.assertIsNone(legacy_image_update["value"])
         self.assertEqual(restored[16]["value"], "Generate 3D · 10 Images")
         self.assertIn('data-input-mode="ten"', restored[22])
+        self.assertIn("10 / 10", restored[28])
+        self.assertIn("Ready to generate", restored[28])
         self.assertEqual(
-            [Path(update["value"]).name for update in restored[28:]],
-            [f"input_{key}.png" for key in TEN_VIEW_KEYS],
+            [path.name for path in restored_preview_paths],
+            [f"input_{key}.preview.webp" for key in TEN_VIEW_KEYS],
         )
-        self.assertTrue(all(update["interactive"] is False for update in restored[28:]))
+        self.assertEqual(restored_preview_sizes, [(8, 8)] * len(TEN_VIEW_KEYS))
+        self.assertTrue(all(update["interactive"] is False for update in restored[29:]))
         self.assertEqual(history_item["input_mode"], "ten")
         self.assertEqual(history_item["view_count"], 10)
         self.assertIn("input_front.png", history_item["assets"]["thumbnail_url"])
