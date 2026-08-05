@@ -374,6 +374,32 @@ class WireframeExportTests(unittest.TestCase):
 
 
 class ModelViewerDocumentTests(unittest.TestCase):
+    def test_template_uses_valid_css_and_javascript_sentinels(self):
+        template_path = (
+            Path(__file__).resolve().parent.parent
+            / "assets"
+            / "modelviewer-template.html"
+        )
+        template = template_path.read_text(encoding="utf-8")
+        template_lines = {line.strip() for line in template.splitlines()}
+
+        self.assertIn("/* #viewer-css# */", template_lines)
+        self.assertIn("// #viewer-js#", template_lines)
+        self.assertNotIn("#viewer-css#", template_lines)
+        self.assertNotIn("#viewer-js#", template_lines)
+
+        document = render_model_viewer_document(
+            {"white": "/static/generation/white_mesh.glb"},
+            "white",
+            650,
+            500,
+        )
+
+        self.assertNotIn("#viewer-css#", document)
+        self.assertNotIn("#viewer-js#", document)
+        self.assertIn("color-scheme: dark", document)
+        self.assertIn('"use strict"', document)
+
     def test_normalizes_supported_viewer_locales_and_defaults_to_english(self):
         self.assertEqual(normalize_viewer_locale("en-US"), "en")
         self.assertEqual(normalize_viewer_locale("zh_Hans"), "zh-CN")

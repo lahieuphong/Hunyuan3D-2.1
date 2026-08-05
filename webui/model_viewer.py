@@ -28,6 +28,8 @@ _ASSET_DIRECTORY = Path(__file__).resolve().parent.parent / "assets"
 _VIEWER_TEMPLATE_PATH = _ASSET_DIRECTORY / "modelviewer-template.html"
 _VIEWER_CSS_PATH = _ASSET_DIRECTORY / "modelviewer.css"
 _VIEWER_JS_PATH = _ASSET_DIRECTORY / "modelviewer.js"
+_VIEWER_CSS_SENTINEL = "/* #viewer-css# */"
+_VIEWER_JS_SENTINEL = "// #viewer-js#"
 _MAX_MANIFEST_BYTES = 1024 * 1024
 _MAX_GLB_JSON_BYTES = 16 * 1024 * 1024
 _GLB_JSON_CHUNK = 0x4E4F534A
@@ -872,15 +874,25 @@ def render_model_viewer_document(
     }
     buttons = _mode_buttons(set(sources), default_mode, locale_value)
 
-    had_css_placeholder = "#viewer-css#" in template
-    had_js_placeholder = "#viewer-js#" in template
+    css_placeholder = (
+        _VIEWER_CSS_SENTINEL
+        if _VIEWER_CSS_SENTINEL in template
+        else "#viewer-css#"
+    )
+    js_placeholder = (
+        _VIEWER_JS_SENTINEL
+        if _VIEWER_JS_SENTINEL in template
+        else "#viewer-js#"
+    )
+    had_css_placeholder = css_placeholder in template
+    had_js_placeholder = js_placeholder in template
     had_config_placeholder = "#viewer-config#" in template
     had_buttons_placeholder = "#mode-buttons#" in template
 
     document = (
         template
-        .replace("#viewer-css#", css)
-        .replace("#viewer-js#", javascript)
+        .replace(css_placeholder, css)
+        .replace(js_placeholder, javascript)
         .replace("#viewer-config#", _safe_json(config))
         .replace("#mode-buttons#", buttons)
         .replace("#document-lang#", locale_value)
