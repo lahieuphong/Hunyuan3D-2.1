@@ -2444,35 +2444,33 @@ def build_app():
                             elem_id='ten-view-progress-host',
                         )
                         ten_view_components = {}
-                        for row_start in range(0, len(TEN_VIEW_DEFINITIONS), 2):
-                            with gr.Row(elem_classes='ten-view-upload-row'):
-                                for index in range(
-                                    row_start,
-                                    min(row_start + 2, len(TEN_VIEW_DEFINITIONS)),
+                        with gr.Row(
+                            elem_id='ten-view-upload-grid',
+                            elem_classes='ten-view-upload-grid',
+                        ):
+                            for index, definition in enumerate(TEN_VIEW_DEFINITIONS):
+                                with gr.Column(
+                                    min_width=100,
+                                    elem_classes='ten-view-slot',
                                 ):
-                                    definition = TEN_VIEW_DEFINITIONS[index]
-                                    with gr.Column(
+                                    gr.HTML(
+                                        render_ten_view_slot_header(
+                                            index + 1,
+                                            definition,
+                                        ),
+                                        elem_classes='ten-view-slot-header-host',
+                                    )
+                                    ten_view_components[definition.key] = gr.Image(
+                                        label=definition.label,
+                                        show_label=False,
+                                        type='pil',
+                                        image_mode='RGBA',
+                                        height=160,
                                         min_width=100,
-                                        elem_classes='ten-view-slot',
-                                    ):
-                                        gr.HTML(
-                                            render_ten_view_slot_header(
-                                                index + 1,
-                                                definition,
-                                            ),
-                                            elem_classes='ten-view-slot-header-host',
-                                        )
-                                        ten_view_components[definition.key] = gr.Image(
-                                            label=definition.label,
-                                            show_label=False,
-                                            type='pil',
-                                            image_mode='RGBA',
-                                            height=180,
-                                            min_width=100,
-                                            interactive=False,
-                                            elem_id=f'ten-image-{definition.key}',
-                                            elem_classes=['ten-view-image', 'ui-upload'],
-                                        )
+                                        interactive=False,
+                                        elem_id=f'ten-image-{definition.key}',
+                                        elem_classes=['ten-view-image', 'ui-upload'],
+                                    )
                         gr.HTML(
                             render_ten_view_summary(),
                             elem_id='ten-view-summary-host',

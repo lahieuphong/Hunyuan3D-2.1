@@ -71,7 +71,10 @@ class TenViewAssetContractTests(unittest.TestCase):
         )
 
         css, javascript = load_ui_assets()
-        self.assertIn(".ten-view-upload-row", css)
+        self.assertIn(".ten-view-upload-grid", css)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
+        self.assertIn("min-height: 160px !important;", css)
+        self.assertIn("min-height: 0 !important;", css)
         self.assertIn(".ten-view-experimental-badge", css)
         self.assertIn('data-ten-view-preview-state="loading"', css)
         self.assertNotIn('data-ten-view-loading-state="loading"', css)
@@ -99,11 +102,38 @@ class TenViewAssetContractTests(unittest.TestCase):
             javascript.index('document.body.classList.add("is-history-review")'),
         )
 
+    def test_input_mode_switcher_keeps_all_three_tabs_on_one_row(self):
+        css = (
+            REPOSITORY_ROOT / "webui/assets/styles/70-left-rail-settings.css"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "#prompt-mode-tabs > .tab-wrapper > .tab-container.visually-hidden",
+            css,
+        )
+        self.assertIn("flex: 1 1 100%;", css)
+        self.assertIn("flex: 1 1 auto !important;", css)
+        self.assertIn("text-overflow: ellipsis;", css)
+        self.assertNotIn(
+            "grid-template-columns: repeat(2, minmax(0, 1fr));",
+            css,
+        )
+
     def test_generation_contract_uses_native_gradio_images_and_callbacks(self):
         application = (REPOSITORY_ROOT / "gradio_app.py").read_text(
             encoding="utf-8",
         )
         self.assertEqual(application.count("id='tab_ten_prompt'"), 1)
+        self.assertEqual(application.count("elem_id='ten-view-upload-grid'"), 1)
+        self.assertEqual(application.count("elem_classes='ten-view-upload-grid'"), 1)
+        self.assertIn(
+            "for index, definition in enumerate(TEN_VIEW_DEFINITIONS):",
+            application,
+        )
+        self.assertNotIn("for row_start in range", application)
+        grid_start = application.index("elem_id='ten-view-upload-grid'")
+        grid_end = application.index("elem_id='ten-view-summary-host'", grid_start)
+        self.assertIn("height=160", application[grid_start:grid_end])
         self.assertIn(") as tab_ten:", application)
         self.assertIn("ten_view_components[definition.key] = gr.Image(", application)
         self.assertIn("type='pil'", application)
