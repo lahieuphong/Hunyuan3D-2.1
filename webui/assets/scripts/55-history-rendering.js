@@ -1,16 +1,46 @@
 
         let generationHistoryController = null;
+        let generationHistoryLastPayload = null;
+        let generationHistoryUiState = "idle";
 
         const generationHistoryElement = (id) => document.getElementById(id);
         const isMissingHistoryValue = (value) => (
             value === null || value === undefined || value === ""
         );
 
+        const setGenerationHistoryCopy = (
+            element,
+            key,
+            params = {}
+        ) => {
+            if (!element) return;
+            element.dataset.uiI18n = key;
+            const copy = uiT(key, params);
+            if (element.textContent !== copy) element.textContent = copy;
+        };
+
+        const historyNumberFormat = (value, options = {}) => (
+            new Intl.NumberFormat(currentUiLocale(), options).format(value)
+        );
+
+        const localizedGenerationViewerUrl = (rawUrl) => {
+            if (!rawUrl) return rawUrl;
+            try {
+                const url = new URL(rawUrl, window.location.href);
+                url.searchParams.set("lang", currentUiLocale());
+                return url.href;
+            } catch {
+                return rawUrl;
+            }
+        };
+
         const formatHistoryDate = (value) => {
-            if (!value) return "Saved model";
+            if (!value) return uiT("history.saved_model");
             const parsed = new Date(value);
-            if (Number.isNaN(parsed.getTime())) return "Saved model";
-            return new Intl.DateTimeFormat(undefined, {
+            if (Number.isNaN(parsed.getTime())) {
+                return uiT("history.saved_model");
+            }
+            return new Intl.DateTimeFormat(currentUiLocale(), {
                 dateStyle: "medium",
                 timeStyle: "short",
             }).format(parsed);
@@ -20,28 +50,46 @@
             if (isMissingHistoryValue(value)) return "—";
             const numeric = Number(value);
             if (!Number.isFinite(numeric)) return "—";
-            return new Intl.NumberFormat(undefined, {
+            return historyNumberFormat(numeric, {
                 notation: numeric >= 10000 ? "compact" : "standard",
                 maximumFractionDigits: numeric >= 10000 ? 1 : 0,
-            }).format(numeric);
+            });
         };
 
         const formatHistoryBytes = (value) => {
             if (isMissingHistoryValue(value)) return "—";
             const bytes = Number(value);
             if (!Number.isFinite(bytes) || bytes < 0) return "—";
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
-            return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+            if (bytes < 1024 * 1024) {
+                return uiT("history.size_kb", {
+                    value: historyNumberFormat(bytes / 1024, {
+                        maximumFractionDigits: 0,
+                    }),
+                });
+            }
+            return uiT("history.size_mb", {
+                value: historyNumberFormat(bytes / (1024 * 1024), {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                }),
+            });
         };
 
         const formatHistorySeconds = (value) => {
             if (isMissingHistoryValue(value)) return "—";
             const seconds = Number(value);
             if (!Number.isFinite(seconds) || seconds < 0) return "—";
-            return seconds.toFixed(seconds >= 10 ? 1 : 2) + " s";
+            const fractionDigits = seconds >= 10 ? 1 : 2;
+            return uiT("history.duration_seconds", {
+                value: historyNumberFormat(seconds, {
+                    minimumFractionDigits: fractionDigits,
+                    maximumFractionDigits: fractionDigits,
+                }),
+            });
         };
 
         const setGenerationHistoryState = (state) => {
+            generationHistoryUiState = state;
             const loading = generationHistoryElement("generation-history-loading");
             const error = generationHistoryElement("generation-history-error");
             const empty = generationHistoryElement("generation-history-empty");
@@ -53,13 +101,16 @@
             if (state === "loading") {
                 const count = generationHistoryElement("generation-history-count");
                 const summary = generationHistoryElement("generation-history-summary");
-                if (count) count.textContent = "Loading";
-                if (summary) summary.textContent = "Reading saved 3D models...";
+                setGenerationHistoryCopy(count, "history.loading");
+                setGenerationHistoryCopy(summary, "history.loading_summary");
             } else if (state === "error") {
                 const count = generationHistoryElement("generation-history-count");
                 const summary = generationHistoryElement("generation-history-summary");
-                if (count) count.textContent = "Unavailable";
-                if (summary) summary.textContent = "Saved models could not be read";
+                setGenerationHistoryCopy(count, "history.unavailable");
+                setGenerationHistoryCopy(
+                    summary,
+                    "history.unavailable_summary"
+                );
             }
         };
 
@@ -68,25 +119,29 @@
             placeholder.className = "generation-history-placeholder";
             placeholder.insertAdjacentHTML("afterbegin", uiIconMarkup("box"));
             const label = document.createElement("span");
-            label.textContent = "3D model";
+            setGenerationHistoryCopy(label, "history.model_placeholder");
             placeholder.append(label);
             return placeholder;
         };
 
-        const createGenerationHistoryMetric = (value, label) => {
+        const createGenerationHistoryMetric = (value, labelKey) => {
             const metric = document.createElement("div");
             metric.className = "generation-history-metric";
             const strong = document.createElement("strong");
             const caption = document.createElement("span");
             strong.textContent = value;
-            caption.textContent = label;
+            setGenerationHistoryCopy(caption, labelKey);
             metric.append(strong, caption);
             return metric;
         };
 
         const openGenerationFromHistory = (item) => {
             if (item.legacy) {
-                window.open(item.assets.viewer_url, "_blank", "noopener");
+                window.open(
+                    localizedGenerationViewerUrl(item.assets.viewer_url),
+                    "_blank",
+                    "noopener"
+                );
                 return;
             }
             const url = currentAppUrl();
@@ -112,15 +167,24 @@
 
             const preview = document.createElement("a");
             preview.className = "generation-history-preview";
-            preview.href = item.assets.viewer_url;
+            preview.href = localizedGenerationViewerUrl(item.assets.viewer_url);
             preview.target = "_blank";
             preview.rel = "noopener";
-            preview.setAttribute("aria-label", "Preview generation " + item.generation_uid);
+            preview.dataset.uiI18nAriaLabel = "history.preview_generation";
+            preview.setAttribute(
+                "aria-label",
+                uiT("history.preview_generation", {
+                    uid: item.generation_uid,
+                })
+            );
 
             if (item.assets.thumbnail_url) {
                 const image = document.createElement("img");
                 image.src = item.assets.thumbnail_url;
-                image.alt = "Input preview for generation " + item.generation_uid.slice(0, 8);
+                image.dataset.uiI18nAlt = "history.input_preview_alt";
+                image.alt = uiT("history.input_preview_alt", {
+                    uid: item.generation_uid.slice(0, 8),
+                });
                 image.loading = "lazy";
                 image.addEventListener("error", () => {
                     image.replaceWith(createGenerationHistoryPlaceholder());
@@ -134,19 +198,19 @@
             const statusKey = item.legacy
                 ? "legacy"
                 : ["processing", "failed"].includes(item.status) ? item.status : "completed";
-            const statusLabels = {
-                completed: "Completed",
-                failed: "Export saved",
-                legacy: "Legacy mesh",
-                processing: "Processing",
+            const statusKeys = {
+                completed: "history.status_completed",
+                failed: "history.status_export_saved",
+                legacy: "history.status_legacy_mesh",
+                processing: "history.status_processing",
             };
             status.className = "generation-history-status is-" + statusKey;
-            status.textContent = statusLabels[statusKey];
+            setGenerationHistoryCopy(status, statusKeys[statusKey]);
             preview.append(status);
             if (isCurrent) {
                 const current = document.createElement("span");
                 current.className = "generation-history-current";
-                current.textContent = "Current";
+                setGenerationHistoryCopy(current, "history.current");
                 preview.append(current);
             }
 
@@ -157,7 +221,9 @@
             const headingCopy = document.createElement("div");
             const title = document.createElement("h3");
             title.className = "generation-history-card-title";
-            title.textContent = "Generation " + item.generation_uid.slice(0, 8).toUpperCase();
+            setGenerationHistoryCopy(title, "history.generation_title", {
+                uid: item.generation_uid.slice(0, 8).toUpperCase(),
+            });
             title.title = item.generation_uid;
             const date = document.createElement("span");
             date.className = "generation-history-card-date";
@@ -166,7 +232,13 @@
 
             const model = document.createElement("span");
             model.className = "generation-history-model";
-            model.textContent = item.model || (item.legacy ? "Saved mesh" : "Hunyuan3D");
+            if (item.model) {
+                model.textContent = item.model;
+            } else if (item.legacy) {
+                setGenerationHistoryCopy(model, "history.saved_mesh");
+            } else {
+                model.textContent = "Hunyuan3D";
+            }
             model.title = model.textContent;
             heading.append(headingCopy, model);
 
@@ -174,20 +246,20 @@
             metrics.className = "generation-history-metrics";
             metrics.append(
                 createGenerationHistoryMetric(
-                    item.view_count ? String(item.view_count) : "—",
-                    "Views"
+                    item.view_count ? formatHistoryNumber(item.view_count) : "—",
+                    "history.metric_views"
                 ),
                 createGenerationHistoryMetric(
                     formatHistoryNumber(item.parameters.octree_resolution),
-                    "Octree"
+                    "history.metric_octree"
                 ),
                 createGenerationHistoryMetric(
                     formatHistorySeconds(item.statistics.seconds),
-                    "Time"
+                    "history.metric_time"
                 ),
                 createGenerationHistoryMetric(
                     formatHistoryBytes(item.statistics.mesh_bytes),
-                    "GLB"
+                    "history.metric_glb"
                 )
             );
 
@@ -198,9 +270,14 @@
             open.type = "button";
             open.insertAdjacentHTML("afterbegin", uiIconMarkup("box"));
             const openLabel = document.createElement("span");
-            openLabel.textContent = item.legacy
-                ? "View 3D"
-                : isCurrent ? "Open current" : "Open model";
+            setGenerationHistoryCopy(
+                openLabel,
+                item.legacy
+                    ? "history.view_3d"
+                    : isCurrent
+                        ? "history.open_current"
+                        : "history.open_model"
+            );
             open.append(openLabel);
             open.addEventListener("click", () => openGenerationFromHistory(item));
 
@@ -213,7 +290,7 @@
             download.download = downloadStem + "_" + item.generation_uid.slice(0, 8) + ".glb";
             download.insertAdjacentHTML("afterbegin", uiIconMarkup("download"));
             const downloadLabel = document.createElement("span");
-            downloadLabel.textContent = "Download";
+            setGenerationHistoryCopy(downloadLabel, "history.download");
             download.append(downloadLabel);
             actions.append(open, download);
 
@@ -222,17 +299,31 @@
             return article;
         };
 
-        const renderGenerationHistory = (payload) => {
+        const renderGenerationHistory = (payload, cachePayload = true) => {
+            if (cachePayload) generationHistoryLastPayload = payload;
             const items = Array.isArray(payload?.items) ? payload.items : [];
             const total = Number.isFinite(Number(payload?.total)) ? Number(payload.total) : items.length;
             const count = generationHistoryElement("generation-history-count");
             const summary = generationHistoryElement("generation-history-summary");
             const list = generationHistoryElement("generation-history-list");
-            if (count) count.textContent = total + (total === 1 ? " model" : " models");
+            setGenerationHistoryCopy(
+                count,
+                total === 1
+                    ? "history.model_count_one"
+                    : "history.model_count_other",
+                {count: historyNumberFormat(total)}
+            );
             if (summary) {
-                summary.textContent = total
-                    ? "Showing " + items.length + " of " + total + " saved models"
-                    : "Newest models appear first";
+                setGenerationHistoryCopy(
+                    summary,
+                    total
+                        ? "history.showing_saved_models"
+                        : "history.newest_first",
+                    {
+                        visible: historyNumberFormat(items.length),
+                        total: historyNumberFormat(total),
+                    }
+                );
             }
             if (!list) return;
             list.replaceChildren();
@@ -273,3 +364,16 @@
                 }
             }
         };
+
+        window.addEventListener("ui-language-change", () => {
+            if (
+                generationHistoryUiState === "loading"
+                || generationHistoryUiState === "error"
+            ) {
+                setGenerationHistoryState(generationHistoryUiState);
+                return;
+            }
+            if (generationHistoryLastPayload !== null) {
+                renderGenerationHistory(generationHistoryLastPayload, false);
+            }
+        });

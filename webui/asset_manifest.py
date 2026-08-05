@@ -29,17 +29,20 @@ STYLE_FRAGMENTS: Final[tuple[str, ...]] = (
     "styles/80-light-theme.css",
     "styles/82-hardware-catalog.css",
     "styles/85-history-review.css",
+    "styles/88-i18n.css",
     "styles/90-responsive.css",
 )
 
 SCRIPT_FRAGMENTS: Final[tuple[str, ...]] = (
     "scripts/00-context.js",
+    "scripts/05-i18n.js",
     "scripts/10-icons.js",
     "scripts/12-advanced-options.js",
     "scripts/15-upload-previews.js",
     "scripts/18-ten-view-loading.js",
     "scripts/20-url-state.js",
     "scripts/25-theme-switching.js",
+    "scripts/28-language-choices.js",
     "scripts/30-generation-console.js",
     "scripts/35-history-review.js",
     "scripts/40-tab-routing.js",

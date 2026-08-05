@@ -13,9 +13,11 @@ import trimesh
 from webui.model_viewer import (
     export_wireframe_glb,
     is_wireframe_glb,
+    normalize_viewer_locale,
     render_model_viewer_document,
     resolve_generation_assets,
     stored_generation_file,
+    viewer_message,
 )
 
 
@@ -186,7 +188,9 @@ class GenerationAssetResolverTests(unittest.TestCase):
                     self.assertEqual(variant.mode, mode)
                     self.assertEqual(variant.filename, filename)
                     self.assertEqual(variant.render_mode, render_mode)
-                    self.assertEqual(variant.path, folder / filename)
+                    self.assertTrue(
+                        os.path.samefile(variant.path, folder / filename)
+                    )
 
     def test_white_only_legacy_generation_falls_back_to_white(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -292,7 +296,7 @@ class WireframeExportTests(unittest.TestCase):
             exported = export_wireframe_glb(mesh, target)
             document = read_glb_json(exported)
 
-            self.assertEqual(Path(exported), target)
+            self.assertTrue(os.path.samefile(exported, target))
             self.assertTrue(target.is_file())
             self.assertTrue(is_wireframe_glb(target))
             primitives = [
@@ -370,6 +374,64 @@ class WireframeExportTests(unittest.TestCase):
 
 
 class ModelViewerDocumentTests(unittest.TestCase):
+    def test_normalizes_supported_viewer_locales_and_defaults_to_english(self):
+        self.assertEqual(normalize_viewer_locale("en-US"), "en")
+        self.assertEqual(normalize_viewer_locale("zh_Hans"), "zh-CN")
+        self.assertEqual(normalize_viewer_locale("zh-CN"), "zh-CN")
+        self.assertEqual(normalize_viewer_locale("vi"), "en")
+        self.assertEqual(normalize_viewer_locale(None), "en")
+        self.assertEqual(
+            viewer_message("generationNotFound", "en"),
+            "Generation not found",
+        )
+        self.assertEqual(
+            viewer_message("generationNotFound", "zh-CN"),
+            "未找到生成记录",
+        )
+
+    def test_renders_simplified_chinese_static_viewer_copy(self):
+        document = render_model_viewer_document(
+            {
+                "original": "/static/generation/original.glb",
+                "white": "/static/generation/white_mesh.glb",
+                "wireframe": "/static/generation/wireframe_mesh.glb",
+            },
+            "original",
+            650,
+            500,
+            locale="zh-CN",
+        )
+        parser = _ViewerMarkupParser()
+        parser.feed(document)
+
+        self.assertIn('<html lang="zh-CN">', document)
+        self.assertIn("Hunyuan3D-2mv · 3D 模型查看器", document)
+        self.assertIn('aria-label="生成的 3D 模型预览"', document)
+        self.assertIn(">点击并拖动以旋转<", document)
+        self.assertIn(">滚动以缩放<", document)
+        self.assertIn(">原始模型<", document)
+        self.assertIn(">白模<", document)
+        self.assertIn(">线框<", document)
+        self.assertEqual(parser.viewer_config["locale"], "zh-CN")
+        self.assertEqual(
+            parser.viewer_config["messages"]["zh-CN"]["fullscreen"],
+            "全屏",
+        )
+
+    def test_viewer_can_follow_parent_and_persisted_locale_at_runtime(self):
+        document = render_model_viewer_document(
+            {"white": "/static/generation/white_mesh.glb"},
+            "white",
+            650,
+            500,
+        )
+
+        self.assertIn("hunyuan3d.ui-locale.v1", document)
+        self.assertIn("window.parent.currentUiLocale", document)
+        self.assertIn('window.parent.addEventListener("ui-language-change"', document)
+        self.assertIn('window.addEventListener("storage"', document)
+        self.assertIn("applyLocale(currentLocale)", document)
+
     def test_renders_three_modes_without_camera_presets_and_keeps_toolbar(self):
         variant_sources = {
             "original": "/static/generation/original.glb",

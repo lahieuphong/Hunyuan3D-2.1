@@ -51,11 +51,12 @@
             document.body.classList.add("is-history-review");
             document.querySelectorAll(historyReviewGuardSelector).forEach((element) => {
                 element.dataset.historyReadonly = "true";
+                element.dataset.uiI18nTitle = "history.readonly_title";
                 element.setAttribute("aria-disabled", "true");
-                element.setAttribute(
-                    "title",
-                    "Saved History snapshot - generation inputs and settings are read-only."
-                );
+                const title = uiT("history.readonly_title");
+                if (element.getAttribute("title") !== title) {
+                    element.setAttribute("title", title);
+                }
             });
 
             document.querySelectorAll([
@@ -92,12 +93,19 @@
             });
 
             const advancedButton = document.getElementById("advanced-settings-form-button");
-            if (advancedButton && !advancedButton.querySelector(".history-readonly-badge")) {
-                const badge = document.createElement("span");
-                badge.className = "history-readonly-badge";
-                badge.textContent = "History - read only";
-                const chevron = advancedButton.querySelector(".advanced-options-chevron");
-                advancedButton.insertBefore(badge, chevron || null);
+            if (advancedButton) {
+                let badge = advancedButton.querySelector(".history-readonly-badge");
+                if (!badge) {
+                    badge = document.createElement("span");
+                    badge.className = "history-readonly-badge";
+                    const chevron = advancedButton.querySelector(".advanced-options-chevron");
+                    advancedButton.insertBefore(badge, chevron || null);
+                }
+                badge.dataset.uiI18n = "history.readonly_badge";
+                const badgeCopy = uiT("history.readonly_badge");
+                if (badge.textContent !== badgeCopy) {
+                    badge.textContent = badgeCopy;
+                }
             }
 
             if (historyReviewGuardInstalled) return;
@@ -129,3 +137,7 @@
                 event.stopImmediatePropagation();
             }, true);
         };
+
+        window.addEventListener("ui-language-change", () => {
+            installHistoryReviewMode();
+        });

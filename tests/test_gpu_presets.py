@@ -577,9 +577,9 @@ class TemplateTests(unittest.TestCase):
             HardwareMatch(self.verified.id, "exact", True),
             self.catalog,
         )
-        self.assertIn("Đã kiểm tra end-to-end", compatible)
+        self.assertIn("End-to-end verified", compatible)
         self.assertIn("hardware-runtime-summary", compatible)
-        self.assertNotIn("Cấu hình gần nhất", compatible)
+        self.assertNotIn("Closest profile", compatible)
         self.assertNotIn("rtx3090-context-tabs", compatible)
 
         nearest = render_catalog_intro(
@@ -587,9 +587,9 @@ class TemplateTests(unittest.TestCase):
             HardwareMatch(self.estimated.id, "nearest", False),
             self.generic_catalog,
         )
-        self.assertIn("Cấu hình gần nhất · Chỉ đối chiếu", nearest)
+        self.assertIn("Closest profile · Reference only", nearest)
         self.assertIn("is-warning", nearest)
-        self.assertNotIn("chọn thủ công", nearest)
+        self.assertNotIn("manual selection", nearest)
 
     def test_blackwell_intro_displays_measured_runtime_without_claiming_benchmark(
         self,
@@ -607,10 +607,10 @@ class TemplateTests(unittest.TestCase):
 
         self.assertIn("95.59 GiB VRAM", rendered)
         self.assertIn("CC 12.0", rendered)
-        self.assertNotIn("Catalog có", rendered)
-        self.assertIn("Ứng viên chờ benchmark", rendered)
+        self.assertNotIn("Catalog has", rendered)
+        self.assertIn("Pending generation benchmark", rendered)
         self.assertIn("is-runtime-verified", rendered)
-        self.assertNotIn("Catalog hiện chỉ giữ cấu hình RTX 3090", rendered)
+        self.assertNotIn("The catalog currently includes only the RTX 3090 profile", rendered)
 
     def test_profile_list_marks_blackwell_current_and_disables_rtx_3090(self) -> None:
         rtx_3090_id = "nvidia-rtx-3090-24gb"
@@ -634,7 +634,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIn('aria-disabled="true"', rtx_3090_card)
         self.assertIn('data-ui-icon="ban"', rtx_3090_card)
         self.assertIn(
-            "Chỉ để đối chiếu · Máy này đang dùng RTX PRO 6000 Blackwell", rtx_3090_card
+            "Reference only · This machine is using RTX PRO 6000 Blackwell", rtx_3090_card
         )
         self.assertNotIn('role="button"', rendered)
         self.assertNotIn("tabindex", rendered)
@@ -658,7 +658,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIn('aria-current="true"', rtx_3090_card)
         self.assertIn("is-disabled", blackwell_card)
         self.assertIn('aria-disabled="true"', blackwell_card)
-        self.assertIn("Chỉ để đối chiếu · Máy này đang dùng RTX 3090", blackwell_card)
+        self.assertIn("Reference only · This machine is using RTX 3090", blackwell_card)
 
     def test_saved_profile_badge_does_not_override_runtime_authority(self) -> None:
         rtx_3090_id = "nvidia-rtx-3090-24gb"
@@ -676,7 +676,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("is-history-saved", rtx_3090_card)
         self.assertIn("is-details-displayed", rtx_3090_card)
         self.assertIn("is-disabled", rtx_3090_card)
-        self.assertIn("Bản ghi đã lưu · Chỉ đọc", rtx_3090_card)
+        self.assertIn("Saved record · Read-only", rtx_3090_card)
         self.assertEqual(rendered.count("hardware-catalog-history-badge"), 1)
 
     def test_saved_current_profile_is_announced_as_read_only(self) -> None:
@@ -690,17 +690,17 @@ class TemplateTests(unittest.TestCase):
 
         self.assertIn("is-runtime-current", blackwell_card)
         self.assertIn("is-history-saved", blackwell_card)
-        self.assertIn("Bản ghi đã lưu · Chỉ đọc", blackwell_card)
-        self.assertIn("chế độ chỉ đọc", blackwell_card)
-        self.assertIn("Bản ghi đã lưu, chỉ đọc.", blackwell_card)
-        self.assertNotIn("có thể áp dụng preset", blackwell_card)
+        self.assertIn("Saved record · Read-only", blackwell_card)
+        self.assertIn("historical record is read-only", blackwell_card)
+        self.assertIn("Saved record, read-only.", blackwell_card)
+        self.assertNotIn("presets are available", blackwell_card)
 
     def test_profile_list_explains_unmatched_runtime(self) -> None:
         rendered = render_hardware_profile_list(self.catalog, None)
 
         self.assertEqual(rendered.count('aria-disabled="true"'), 2)
-        self.assertIn("Không tìm thấy profile khớp GPU runtime", rendered)
-        self.assertNotIn("Máy này đang dùng GPU hiện tại", rendered)
+        self.assertIn("No profile matches the runtime GPU", rendered)
+        self.assertNotIn("This machine is using current GPU", rendered)
 
     def test_normal_profile_block_omits_duplicate_detail_summary(self) -> None:
         rendered = render_hardware_profile_block(
@@ -721,7 +721,7 @@ class TemplateTests(unittest.TestCase):
         )
         self.assertIn("hardware-profile-detail-heading", history)
         self.assertIn("hardware-profile-summary", history)
-        self.assertIn("Bản ghi đã lưu · Chỉ đọc", history)
+        self.assertIn("Saved record · Read-only", history)
 
     def test_profile_list_escapes_catalog_text(self) -> None:
         unsafe_profile = replace(
@@ -750,13 +750,13 @@ class TemplateTests(unittest.TestCase):
         profile = replace(
             self.estimated,
             display_name="<script>alert(1)</script>",
-            vram_label="VRAM tùy chỉnh",
+            vram_label="Custom VRAM",
         )
         rendered = render_profile_summary(
             profile,
             recommended_hardware_id=profile.id,
         )
-        self.assertIn("VRAM tùy chỉnh", rendered)
+        self.assertIn("Custom VRAM", rendered)
         self.assertIn("&lt;script&gt;", rendered)
         self.assertNotIn("<script>", rendered)
         self.assertIn(self.estimated.verification_label, rendered)

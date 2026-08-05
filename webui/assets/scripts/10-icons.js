@@ -59,12 +59,13 @@
             const title = copy.querySelector("strong");
             const subtitle = copy.querySelector("small");
             const nextSubtitle = mode === "ten"
-                ? "10 views · experimental 10→4 fusion"
+                ? uiT("action.generate_subtitle_ten")
                 : mode === "four"
-                    ? "4 synchronized views"
-                    : "1 front image";
-            if (title.textContent !== "Generate 3D") {
-                title.textContent = "Generate 3D";
+                    ? uiT("action.generate_subtitle_four")
+                    : uiT("action.generate_subtitle_one");
+            const generateTitle = uiT("action.generate_3d");
+            if (title.textContent !== generateTitle) {
+                title.textContent = generateTitle;
             }
             if (subtitle.textContent !== nextSubtitle) {
                 subtitle.textContent = nextSubtitle;
@@ -90,29 +91,36 @@
             });
 
             const settingsThemeIcons = [
-                ["sun", "Light"],
-                ["moon", "Dark"],
-                ["monitor", "System"],
+                ["sun", "light", "theme.light", "theme.light_aria"],
+                ["moon", "dark", "theme.dark", "theme.dark_aria"],
+                ["monitor", "system", "theme.system", "theme.system_aria"],
             ];
             document.querySelectorAll(
                 ".api-docs .theme-buttons .theme-button > button"
             ).forEach((button, index) => {
-                const [iconName, label] = settingsThemeIcons[index] ?? [];
-                if (!iconName || !label) return;
-                button.dataset.uiThemeMode = label.toLowerCase();
-                button.setAttribute("aria-label", label + " theme");
+                const [iconName, mode, labelKey, ariaKey] = settingsThemeIcons[index] ?? [];
+                if (!iconName || !mode || !labelKey || !ariaKey) return;
+                const label = uiT(labelKey);
+                button.dataset.uiThemeMode = mode;
+                button.setAttribute("aria-label", uiT(ariaKey));
                 button.type = "button";
-                if (button.dataset.uiIconWired === "true") return;
-                button.dataset.uiIconWired = "true";
-                button.innerHTML = (
-                    '<span class="settings-theme-content">'
-                    + uiIconMarkup(iconName, "settings-theme-icon")
-                    + '<span>' + label + '</span></span>'
+                if (button.dataset.uiIconWired !== "true") {
+                    button.dataset.uiIconWired = "true";
+                    button.innerHTML = (
+                        '<span class="settings-theme-content">'
+                        + uiIconMarkup(iconName, "settings-theme-icon")
+                        + '<span></span></span>'
+                    );
+                }
+                const labelElement = button.querySelector(
+                    ".settings-theme-content > span:last-child"
                 );
+                if (labelElement) labelElement.textContent = label;
             });
 
             document.querySelectorAll(
-                '.api-docs input[aria-label="Language"]'
+                '.api-docs input[aria-label="Language"], '
+                + '.api-docs input[aria-label="语言"]'
             ).forEach((input) => {
                 const iconWrap = input.closest(".secondary-wrap")
                     ?.querySelector(".icon-wrap");
@@ -147,13 +155,17 @@
             });
 
             document.querySelectorAll(".file-preview td.download a").forEach((link) => {
-                if (link.dataset.uiIconWired === "true") return;
                 const filenameCell = link.closest("tr.file")?.querySelector("td.filename");
-                const filename = filenameCell?.getAttribute("aria-label") ?? link.getAttribute("download") ?? "generated mesh";
+                const filename = link.dataset.uiDownloadFilename
+                    ?? filenameCell?.getAttribute("aria-label")
+                    ?? link.getAttribute("download")
+                    ?? uiT("output.generated_mesh_lower");
+                link.dataset.uiDownloadFilename = filename;
                 link.dataset.uiIconWired = "true";
-                link.innerHTML = "Download " + uiIconMarkup("download");
-                link.setAttribute("aria-label", "Download " + filename);
-                link.setAttribute("title", "Download " + filename);
+                link.innerHTML = uiT("common.download") + " " + uiIconMarkup("download");
+                const downloadLabel = uiT("common.download_named", {filename});
+                link.setAttribute("aria-label", downloadLabel);
+                link.setAttribute("title", downloadLabel);
                 if (filenameCell) filenameCell.setAttribute("title", filename);
             });
 

@@ -46,7 +46,7 @@ def normalize_input_mode(value: object) -> str:
         return "four"
     if normalized in SINGLE_VIEW_MODE_ALIASES:
         return "single"
-    raise GenerationInputError("Chế độ ảnh không hợp lệ. Hãy tải lại trang Web UI.")
+    raise GenerationInputError("Invalid image mode. Reload the Web UI and try again.")
 
 
 def ordered_ten_view_images(
@@ -68,7 +68,7 @@ def _validate_ten_view_images(
     missing = [key for key in TEN_VIEW_KEYS if key not in images or images[key] is None]
     if missing:
         raise GenerationInputError(
-            "Tab 10 ẢNH cần đủ cả 10 góc. Còn thiếu: "
+            "The 10 Views tab requires all 10 camera views. Missing: "
             + ", ".join(key.replace("_", " ").title() for key in missing)
         )
 
@@ -83,17 +83,17 @@ def _validate_ten_view_images(
         image = images[key]
         if not isinstance(image, Image.Image):
             raise GenerationInputError(
-                f"Ảnh {key.replace('_', ' ')} không phải định dạng ảnh hợp lệ."
+                f"The {key.replace('_', ' ')} image is not a valid image."
             )
         width, height = image.size
         if width <= 0 or height <= 0 or width * height > MAX_TEN_VIEW_PIXELS:
             raise GenerationInputError(
-                f"Ảnh {key.replace('_', ' ')} có kích thước không hợp lệ "
+                f"The {key.replace('_', ' ')} image has invalid dimensions "
                 f"({width}×{height})."
             )
         if "A" in image.getbands() and image.getchannel("A").getbbox() is None:
             raise GenerationInputError(
-                f"Ảnh {key.replace('_', ' ')} hoàn toàn trong suốt."
+                f"The {key.replace('_', ' ')} image is fully transparent."
             )
         validated[key] = image
     return validated
@@ -110,7 +110,9 @@ def build_generation_input_bundle(
     mode = normalize_input_mode(input_mode)
     if mode == "single":
         if single_image is None:
-            raise GenerationInputError("Tab 1 ẢNH cần một ảnh chính diện của vật thể.")
+            raise GenerationInputError(
+                "The Single View tab requires one front-facing image of the object."
+            )
         provided = {"front": single_image}
         return GenerationInputBundle(
             mode=mode,
@@ -130,7 +132,8 @@ def build_generation_input_bundle(
         missing = [key for key, image in ordered_four.items() if image is None]
         if missing:
             raise GenerationInputError(
-                "Tab 4 ẢNH cần đủ Front, Back, Left và Right. Còn thiếu: "
+                "The Multi View tab requires Front, Back, Left, and Right images. "
+                "Missing: "
                 + ", ".join(key.title() for key in missing)
             )
         provided = {

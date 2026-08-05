@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="#document-lang#">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Hunyuan3D-2mv · 3D Model Viewer</title>
+    <title>#viewer-title#</title>
     <script src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.1.1/dist/model-viewer.min.js" type="module"></script>
     <script>
         if (window.self === window.top) {
@@ -19,12 +19,12 @@
     </style>
 </head>
 <body>
-    <main id="viewer-shell" class="viewer-shell" aria-label="Generated 3D model preview">
+    <main id="viewer-shell" class="viewer-shell" aria-label="#model-preview#">
         <div id="viewer-floor" class="viewer-floor" aria-hidden="true"></div>
         <model-viewer
             id="modelviewer"
             src="#src#"
-            alt="Generated 3D model preview"
+            alt="#model-preview#"
             camera-target="auto auto auto"
             camera-orbit="0deg 75deg 160%"
             max-camera-orbit="auto 180deg 300%"
@@ -39,26 +39,26 @@
         </model-viewer>
 
         <div class="viewer-overlay" aria-hidden="true">
-            <span class="preview-badge">Preview</span>
-            <span class="viewer-help-text">Click and drag to rotate</span>
-            <span class="viewer-help-separator">•</span>
-            <span class="viewer-help-text">Scroll to zoom</span>
+            <span class="preview-badge" data-viewer-message="preview">#preview#</span>
+            <span class="viewer-help-text" data-viewer-message="clickDrag">#click-drag#</span>
+            <span class="viewer-help-separator">&bull;</span>
+            <span class="viewer-help-text" data-viewer-message="scrollZoom">#scroll-zoom#</span>
         </div>
 
-        <div class="viewer-toolbar" role="toolbar" aria-label="Viewer controls">
-            <button class="viewer-tool" type="button" data-action="fullscreen" data-icon="maximize" aria-label="Fullscreen" title="Fullscreen"></button>
-            <button class="viewer-tool" type="button" data-action="reset" data-icon="reset" aria-label="Reset camera" title="Reset camera"></button>
-            <button class="viewer-tool" type="button" data-action="rotate" data-icon="rotate" aria-label="Toggle auto rotate" title="Toggle auto rotate" aria-pressed="false"></button>
-            <button class="viewer-tool" type="button" data-action="grid" data-icon="grid" aria-label="Toggle floor grid" title="Toggle floor grid" aria-pressed="true"></button>
+        <div class="viewer-toolbar" role="toolbar" aria-label="#viewer-controls#">
+            <button class="viewer-tool" type="button" data-action="fullscreen" data-icon="maximize" aria-label="#fullscreen#" title="#fullscreen#"></button>
+            <button class="viewer-tool" type="button" data-action="reset" data-icon="reset" aria-label="#reset-camera#" title="#reset-camera#"></button>
+            <button class="viewer-tool" type="button" data-action="rotate" data-icon="rotate" aria-label="#toggle-auto-rotate#" title="#toggle-auto-rotate#" aria-pressed="false"></button>
+            <button class="viewer-tool" type="button" data-action="grid" data-icon="grid" aria-label="#toggle-floor-grid#" title="#toggle-floor-grid#" aria-pressed="true"></button>
         </div>
 
         <div id="viewer-loading" class="viewer-loading" role="status" aria-live="polite" hidden>
             <span class="viewer-spinner" aria-hidden="true"></span>
-            <span id="viewer-loading-label">Loading model…</span>
+            <span id="viewer-loading-label">#loading-model#</span>
         </div>
         <div id="viewer-status" class="viewer-status" role="status" aria-live="polite" hidden></div>
 
-        <div id="viewer-mode-strip" class="viewer-mode-strip" role="group" aria-label="Model display modes">
+        <div id="viewer-mode-strip" class="viewer-mode-strip" role="group" aria-label="#display-modes#">
 #mode-buttons#
         </div>
     </main>

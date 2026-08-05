@@ -30,6 +30,77 @@
         width: 14px;
     }
 
+    .api-docs .ui-language-restricted .wrap-inner:has(
+        > .ui-language-select-control
+    ) {
+        position: relative;
+    }
+
+    .api-docs .ui-language-restricted .ui-language-native-control {
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+        position: absolute;
+    }
+
+    .api-docs .ui-language-restricted ul.options[role="listbox"] {
+        display: none !important;
+    }
+
+    .api-docs .ui-language-select-control {
+        align-items: center;
+        display: flex;
+        position: relative;
+        width: 100%;
+    }
+
+    .api-docs .ui-language-select {
+        appearance: none;
+        background: var(--input-background-fill);
+        border: 1px solid var(--input-border-color, var(--border-color-primary));
+        border-radius: var(--ui-radius-sm, 6px);
+        color: var(--body-text-color);
+        cursor: pointer;
+        font: inherit;
+        font-size: 14px;
+        height: 36px;
+        line-height: 1.25;
+        outline: none;
+        padding: 0 38px 0 13px;
+        transition:
+            border-color 140ms ease,
+            box-shadow 140ms ease,
+            background-color 140ms ease;
+        width: 100%;
+    }
+
+    .api-docs .ui-language-select:hover {
+        border-color: var(--border-color-accent, var(--primary-500));
+    }
+
+    .api-docs .ui-language-select:focus-visible {
+        border-color: var(--border-color-accent, var(--primary-500));
+        box-shadow: 0 0 0 2px color-mix(
+            in srgb,
+            var(--primary-500) 28%,
+            transparent
+        );
+    }
+
+    .api-docs .ui-language-select:disabled {
+        cursor: wait;
+        opacity: 0.72;
+    }
+
+    .api-docs .ui-language-select-icon {
+        height: 14px;
+        pointer-events: none;
+        position: absolute;
+        right: 12px;
+        stroke-width: 1.75;
+        width: 14px;
+    }
+
     body.rtx3090-modal-open {
         overflow: hidden;
     }

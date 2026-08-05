@@ -20,6 +20,36 @@
         const stableUploadDeadlineMs = 300000;
         const stableNativePreviewDeadlineMs = 5000;
         const stableUploadPreviewFadeMs = 180;
+        const uploadActionTranslationKeys = Object.freeze({
+            capture: "upload.capture_camera",
+            paste: "upload.paste_clipboard",
+            remove: "upload.remove_image",
+            upload: "upload.upload_file",
+        });
+
+        const uploadActionButtonMatches = (button, action) => {
+            const key = uploadActionTranslationKeys[action];
+            const label = button?.getAttribute("aria-label");
+            return Boolean(
+                key
+                && label
+                && (
+                    label === uiT(key, {}, "en")
+                    || label === uiT(key, {}, "zh-CN")
+                )
+            );
+        };
+
+        const uploadActionButton = (root, action) => (
+            Array.from(root.querySelectorAll("button[aria-label]")).find(
+                (button) => uploadActionButtonMatches(button, action)
+            ) ?? null
+        );
+
+        const closestUploadActionButton = (target, action) => {
+            const button = target.closest?.("button[aria-label]");
+            return uploadActionButtonMatches(button, action) ? button : null;
+        };
 
         const uploadPreviewHost = (tile) => (
             tile.querySelector('[data-testid="image"] .upload-container')
@@ -207,7 +237,7 @@
                 failStableUploadPreview(
                     state,
                     runId,
-                    "Preview failed \u00b7 choose again"
+                    uiT("upload.preview_failed")
                 );
                 return;
             }
@@ -289,12 +319,16 @@
             if (retryIndex >= stableUploadPreviewRetryDelays.length) {
                 if (
                     state.preview
-                    && state.tile.querySelector('button[aria-label="Remove Image"]')
+                    && uploadActionButton(state.tile, "remove")
                 ) {
                     settleStableLocalPreview(state, runId);
                     return;
                 }
-                failStableUploadPreview(state, runId, "Preview failed · choose again");
+                failStableUploadPreview(
+                    state,
+                    runId,
+                    uiT("upload.preview_failed")
+                );
                 return;
             }
 
@@ -390,7 +424,7 @@
                     }
                 } else if (
                     !nativeImage
-                    && !state.tile.querySelector('button[aria-label="Remove Image"]')
+                    && !uploadActionButton(state.tile, "remove")
                 ) {
                     resetStableUploadPreview(state);
                 }
@@ -402,7 +436,7 @@
                 failStableUploadPreview(
                     state,
                     runId,
-                    "Upload failed \u00b7 choose again"
+                    uiT("upload.failed")
                 );
                 return;
             }
@@ -425,18 +459,20 @@
                 state.sawUploadProgress = true;
                 if (!nativeImage) state.sawNativeAbsent = true;
                 if (Date.now() >= state.deadlineAt) {
-                    failStableUploadPreview(state, runId, "Upload timed out · choose again");
+                    failStableUploadPreview(
+                        state,
+                        runId,
+                        uiT("upload.timed_out")
+                    );
                     return;
                 }
-                ensureUploadPreviewStatus(state, "Uploading preview…");
+                ensureUploadPreviewStatus(state, uiT("upload.uploading_preview"));
                 scheduleUploadPreviewReconcile(state, runId, 400);
                 return;
             }
 
             if (!nativeImage) state.sawNativeAbsent = true;
-            const accepted = state.tile.querySelector(
-                'button[aria-label="Remove Image"]'
-            );
+            const accepted = uploadActionButton(state.tile, "remove");
             if (!accepted) state.sawRemoveAbsent = true;
             const acceptedBelongsToRun = Boolean(
                 accepted
@@ -458,12 +494,12 @@
                         failStableUploadPreview(
                             state,
                             runId,
-                            "Preview failed · choose again"
+                            uiT("upload.preview_failed")
                         );
                     }
                     return;
                 }
-                ensureUploadPreviewStatus(state, "Preparing preview…");
+                ensureUploadPreviewStatus(state, uiT("upload.preparing_preview"));
                 scheduleUploadPreviewReconcile(state, runId, 250);
                 return;
             }
@@ -472,7 +508,11 @@
                 scheduleUploadPreviewReconcile(state, runId, 150);
                 return;
             }
-            failStableUploadPreview(state, runId, "Upload interrupted · choose again");
+            failStableUploadPreview(
+                state,
+                runId,
+                uiT("upload.interrupted")
+            );
         };
 
         const startStableUploadPreview = (state, file) => {
@@ -491,9 +531,7 @@
                 || "";
             state.previousNativeError = previousNativeError;
             state.previousNativeErrorText = previousNativeError?.textContent || "";
-            state.previousRemoveButton = state.tile.querySelector(
-                'button[aria-label="Remove Image"]'
-            );
+            state.previousRemoveButton = uploadActionButton(state.tile, "remove");
             state.sawNativeErrorAbsent = !previousNativeError;
             state.sawRemoveAbsent = !state.previousRemoveButton;
             state.startedAt = Date.now();
@@ -507,12 +545,16 @@
             state.preview.decoding = "async";
             state.preview.src = state.objectUrl;
             state.preview.addEventListener("error", () => {
-                failStableUploadPreview(state, runId, "Cannot preview this image");
+                failStableUploadPreview(
+                    state,
+                    runId,
+                    uiT("upload.cannot_preview")
+                );
             }, {once: true});
             host.append(state.preview);
             state.tile.classList.add("is-uploading-preview");
             suppressStaleNativeUploadStatus(state.tile);
-            ensureUploadPreviewStatus(state, "Uploading preview…");
+            ensureUploadPreviewStatus(state, uiT("upload.uploading_preview"));
             scheduleUploadPreviewReconcile(state, runId, 100);
         };
 
@@ -565,8 +607,9 @@
                 if (file) startStableUploadPreview(state, file);
             }, listenerOptions);
             tile.addEventListener("click", (event) => {
-                const uploadSource = event.target.closest?.(
-                    'button[aria-label="Upload file"]'
+                const uploadSource = closestUploadActionButton(
+                    event.target,
+                    "upload"
                 );
                 if (
                     uploadSource
@@ -585,12 +628,10 @@
                     return;
                 }
 
-                const remove = event.target.closest?.(
-                    'button[aria-label="Remove Image"]'
-                );
-                const switchesSource = event.target.closest?.(
-                    'button[aria-label="Capture from camera"], '
-                    + 'button[aria-label="Paste from clipboard"]'
+                const remove = closestUploadActionButton(event.target, "remove");
+                const switchesSource = (
+                    closestUploadActionButton(event.target, "capture")
+                    || closestUploadActionButton(event.target, "paste")
                 );
                 if (
                     (remove && tile.contains(remove))
@@ -607,7 +648,7 @@
                     if (
                         nativeImage
                         && nativePreviewBelongsToRun(state, nativeImage)
-                        && state.tile.querySelector('button[aria-label="Remove Image"]')
+                        && uploadActionButton(state.tile, "remove")
                     ) {
                         wireNativeUploadPreview(state, state.runId, nativeImage);
                         if (nativePreviewIsReady(nativeImage)) {

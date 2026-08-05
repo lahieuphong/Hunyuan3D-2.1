@@ -32,7 +32,15 @@
             const footer = Array.from(document.querySelectorAll("gradio-app footer, footer")).find(
                 (element) => element.querySelector("button.show-api, a.built-with, button.settings")
             );
-            if (!footer || document.getElementById(footerButtonId)) return;
+            const existingTrigger = document.getElementById(footerButtonId);
+            if (existingTrigger) {
+                const label = existingTrigger.querySelector(
+                    ".rtx3090-footer-label"
+                );
+                if (label) label.textContent = uiT("gpu.recommended");
+                return;
+            }
+            if (!footer) return;
 
             const builtWith = footer.querySelector("a.built-with");
             const settings = footer.querySelector("button.settings");
@@ -49,7 +57,14 @@
                 "aria-expanded",
                 String(modal()?.classList.contains("rtx-open") === true)
             );
-            trigger.innerHTML = '<span class="rtx3090-footer-icon ui-icon-slot" data-ui-icon="memory"></span><span>GPU · Cấu hình đề xuất</span>';
+            trigger.innerHTML = (
+                '<span class="rtx3090-footer-icon ui-icon-slot" '
+                + 'data-ui-icon="memory"></span>'
+                + '<span class="rtx3090-footer-label"></span>'
+            );
+            trigger.querySelector(".rtx3090-footer-label").textContent = (
+                uiT("gpu.recommended")
+            );
             trigger.addEventListener("click", openModal);
 
             const divider = document.createElement("div");

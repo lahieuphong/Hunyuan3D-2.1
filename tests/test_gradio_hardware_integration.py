@@ -101,8 +101,8 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertNotIn(f'data-hardware-id="{rtx_3090_id}"', preset_cards)
         self.assertTrue(ui_state[3]["interactive"])
         self.assertTrue(ui_state[4]["interactive"])
-        self.assertTrue(ui_state[3]["value"].startswith("Áp dụng thử ·"))
-        self.assertTrue(ui_state[4]["value"].startswith("Áp dụng thử ·"))
+        self.assertTrue(ui_state[3]["value"].startswith("Try ·"))
+        self.assertTrue(ui_state[4]["value"].startswith("Try ·"))
 
     def test_runtime_verified_blackwell_exposes_only_its_trial_presets(self):
         with runtime_match(app.HardwareMatch(BLACKWELL_ID, "exact", True)):
@@ -134,9 +134,9 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertEqual(hardware["verification"], "runtime-verified")
         self.assertEqual(preset["id"], "quality")
         self.assertFalse(preset["verified"])
-        self.assertTrue(ui_state[3]["value"].startswith("Áp dụng thử ·"))
-        self.assertTrue(ui_state[4]["value"].startswith("Áp dụng thử ·"))
-        self.assertIn("Đang dùng thử", ui_state[5])
+        self.assertTrue(ui_state[3]["value"].startswith("Try ·"))
+        self.assertTrue(ui_state[4]["value"].startswith("Try ·"))
+        self.assertIn("In use for testing", ui_state[5])
         self.assertEqual(ui_state[0].count('role="listitem"'), 2)
         self.assertIn(f'data-hardware-id="{BLACKWELL_ID}"', ui_state[0])
         self.assertIn('data-hardware-id="nvidia-rtx-3090-24gb"', ui_state[0])
@@ -206,9 +206,9 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         rendered = ui_state[0]
         self.assertIn("is-runtime-current", rendered)
         self.assertIn("is-history-saved", rendered)
-        self.assertIn("Bản ghi đã lưu · Chỉ đọc", rendered)
+        self.assertIn("Saved record · Read-only", rendered)
         self.assertIn('aria-disabled="true"', rendered)
-        self.assertIn("Chi tiết cấu hình của bản ghi đã lưu", rendered)
+        self.assertIn("Saved record profile details", rendered)
         self.assertIn("hardware-profile-summary", rendered)
         self.assertFalse(ui_state[3]["interactive"])
         self.assertFalse(ui_state[4]["interactive"])
@@ -364,8 +364,8 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             "#rtx3090-modal:not(.hardware-presets-enabled).rtx-open",
             custom_css,
         )
-        self.assertIn("GPU · Cấu hình đề xuất", custom_js)
-        self.assertNotIn("<span>RTX 3090 · Cấu hình đề xuất</span>", custom_js)
+        self.assertIn("GPU · Recommended configuration", custom_js)
+        self.assertNotIn("<span>RTX 3090 · Recommended configuration</span>", custom_js)
 
     def test_form_sync_keeps_legacy_history_label(self):
         _, _, status = app.get_hardware_form_state(
@@ -377,8 +377,8 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             '<span data-history-review-active="true"></span>',
         )
 
-        self.assertIn("Bản ghi cũ", status)
-        self.assertIn("GPU chưa được lưu", status)
+        self.assertIn("Legacy record", status)
+        self.assertIn("GPU was not saved", status)
 
     def test_history_restore_locks_profile_and_keeps_saved_quality_values(self):
         hardware_id = "nvidia-rtx-3090-24gb"
@@ -455,12 +455,12 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         self.assertEqual(restored[12]["value"], 384)
         self.assertFalse(restored[12]["interactive"])
         self.assertIn('data-profile="quality"', restored[17])
-        self.assertIn("Đã lưu", restored[17])
+        self.assertIn("Saved", restored[17])
         self.assertIn('data-history-review-active="true"', restored[22])
-        self.assertIn("Bản ghi đã lưu · Chỉ đọc", restored[25])
-        self.assertIn("Bản ghi lịch sử này chỉ đọc", restored[25])
-        self.assertIn("Bản ghi đã lưu, chỉ đọc.", restored[25])
-        self.assertNotIn("có thể áp dụng preset", restored[25])
+        self.assertIn("Saved record · Read-only", restored[25])
+        self.assertIn("This historical record is read-only", restored[25])
+        self.assertIn("Saved record, read-only.", restored[25])
+        self.assertNotIn("its presets are available", restored[25])
         self.assertEqual(restored[23], browser_state)
         self.assertEqual(restored[24]["value"], hardware_id)
         self.assertFalse(restored[24]["interactive"])
@@ -533,15 +533,15 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
                         setattr(app, name, value)
 
         self.assertIn(removed_hardware_label, restored[17])
-        self.assertIn("Không còn trong catalog", restored[17])
-        self.assertNotIn("GPU chưa được lưu", restored[17])
-        self.assertEqual(restored[18]["value"], "Preset cũ · Không khả dụng")
-        self.assertEqual(restored[19]["value"], "Preset cũ · Không khả dụng")
+        self.assertIn("No longer in the catalog", restored[17])
+        self.assertNotIn("GPU was not saved", restored[17])
+        self.assertEqual(restored[18]["value"], "Legacy preset · Unavailable")
+        self.assertEqual(restored[19]["value"], "Legacy preset · Unavailable")
         self.assertIsNone(restored[24]["value"])
         self.assertIn(removed_hardware_label, restored[26])
         self.assertIn(removed_hardware_label, restored[25])
-        self.assertIn("không phải GPU của bản ghi", restored[25])
-        self.assertNotIn("Bản ghi cũ không lưu GPU", restored[25])
+        self.assertIn("not as the GPU from the saved record", restored[25])
+        self.assertNotIn("The legacy record did not store a GPU", restored[25])
         self.assertNotIn("RTX 3090", restored[26])
 
 

@@ -2,10 +2,25 @@
     "use strict";
 
     const MODE_ORDER = ["original", "white", "wireframe"];
-    const MODE_LABELS = {
-        original: "Original",
-        white: "White",
-        wireframe: "Wireframe",
+    const MODE_MESSAGE_KEYS = {
+        original: "modeOriginal",
+        white: "modeWhite",
+        wireframe: "modeWireframe",
+    };
+    const DEFAULT_LOCALE = "en";
+    const LOCALE_STORAGE_KEY = "hunyuan3d.ui-locale.v1";
+    const normalizeLocale = (value) => {
+        if (typeof value !== "string") {
+            return null;
+        }
+        const candidate = value.trim().toLowerCase().replace("_", "-");
+        if (candidate === "zh" || candidate === "zh-cn" || candidate === "zh-hans") {
+            return "zh-CN";
+        }
+        if (candidate === "en" || candidate === "en-us") {
+            return "en";
+        }
+        return null;
     };
     const DEFAULT_CAMERA_ORBIT = "0deg 75deg 160%";
     const GROUND_TARGET_OFFSET_RATIO = 0;
@@ -39,6 +54,9 @@
     const loading = document.getElementById("viewer-loading");
     const loadingLabel = document.getElementById("viewer-loading-label");
     const status = document.getElementById("viewer-status");
+    const toolbar = document.querySelector(".viewer-toolbar");
+    const fullscreenButton = document.querySelector('[data-action="fullscreen"]');
+    const resetButton = document.querySelector('[data-action="reset"]');
     const rotateButton = document.querySelector('[data-action="rotate"]');
     const gridButton = document.querySelector('[data-action="grid"]');
     const modeButtons = new Map();
@@ -62,6 +80,61 @@
         configError = true;
     }
 
+    const messageCatalog = (
+        parsedConfig
+        && parsedConfig.messages
+        && typeof parsedConfig.messages === "object"
+    ) ? parsedConfig.messages : {};
+    const parentLocale = () => {
+        if (window.parent === window) {
+            return null;
+        }
+        try {
+            if (typeof window.parent.currentUiLocale === "function") {
+                return normalizeLocale(window.parent.currentUiLocale());
+            }
+            return normalizeLocale(window.parent.document.documentElement.lang);
+        } catch (_error) {
+            return null;
+        }
+    };
+    const queryLocale = () => {
+        try {
+            return normalizeLocale(new URL(window.location.href).searchParams.get("lang"));
+        } catch (_error) {
+            return null;
+        }
+    };
+    const storedLocale = () => {
+        try {
+            return normalizeLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
+        } catch (_error) {
+            return null;
+        }
+    };
+    let currentLocale = (
+        parentLocale()
+        || queryLocale()
+        || storedLocale()
+        || normalizeLocale(parsedConfig.locale)
+        || DEFAULT_LOCALE
+    );
+    const message = (key, parameters = {}) => {
+        const localeMessages = messageCatalog[currentLocale] || {};
+        const englishMessages = messageCatalog[DEFAULT_LOCALE] || {};
+        const template = localeMessages[key] || englishMessages[key] || key;
+        return Object.entries(parameters).reduce(
+            (result, [name, value]) => {
+                const displayValue = MODE_ORDER.includes(value)
+                    ? modeLabel(value)
+                    : value;
+                return result.replaceAll("{" + name + "}", String(displayValue));
+            },
+            template
+        );
+    };
+    const modeLabel = (mode) => message(MODE_MESSAGE_KEYS[mode] || "requestedMode");
+
     const variants = {};
     MODE_ORDER.forEach((mode) => {
         const candidate = parsedConfig
@@ -78,8 +151,10 @@
         busy: false,
         cameraSnapshot: null,
         modelLoaded: false,
-        notice: "",
+        notice: null,
         pendingMode: null,
+        statusKey: "",
+        statusParameters: {},
         statusTimer: null,
     };
 
@@ -98,13 +173,29 @@
         )) || null;
     };
 
-    const showStatus = (message, kind = "info", autoHide = false) => {
+    const renderStatus = () => {
+        const text = state.statusKey
+            ? message(state.statusKey, state.statusParameters)
+            : "";
+        status.textContent = text;
+        status.hidden = !text;
+    };
+
+    const showStatus = (
+        key,
+        parameters = {},
+        kind = "info",
+        autoHide = false
+    ) => {
         window.clearTimeout(state.statusTimer);
-        status.textContent = message;
+        state.statusKey = key;
+        state.statusParameters = parameters;
         status.dataset.kind = kind;
-        status.hidden = !message;
-        if (message && autoHide) {
+        renderStatus();
+        if (key && autoHide) {
             state.statusTimer = window.setTimeout(() => {
+                state.statusKey = "";
+                state.statusParameters = {};
                 status.hidden = true;
                 status.textContent = "";
             }, 1600);
@@ -125,11 +216,11 @@
             button.setAttribute("aria-disabled", String(disabled));
             button.setAttribute("aria-pressed", String(active));
             if (failedModes.has(mode)) {
-                button.title = MODE_LABELS[mode] + " model could not be loaded";
+                button.title = message("modeFailedTitle", {mode});
             } else if (!variants[mode]) {
-                button.title = MODE_LABELS[mode] + " model is unavailable";
+                button.title = message("modeUnavailableTitle", {mode});
             } else {
-                button.title = "Show " + MODE_LABELS[mode] + " model";
+                button.title = message("showModeTitle", {mode});
             }
         });
         modeStrip.setAttribute("aria-busy", String(state.busy));
@@ -141,9 +232,60 @@
         shell.dataset.loading = String(busy);
         modelViewer.setAttribute("aria-busy", String(busy));
         if (busy && mode) {
-            loadingLabel.textContent = "Loading " + MODE_LABELS[mode] + "…";
+            loadingLabel.textContent = message("loadingMode", {mode});
+        } else if (!busy) {
+            loadingLabel.textContent = message("loadingModel");
         }
         updateModeButtons();
+    };
+
+    const applyLocale = (requestedLocale) => {
+        const nextLocale = normalizeLocale(requestedLocale) || DEFAULT_LOCALE;
+        currentLocale = nextLocale;
+        document.documentElement.lang = nextLocale;
+        document.title = message("title");
+        shell.setAttribute("aria-label", message("modelPreview"));
+        modelViewer.setAttribute("alt", message("modelPreview"));
+        try {
+            if (window.frameElement) {
+                window.frameElement.title = message("modelPreview");
+            }
+        } catch (_error) {
+            // A cross-origin parent owns its iframe title.
+        }
+        toolbar?.setAttribute("aria-label", message("viewerControls"));
+        modeStrip.setAttribute("aria-label", message("displayModes"));
+
+        document.querySelectorAll("[data-viewer-message]").forEach((element) => {
+            element.textContent = message(element.dataset.viewerMessage);
+        });
+        document.querySelectorAll("[data-viewer-mode-label]").forEach((element) => {
+            element.textContent = modeLabel(element.dataset.viewerModeLabel);
+        });
+
+        [
+            [fullscreenButton, "fullscreen"],
+            [resetButton, "resetCamera"],
+            [rotateButton, "toggleAutoRotate"],
+            [gridButton, "toggleFloorGrid"],
+        ].forEach(([button, key]) => {
+            if (!button) {
+                return;
+            }
+            const label = message(key);
+            button.setAttribute("aria-label", label);
+            button.title = label;
+        });
+
+        if (state.busy && state.pendingMode) {
+            loadingLabel.textContent = message("loadingMode", {
+                mode: state.pendingMode,
+            });
+        } else {
+            loadingLabel.textContent = message("loadingModel");
+        }
+        updateModeButtons();
+        renderStatus();
     };
 
     const finiteNumber = (value) => (
@@ -235,10 +377,20 @@
         setLoading(false);
 
         if (state.notice) {
-            showStatus(state.notice, "error", false);
-            state.notice = "";
+            showStatus(
+                state.notice.key,
+                state.notice.parameters,
+                "error",
+                false
+            );
+            state.notice = null;
         } else if (loadedMode) {
-            showStatus(MODE_LABELS[loadedMode] + " model ready", "info", true);
+            showStatus(
+                "modeReady",
+                {mode: loadedMode},
+                "info",
+                true
+            );
         }
     };
 
@@ -258,10 +410,10 @@
         state.cameraSnapshot = options.cameraSnapshot || (
             state.modelLoaded ? captureCameraState() : null
         );
-        state.notice = options.notice || "";
+        state.notice = options.notice || null;
         state.pendingMode = mode;
         setLoading(true, mode);
-        showStatus("", "info", false);
+        showStatus("", {}, "info", false);
 
         const requestedSource = absoluteSource(variants[mode].src);
         const currentSource = absoluteSource(modelViewer.getAttribute("src") || "");
@@ -282,7 +434,7 @@
         }
         const cameraSnapshot = state.cameraSnapshot;
         state.modelLoaded = false;
-        const failedLabel = MODE_LABELS[failedMode] || "Requested";
+        const failedLabel = failedMode || message("requestedMode");
         state.pendingMode = null;
         state.activeMode = null;
         setLoading(false);
@@ -294,19 +446,25 @@
         ) {
             requestMode("white", {
                 cameraSnapshot,
-                notice: failedLabel + " is unavailable. Showing White instead.",
+                notice: {
+                    key: "fallbackMode",
+                    parameters: {
+                        mode: failedLabel,
+                        fallback: "white",
+                    },
+                },
             });
             return;
         }
 
-        showStatus(failedLabel + " model could not be loaded.", "error", false);
+        showStatus("modeFailed", {mode: failedLabel}, "error", false);
         updateModeButtons();
     };
 
     modelViewer.addEventListener("load", finishModeLoad);
     modelViewer.addEventListener("error", handleModelError);
 
-    document.querySelector('[data-action="fullscreen"]').addEventListener("click", async () => {
+    fullscreenButton.addEventListener("click", async () => {
         try {
             if (document.fullscreenElement) {
                 await document.exitFullscreen();
@@ -314,11 +472,11 @@
                 await shell.requestFullscreen();
             }
         } catch (_error) {
-            showStatus("Fullscreen is unavailable in this browser.", "error", true);
+            showStatus("fullscreenUnavailable", {}, "error", true);
         }
     });
 
-    document.querySelector('[data-action="reset"]').addEventListener("click", resetCamera);
+    resetButton.addEventListener("click", resetCamera);
 
     rotateButton.addEventListener("click", () => {
         const enabled = !modelViewer.hasAttribute("auto-rotate");
@@ -335,10 +493,25 @@
         button.addEventListener("click", () => requestMode(mode));
     });
 
-    updateModeButtons();
+    applyLocale(currentLocale);
+
+    if (window.parent !== window) {
+        try {
+            window.parent.addEventListener("ui-language-change", (event) => {
+                applyLocale(event?.detail?.locale || parentLocale());
+            });
+        } catch (_error) {
+            // Cross-origin embeds retain their URL/configured locale.
+        }
+    }
+    window.addEventListener("storage", (event) => {
+        if (event.key === LOCALE_STORAGE_KEY) {
+            applyLocale(event.newValue);
+        }
+    });
 
     if (configError) {
-        showStatus("Viewer configuration could not be read.", "error", false);
+        showStatus("configurationUnreadable", {}, "error", false);
     }
 
     const configuredDefault = typeof parsedConfig.defaultMode === "string"

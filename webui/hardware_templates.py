@@ -36,22 +36,22 @@ def render_catalog_intro(
     matched_profile = catalog.get_hardware(match.hardware_id)
     runtime_name = short_gpu_name(runtime.name)
     vram = runtime.total_vram_gb
-    vram_label = f"{vram:.2f} GiB VRAM" if vram is not None else "VRAM chưa xác định"
+    vram_label = f"{vram:.2f} GiB VRAM" if vram is not None else "VRAM unavailable"
     backend_label = runtime.backend.upper() if runtime.backend else "LOCAL"
     capability_label = (
-        f"CC {runtime.capability}" if runtime.capability else "CC chưa xác định"
+        f"CC {runtime.capability}" if runtime.capability else "CC unavailable"
     )
     if matched_profile and match.compatible:
         if matched_profile.verification == "verified":
-            status_label = "Đã kiểm tra end-to-end"
+            status_label = "End-to-end verified"
         elif matched_profile.verification == "runtime-verified":
-            status_label = "Ứng viên chờ benchmark"
+            status_label = "Pending generation benchmark"
         else:
-            status_label = "Chưa cho phép áp dụng"
+            status_label = "Not available for use"
     elif matched_profile:
-        status_label = "Cấu hình gần nhất · Chỉ đối chiếu"
+        status_label = "Closest profile · Reference only"
     else:
-        status_label = "Chưa có profile phù hợp"
+        status_label = "No compatible profile"
     runtime_verified = (
         matched_profile is not None
         and matched_profile.verification == "runtime-verified"
@@ -71,7 +71,7 @@ def render_catalog_intro(
         f"{vram_label} · {backend_label} {runtime.dtype.upper()} · {capability_label}"
     )
     accessibility_label = (
-        f"GPU phát hiện: {runtime.name}. {runtime_meta}. {status_label}."
+        f"Detected GPU: {runtime.name}. {runtime_meta}. {status_label}."
     )
     return f"""
     <div class="rtx3090-api-intro hardware-catalog-intro">
@@ -104,7 +104,7 @@ def render_hardware_profile_list(
     """Render every catalog profile while keeping runtime authority explicit."""
     runtime_profile = catalog.get_hardware(runtime_hardware_id)
     runtime_label = (
-        runtime_profile.short_label if runtime_profile is not None else "GPU hiện tại"
+        runtime_profile.short_label if runtime_profile is not None else "current GPU"
     )
     ordered_profiles = sorted(
         enumerate(catalog.hardware),
@@ -124,36 +124,37 @@ def render_hardware_profile_list(
         details_class = " is-details-displayed" if is_details_displayed else ""
         history_class = " is-history-saved" if is_history_saved else ""
         state_icon = "check" if is_runtime_current else "ban"
-        state_label = "Đang dùng" if is_runtime_current else "Không khả dụng"
+        state_label = "Active" if is_runtime_current else "Unavailable"
         if is_runtime_current:
             if is_history_saved:
                 availability_copy = (
-                    "GPU của bản ghi khớp máy hiện tại. Bản ghi lịch sử đang ở "
-                    "chế độ chỉ đọc; preset không thể áp dụng từ màn hình này."
+                    "The saved record's GPU matches the current machine. This "
+                    "historical record is read-only; presets cannot be applied "
+                    "from this screen."
                 )
             else:
                 availability_copy = (
-                    "Cấu hình khớp GPU hiện tại và có thể áp dụng preset."
+                    "This profile matches the current GPU and its presets are available."
                 )
             state_attribute = 'aria-current="true"'
         else:
             if runtime_profile is None:
                 availability_copy = (
-                    "Chỉ để đối chiếu · Không tìm thấy profile khớp GPU runtime."
+                    "Reference only · No profile matches the runtime GPU."
                 )
             else:
                 availability_copy = (
-                    f"Chỉ để đối chiếu · Máy này đang dùng {runtime_label}."
+                    f"Reference only · This machine is using {runtime_label}."
                 )
             if is_history_saved:
-                availability_copy += " Bản ghi lịch sử này chỉ đọc."
+                availability_copy += " This historical record is read-only."
             state_attribute = 'aria-disabled="true"'
-        history_accessibility = " Bản ghi đã lưu, chỉ đọc." if is_history_saved else ""
+        history_accessibility = " Saved record, read-only." if is_history_saved else ""
         history_badge = (
             """
             <span class="hardware-catalog-history-badge">
                 <i class="ui-icon-slot" data-ui-icon="history" aria-hidden="true"></i>
-                Bản ghi đã lưu · Chỉ đọc
+                Saved record · Read-only
             </span>
             """
             if is_history_saved
@@ -164,8 +165,8 @@ def render_hardware_profile_list(
             <span class="hardware-catalog-disabled-overlay" aria-hidden="true">
                 <i class="ui-icon-slot" data-ui-icon="ban"></i>
                 <span>
-                    <strong>Không thể chọn</strong>
-                    <small>Không khớp GPU hiện tại</small>
+                    <strong>Cannot select</strong>
+                    <small>Does not match the current GPU</small>
                 </span>
             </span>
             """
@@ -215,7 +216,7 @@ def render_hardware_profile_list(
         )
     return (
         '<ul class="hardware-profile-list" role="list" '
-        'aria-label="Danh sách cấu hình GPU trong catalog">' + "".join(cards) + "</ul>"
+        'aria-label="GPU profiles in the catalog">' + "".join(cards) + "</ul>"
     )
 
 
@@ -240,14 +241,14 @@ def render_profile_summary(
     legacy_identity = legacy_hardware_label or legacy_hardware_id
     if legacy and legacy_identity:
         verification = (
-            f"GPU đã lưu: {legacy_identity}. Profile này không còn trong catalog; "
-            f"{profile.short_label} đang hiển thị là GPU runtime hiện tại để đối "
-            "chiếu, không phải GPU của bản ghi."
+            f"Saved GPU: {legacy_identity}. This profile is no longer in the catalog; "
+            f"{profile.short_label} is shown as the current runtime GPU for "
+            "comparison, not as the GPU from the saved record."
         )
     elif legacy:
         verification = (
-            "Bản ghi cũ không lưu GPU; profile đang hiển thị chỉ dùng để đối chiếu "
-            "các thông số đã lưu."
+            "The legacy record did not store a GPU; the displayed profile is "
+            "provided only to compare the saved settings."
         )
     else:
         verification = profile.verification_label
@@ -293,16 +294,16 @@ def render_hardware_profile_block(
 
     legacy_identity = legacy_hardware_label or legacy_hardware_id
     if saved and not legacy:
-        detail_label = "Chi tiết cấu hình của bản ghi đã lưu"
+        detail_label = "Saved record profile details"
     elif legacy and legacy_identity:
         detail_label = (
-            f"GPU đã lưu: {legacy_identity} · Không còn trong catalog; "
-            f"đang đối chiếu với {profile.short_label}"
+            f"Saved GPU: {legacy_identity} · No longer in the catalog; "
+            f"compared with {profile.short_label}"
         )
     elif legacy:
-        detail_label = "Profile runtime dùng để đối chiếu bản ghi chưa lưu GPU"
+        detail_label = "Runtime profile for a record with no saved GPU"
     else:
-        detail_label = "Chi tiết cấu hình đang dùng"
+        detail_label = "Active profile details"
     return (
         profile_list
         + '<div class="hardware-profile-detail-heading">'
@@ -327,7 +328,7 @@ def render_preset_cards(
         is_selected = preset.id == selected_preset_id
         selected_class = " is-selected" if is_selected else ""
         aria_pressed = "true" if is_selected else "false"
-        action_label = "Áp dụng" if preset.verified else "Áp dụng thử"
+        action_label = "Apply" if preset.verified else "Try"
         cards.append(
             f"""
             <article
@@ -382,14 +383,14 @@ def render_legacy_profile_notice(
     hardware_label: str,
     hardware_id: str | None = None,
 ) -> str:
-    identity = hardware_label or hardware_id or "GPU profile cũ"
+    identity = hardware_label or hardware_id or "Legacy GPU profile"
     return f"""
     <div class="rtx3090-modal-note hardware-profile-note is-experimental">
         <span class="rtx3090-note-icon ui-icon-slot" data-ui-icon="info" aria-hidden="true"></span>
         <p>
             <strong>{_text(identity)}</strong><br>
-            Profile đã lưu không còn trong catalog hiện tại. Các thông số generation
-            bên dưới vẫn được giữ nguyên để đối chiếu lịch sử.
+            This saved profile is no longer in the current catalog. The generation
+            settings below are preserved for historical reference.
         </p>
     </div>
     """
@@ -414,7 +415,7 @@ def render_preset_status(
     else:
         profile_class = "custom"
         preset_id = "custom"
-        title = "Cấu hình tùy chỉnh"
+        title = "Custom configuration"
         icon = "settings"
         displayed_values = values
 
@@ -423,18 +424,18 @@ def render_preset_status(
     if legacy and legacy_hardware_label:
         display_hardware_label = legacy_hardware_label
         display_hardware_id = legacy_hardware_id or legacy_hardware_label
-        current_label = "Profile cũ"
-        title = f"{title} · Không còn trong catalog"
+        current_label = "Legacy profile"
+        title = f"{title} · No longer in the catalog"
     elif legacy:
-        current_label = "Bản ghi cũ"
-        title = f"{title} · GPU chưa được lưu"
+        current_label = "Legacy record"
+        title = f"{title} · GPU was not saved"
     elif saved:
-        current_label = "Đã lưu"
+        current_label = "Saved"
     else:
         current_label = (
-            "Đang dùng thử"
+            "In use for testing"
             if preset is not None and not preset.verified
-            else "Đang dùng"
+            else "In use"
         )
 
     normalized = normalize_control_tuple(*displayed_values)
@@ -453,7 +454,7 @@ def render_preset_status(
         <div class="rtx-preset-status-heading">
             <div class="rtx-preset-status-title">
                 <span class="rtx-preset-status-check ui-icon-slot" data-ui-icon="{icon}" aria-hidden="true"></span>
-                <span>{_text(display_hardware_label)} · 1 ảnh &amp; 4 ảnh · {_text(title)}</span>
+                <span>{_text(display_hardware_label)} · 1 image &amp; 4 images · {_text(title)}</span>
             </div>
             <span class="rtx-preset-current">{_text(current_label)}</span>
         </div>

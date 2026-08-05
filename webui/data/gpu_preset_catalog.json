@@ -17,15 +17,15 @@
       "dtype": "float16",
       "compute_capability": "8.6",
       "verification": "verified",
-      "verification_label": "Đã kiểm tra end-to-end",
-      "summary": "Profile chuẩn của máy hiện tại, đã chạy thành công với cả đầu vào 1 ảnh và 4 ảnh.",
-      "note": "Seed không làm tăng VRAM. Chunks 8000 cân bằng tốc độ và bộ nhớ. Không đặt Octree 512 làm mặc định trên RTX 3090 24 GB.",
+      "verification_label": "End-to-end verified",
+      "summary": "Standard profile for the current machine, successfully tested with both single-image and four-image inputs.",
+      "note": "Seed values do not increase VRAM usage. 8,000 chunks balance speed and memory. Octree 512 is not the default on the 24 GB RTX 3090.",
       "default_preset_id": "safe",
       "presets": [
         {
           "id": "safe",
-          "label": "256 · Mặc định an toàn",
-          "description": "Dùng cho lần chạy đầu hoặc khi ưu tiên ổn định và tốc độ.",
+          "label": "256 · Safe default",
+          "description": "Use for the first run or when prioritizing stability and speed.",
           "tone": "safe",
           "verified": true,
           "params": {
@@ -37,8 +37,8 @@
         },
         {
           "id": "quality",
-          "label": "384 · Chất lượng cao",
-          "description": "Dùng khi ảnh đầu vào đã đúng và cần mesh dày, mịn hơn.",
+          "label": "384 · High quality",
+          "description": "Use when the input image is ready and a denser, smoother mesh is needed.",
           "tone": "quality",
           "verified": true,
           "params": {
@@ -65,15 +65,15 @@
       "dtype": "float16",
       "compute_capability": "12.0",
       "verification": "runtime-verified",
-      "verification_label": "Đã xác nhận runtime · Chưa kiểm chứng generation",
-      "summary": "Đã vượt qua CUDA 12.8, compute capability 12.0, BF16 smoke test, kiểm tra dependency và WebUI preflight trên máy đích.",
-      "note": "Hai preset tạm dùng đúng các giá trị đã hoàn tất run 1 ảnh và 4 ảnh trên RTX 3090; chưa được xem là benchmark end-to-end của Blackwell cho đến khi hoàn tất generation 1 ảnh và 4 ảnh trên máy này.",
+      "verification_label": "Runtime verified · Generation not yet verified",
+      "summary": "Passed CUDA 12.8, compute capability 12.0, BF16 smoke testing, dependency checks, and WebUI preflight on the target machine.",
+      "note": "Both provisional presets use the same values that completed single-image and four-image runs on the RTX 3090. They are not considered end-to-end Blackwell benchmarks until both generation modes complete on this machine.",
       "default_preset_id": "safe",
       "presets": [
         {
           "id": "safe",
-          "label": "256 · Cấu hình cơ sở",
-          "description": "Ứng viên thận trọng cho lần generation đầu tiên trên Blackwell.",
+          "label": "256 · Baseline",
+          "description": "Conservative candidate for the first generation run on Blackwell.",
           "tone": "safe",
           "verified": false,
           "params": {
@@ -85,8 +85,8 @@
         },
         {
           "id": "quality",
-          "label": "384 · Độ phân giải cao (ứng viên)",
-          "description": "Dùng để benchmark mesh dày hơn sau khi cấu hình cơ sở đã hoàn tất.",
+          "label": "384 · High resolution (candidate)",
+          "description": "Use to benchmark a denser mesh after the baseline run completes successfully.",
           "tone": "quality",
           "verified": false,
           "params": {

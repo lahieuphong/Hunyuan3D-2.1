@@ -99,6 +99,7 @@ from webui.model_viewer import (
     render_model_viewer_document as render_variant_model_viewer_document,
     resolve_generation_assets,
     stored_generation_file as resolve_stored_generation_file,
+    viewer_message,
 )
 
 MAX_SEED = 10_000_000
@@ -258,7 +259,7 @@ def get_hardware_preset(hardware_id, preset_id, *, saved=False):
 
 
 def hardware_preset_action_label(hardware, preset):
-    action = 'Áp dụng' if preset.verified else 'Áp dụng thử'
+    action = 'Apply' if preset.verified else 'Try'
     return f'{action} · {preset.label}'
 
 
@@ -375,7 +376,7 @@ def resolve_browser_hardware_id(state):
 def apply_hardware_preset(hardware_id, preset_id):
     hardware = get_available_hardware_profile()
     if hardware is None or hardware.id != hardware_id:
-        raise gr.Error("GPU preset không khả dụng cho runtime hiện tại.")
+        raise gr.Error("This GPU preset is unavailable for the current runtime.")
     return (
         *get_hardware_preset(hardware.id, preset_id),
         hardware_browser_state(hardware.id, preset_id),
@@ -463,7 +464,7 @@ def select_hardware_profile(
 ):
     hardware = get_available_hardware_profile()
     if hardware is None or hardware.id != hardware_id:
-        raise gr.Error("GPU preset không khả dụng cho runtime hiện tại.")
+        raise gr.Error("This GPU preset is unavailable for the current runtime.")
     return (
         hardware_browser_state(hardware.id, hardware.default_preset_id),
         *get_hardware_ui_state(
@@ -663,7 +664,9 @@ def normalize_generation_uid(generation_uid=None):
     try:
         return str(uuid.UUID(str(generation_uid).strip()))
     except (ValueError, AttributeError, TypeError) as exc:
-        raise gr.Error("Generation UID không hợp lệ. Hãy tải lại trang và thử lại.") from exc
+        raise gr.Error(
+            "Invalid generation UID. Reload the Web UI and try again."
+        ) from exc
 
 
 def generation_uid_query_from_request(request=None):
@@ -971,7 +974,7 @@ def gen_save_folder(max_size=200, generation_uid=None):
     new_folder = os.path.join(SAVE_DIR, generation_uid)
     if os.path.exists(new_folder):
         raise GenerationUidConflictError(
-            f"Generation UID đã tồn tại: {generation_uid}"
+            f"Generation UID already exists: {generation_uid}"
         )
 
     dirs = []
@@ -991,7 +994,7 @@ def gen_save_folder(max_size=200, generation_uid=None):
         os.makedirs(new_folder, exist_ok=False)
     except FileExistsError as exc:
         raise GenerationUidConflictError(
-            f"Generation UID đã tồn tại: {generation_uid}"
+            f"Generation UID already exists: {generation_uid}"
         ) from exc
     print(f"Created new folder: {new_folder}")
     return new_folder
@@ -1048,7 +1051,13 @@ def randomize_seed_fn(seed: int, randomize_seed: bool) -> int:
     return seed
 
 
-def render_model_viewer_document(mesh_src, height, width, textured=False):
+def render_model_viewer_document(
+    mesh_src,
+    height,
+    width,
+    textured=False,
+    locale=None,
+):
     """Compatibility wrapper for callers that provide one standalone GLB."""
     mode = 'original' if textured else 'white'
     return render_variant_model_viewer_document(
@@ -1056,6 +1065,7 @@ def render_model_viewer_document(mesh_src, height, width, textured=False):
         mode,
         height,
         width,
+        locale=locale,
     )
 
 
@@ -1424,7 +1434,7 @@ def restore_generation_from_request(
         )
         history_profile_note = ''
         unavailable_preset = gr.update(
-            value='Preset cũ · Không khả dụng',
+            value='Legacy preset · Unavailable',
             interactive=False,
         )
         history_safe_preset = unavailable_preset
@@ -2698,11 +2708,11 @@ Fast for very complex cases, Standard seldom use.',
                 <div class="rtx3090-modal-header">
                     <div class="rtx3090-header-main">
                         <span class="rtx3090-header-icon ui-icon-slot" data-ui-icon="zap" aria-hidden="true"></span>
-                        <h2 id="rtx3090-modal-title">GPU · Cấu hình đề xuất</h2>
+                        <h2 id="rtx3090-modal-title">GPU · Recommended configuration</h2>
                     </div>
                     <div class="rtx3090-header-actions">
-                        <span class="rtx3090-preset-count"><b>{hardware_count}</b> GPU · {tier_count} mức</span>
-                        <button id="rtx3090-modal-close" type="button" aria-label="Đóng cửa sổ cấu hình">
+                        <span class="rtx3090-preset-count"><b>{hardware_count}</b> GPU · {tier_count} tiers</span>
+                        <button id="rtx3090-modal-close" type="button" aria-label="Close configuration dialog">
                             <svg class="rtx3090-close-icon" width="100%" height="100%" viewBox="0 0 5 5" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill: currentcolor; fill-rule: evenodd; clip-rule: evenodd; stroke-linejoin: round; stroke-miterlimit: 2;" aria-hidden="true" focusable="false">
                                 <g>
                                     <path d="M3.789,0.09C3.903,-0.024 4.088,-0.024 4.202,0.09L4.817,0.705C4.931,0.819 4.931,1.004 4.817,1.118L1.118,4.817C1.004,4.931 0.819,4.931 0.705,4.817L0.09,4.202C-0.024,4.088 -0.024,3.903 0.09,3.789L3.789,0.09Z"></path>
@@ -2726,8 +2736,8 @@ Fast for very complex cases, Standard seldom use.',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>Cấu hình GPU</b>
-                    <span>Profile khớp máy được ưu tiên; profile còn lại chỉ để đối chiếu.</span>
+                    <b>GPU configuration</b>
+                    <span>The matching machine profile takes priority; other profiles are shown for comparison only.</span>
                 </div>
                 """, elem_classes='rtx3090-section-one')
                 hardware_profile = gr.Dropdown(
@@ -2736,7 +2746,7 @@ Fast for very complex cases, Standard seldom use.',
                     label='GPU / VRAM profile',
                     interactive=hardware_profile_interactive,
                     visible=False,
-                    info='Tự động khóa theo GPU, VRAM, backend, dtype và compute capability',
+                    info='Automatically locked based on GPU, VRAM, backend, dtype, and compute capability',
                     elem_id='hardware-profile-select',
                     elem_classes='hardware-profile-select-control',
                 )
@@ -2755,8 +2765,8 @@ Fast for very complex cases, Standard seldom use.',
                 )
                 gr.HTML("""
                 <div class="rtx3090-section-heading">
-                    <b>Mức chất lượng</b>
-                    <span>Chọn preset để cập nhật trực tiếp Advanced Options.</span>
+                    <b>Quality level</b>
+                    <span>Select a preset to update Advanced Options directly.</span>
                 </div>
                 """, elem_classes='rtx3090-section-two')
                 hardware_profile_cards = gr.HTML(
@@ -3327,23 +3337,36 @@ if __name__ == '__main__':
         )
 
     @app.get('/generation-viewer/{generation_uid}', response_class=HTMLResponse)
-    def generation_viewer(generation_uid: str, variant: str | None = None):
+    def generation_viewer(
+        generation_uid: str,
+        variant: str | None = None,
+        lang: str | None = None,
+    ):
         try:
             generation_uid = str(uuid.UUID(generation_uid))
         except (ValueError, AttributeError, TypeError) as exc:
-            raise HTTPException(status_code=404, detail='Generation not found') from exc
+            raise HTTPException(
+                status_code=404,
+                detail=viewer_message('generationNotFound', lang),
+            ) from exc
 
         viewer_assets = resolve_generation_assets(
             os.path.join(SAVE_DIR, generation_uid),
             ensure_wireframe=False,
         )
         if viewer_assets is None:
-            raise HTTPException(status_code=404, detail='Generated mesh not found')
+            raise HTTPException(
+                status_code=404,
+                detail=viewer_message('meshNotFound', lang),
+            )
         if variant is not None and (
             variant not in VARIANT_ORDER
             or variant not in viewer_assets.variants
         ):
-            raise HTTPException(status_code=404, detail='Model variant not found')
+            raise HTTPException(
+                status_code=404,
+                detail=viewer_message('variantNotFound', lang),
+            )
         initial_mode = variant or viewer_assets.default_mode
 
         document = render_variant_model_viewer_document(
@@ -3354,6 +3377,7 @@ if __name__ == '__main__':
             initial_mode,
             HTML_HEIGHT - 10,
             HTML_WIDTH,
+            locale=lang,
         )
         return HTMLResponse(
             document,

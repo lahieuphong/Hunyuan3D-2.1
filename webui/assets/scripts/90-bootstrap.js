@@ -1,9 +1,12 @@
 
         const syncMountedUi = () => {
+            installUiLocalization();
             installFooterItem();
             installUnifiedIcons();
             installAdvancedOptionsDisclosure();
             installSmoothThemeSwitching();
+            installRestrictedLanguageChoices();
+            installUiLocalization();
             installStableUploadPreviews();
             wireTopbar();
             wireModal();

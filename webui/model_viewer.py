@@ -43,10 +43,82 @@ _MODE_ICONS = {
     "white": "box",
     "wireframe": "wireframe",
 }
-_MODE_LABELS = {
-    "original": "Original",
-    "white": "White",
-    "wireframe": "Wireframe",
+VIEWER_LOCALES = ("en", "zh-CN")
+_VIEWER_LOCALE_ALIASES = {
+    "en": "en",
+    "en-us": "en",
+    "en_us": "en",
+    "zh": "zh-CN",
+    "zh-cn": "zh-CN",
+    "zh_cn": "zh-CN",
+    "zh-hans": "zh-CN",
+}
+_VIEWER_MESSAGES = {
+    "en": {
+        "title": "Hunyuan3D-2mv · 3D Model Viewer",
+        "modelPreview": "Generated 3D model preview",
+        "preview": "Preview",
+        "clickDrag": "Click and drag to rotate",
+        "scrollZoom": "Scroll to zoom",
+        "viewerControls": "Viewer controls",
+        "fullscreen": "Fullscreen",
+        "resetCamera": "Reset camera",
+        "toggleAutoRotate": "Toggle auto rotate",
+        "toggleFloorGrid": "Toggle floor grid",
+        "loadingModel": "Loading model…",
+        "displayModes": "Model display modes",
+        "modeOriginal": "Original",
+        "modeWhite": "White",
+        "modeWireframe": "Wireframe",
+        "modeFailedTitle": "{mode} model could not be loaded",
+        "modeUnavailableTitle": "{mode} model is unavailable",
+        "showModeTitle": "Show {mode} model",
+        "loadingMode": "Loading {mode}…",
+        "modeReady": "{mode} model ready",
+        "requestedMode": "Requested",
+        "fallbackMode": "{mode} is unavailable. Showing {fallback} instead.",
+        "modeFailed": "{mode} model could not be loaded.",
+        "fullscreenUnavailable": "Fullscreen is unavailable in this browser.",
+        "configurationUnreadable": "Viewer configuration could not be read.",
+        "generationNotFound": "Generation not found",
+        "meshNotFound": "Generated mesh not found",
+        "variantNotFound": "Model variant not found",
+    },
+    "zh-CN": {
+        "title": "Hunyuan3D-2mv · 3D 模型查看器",
+        "modelPreview": "生成的 3D 模型预览",
+        "preview": "预览",
+        "clickDrag": "点击并拖动以旋转",
+        "scrollZoom": "滚动以缩放",
+        "viewerControls": "查看器控件",
+        "fullscreen": "全屏",
+        "resetCamera": "重置相机",
+        "toggleAutoRotate": "切换自动旋转",
+        "toggleFloorGrid": "切换地面网格",
+        "loadingModel": "正在加载模型…",
+        "displayModes": "模型显示模式",
+        "modeOriginal": "原始模型",
+        "modeWhite": "白模",
+        "modeWireframe": "线框",
+        "modeFailedTitle": "无法加载{mode}",
+        "modeUnavailableTitle": "{mode}不可用",
+        "showModeTitle": "显示{mode}",
+        "loadingMode": "正在加载{mode}…",
+        "modeReady": "{mode}已就绪",
+        "requestedMode": "请求的模型",
+        "fallbackMode": "{mode}不可用，改为显示{fallback}。",
+        "modeFailed": "无法加载{mode}。",
+        "fullscreenUnavailable": "此浏览器不支持全屏。",
+        "configurationUnreadable": "无法读取查看器配置。",
+        "generationNotFound": "未找到生成记录",
+        "meshNotFound": "未找到生成的网格",
+        "variantNotFound": "未找到模型变体",
+    },
+}
+_MODE_MESSAGE_KEYS = {
+    "original": "modeOriginal",
+    "white": "modeWhite",
+    "wireframe": "modeWireframe",
 }
 _WIREFRAME_EXPORT_LOCK = threading.Lock()
 # Bump this whenever the generated line topology or styling changes so cached
@@ -692,9 +764,31 @@ def _safe_json(value: object) -> str:
     )
 
 
+def normalize_viewer_locale(locale: object) -> str:
+    """Return one of the two viewer locales, defaulting safely to English."""
+
+    if not isinstance(locale, str):
+        return "en"
+    candidate = locale.strip().lower().replace("_", "-")
+    return _VIEWER_LOCALE_ALIASES.get(candidate, "en")
+
+
+def _viewer_message(locale: str, key: str) -> str:
+    return _VIEWER_MESSAGES[locale][key]
+
+
+def viewer_message(key: str, locale: object = None, **parameters: object) -> str:
+    """Translate one model-viewer message for route and renderer callers."""
+
+    locale_value = normalize_viewer_locale(locale)
+    template = _viewer_message(locale_value, key)
+    return template.format_map(parameters) if parameters else template
+
+
 def _mode_buttons(
     available_modes: set[str],
     default_mode: str | None,
+    locale: str,
 ) -> str:
     buttons: list[str] = []
     for mode in VARIANT_ORDER:
@@ -711,7 +805,9 @@ def _mode_buttons(
             f'data-view-mode="{mode}" data-icon="{_MODE_ICONS[mode]}" '
             f'aria-pressed="{str(active).lower()}"'
             f"{unavailable_attributes}>"
-            f"<span>{_MODE_LABELS[mode]}</span></button>"
+            f'<span data-viewer-mode-label="{mode}">'
+            f'{html.escape(_viewer_message(locale, _MODE_MESSAGE_KEYS[mode]))}'
+            f"</span></button>"
         )
     return "\n".join(buttons)
 
@@ -731,9 +827,12 @@ def render_model_viewer_document(
     default_mode: str | None,
     height: int,
     width: int,
+    locale: str | None = None,
 ) -> str:
     """Render the standalone viewer with safe, server-resolved variant URLs."""
 
+    locale_value = normalize_viewer_locale(locale)
+    messages = _VIEWER_MESSAGES[locale_value]
     sources: dict[str, str] = {}
     for mode in VARIANT_ORDER:
         source = variant_sources.get(mode)
@@ -764,12 +863,14 @@ def render_model_viewer_document(
     initial_source = sources.get(default_mode or "", "")
     config = {
         "defaultMode": default_mode,
+        "locale": locale_value,
+        "messages": _VIEWER_MESSAGES,
         "variants": {
             mode: {"src": source}
             for mode, source in sources.items()
         },
     }
-    buttons = _mode_buttons(set(sources), default_mode)
+    buttons = _mode_buttons(set(sources), default_mode, locale_value)
 
     had_css_placeholder = "#viewer-css#" in template
     had_js_placeholder = "#viewer-js#" in template
@@ -782,6 +883,19 @@ def render_model_viewer_document(
         .replace("#viewer-js#", javascript)
         .replace("#viewer-config#", _safe_json(config))
         .replace("#mode-buttons#", buttons)
+        .replace("#document-lang#", locale_value)
+        .replace("#viewer-title#", html.escape(messages["title"], quote=True))
+        .replace("#model-preview#", html.escape(messages["modelPreview"], quote=True))
+        .replace("#preview#", html.escape(messages["preview"], quote=True))
+        .replace("#click-drag#", html.escape(messages["clickDrag"], quote=True))
+        .replace("#scroll-zoom#", html.escape(messages["scrollZoom"], quote=True))
+        .replace("#viewer-controls#", html.escape(messages["viewerControls"], quote=True))
+        .replace("#fullscreen#", html.escape(messages["fullscreen"], quote=True))
+        .replace("#reset-camera#", html.escape(messages["resetCamera"], quote=True))
+        .replace("#toggle-auto-rotate#", html.escape(messages["toggleAutoRotate"], quote=True))
+        .replace("#toggle-floor-grid#", html.escape(messages["toggleFloorGrid"], quote=True))
+        .replace("#loading-model#", html.escape(messages["loadingModel"], quote=True))
+        .replace("#display-modes#", html.escape(messages["displayModes"], quote=True))
         .replace("#src#", html.escape(initial_source, quote=True))
         .replace("#width#", str(viewer_width))
         .replace("var(--viewer-height, 650px)", f"{viewer_height}px")
@@ -792,7 +906,7 @@ def render_model_viewer_document(
     if not had_buttons_placeholder:
         mode_strip = (
             '<div class="viewer-mode-strip" role="group" '
-            'aria-label="Model display modes">'
+            f'aria-label="{html.escape(messages["displayModes"], quote=True)}">'
             f"{buttons}</div>"
         )
         document, replacements = re.subn(

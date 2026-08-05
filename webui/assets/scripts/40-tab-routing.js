@@ -3,6 +3,12 @@
             .replace(/\s+/g, " ")
             .trim();
 
+        const promptTabLabelMatchesRoute = (value, route) => {
+            const label = normalizePromptTabLabel(value);
+            return label === normalizePromptTabLabel(route.label)
+                || label === normalizePromptTabLabel(uiT(route.labelKey));
+        };
+
         const promptTabPanels = () => Array.from(
             document.querySelectorAll('#prompt-mode-tabs [role="tabpanel"]')
         ).slice(0, tabRoutes.length);
@@ -14,7 +20,7 @@
         const promptOverflowTabButton = (route) => Array.from(
             document.querySelectorAll("#prompt-mode-tabs .overflow-dropdown button")
         ).find((button) => (
-            normalizePromptTabLabel(button.textContent) === route.label
+            promptTabLabelMatchesRoute(button.textContent, route)
         )) || null;
 
         const promptRouteIsActive = (route) => {
@@ -91,9 +97,11 @@
 
             promptOverflowTabButtons().forEach((button) => {
                 if (button.dataset.urlRouteWired === "true") return;
-                const label = normalizePromptTabLabel(button.textContent);
                 const route = tabRoutes.find(
-                    (candidate) => candidate.label === label
+                    (candidate) => promptTabLabelMatchesRoute(
+                        button.textContent,
+                        candidate
+                    )
                 );
                 if (!route) return;
                 button.dataset.urlRouteWired = "true";

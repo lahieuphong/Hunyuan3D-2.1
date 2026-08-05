@@ -1,0 +1,1838 @@
+{
+  "shell.workspace.multiview": {
+    "en": "Image to 3D Generation with 1–10 Views",
+    "zh-CN": "支持 1–10 视图的图像转 3D 生成"
+  },
+  "shell.workspace.default": {
+    "en": "High Resolution Textured 3D Assets Generation",
+    "zh-CN": "高分辨率纹理 3D 资产生成"
+  },
+  "shell.subtitle": {
+    "en": "Transform images into high-quality 3D assets with AI",
+    "zh-CN": "使用 AI 将图像转换为高质量 3D 资产"
+  },
+  "shell.actions": {
+    "en": "Application actions",
+    "zh-CN": "应用操作"
+  },
+  "action.api_docs": {
+    "en": "API Docs",
+    "zh-CN": "API 文档"
+  },
+  "action.history": {
+    "en": "History",
+    "zh-CN": "历史记录"
+  },
+  "action.settings": {
+    "en": "Settings",
+    "zh-CN": "设置"
+  },
+  "input.heading": {
+    "en": "Input Views",
+    "zh-CN": "输入视图"
+  },
+  "input.single": {
+    "en": "Single View",
+    "zh-CN": "单视图"
+  },
+  "input.multi": {
+    "en": "Multi View (1–4)",
+    "zh-CN": "多视图（1–4）"
+  },
+  "input.ten": {
+    "en": "10 Views",
+    "zh-CN": "10 视图"
+  },
+  "input.single_guide_title": {
+    "en": "Best results with one front view",
+    "zh-CN": "单张正面图可获得最佳效果"
+  },
+  "input.single_guide_body": {
+    "en": "Use a sharp subject on a clean or transparent background.",
+    "zh-CN": "请使用主体清晰、背景干净或透明的图像。"
+  },
+  "input.front_view": {
+    "en": "Front View",
+    "zh-CN": "正面视图"
+  },
+  "input.single_hint": {
+    "en": "PNG or JPG · one front-facing image",
+    "zh-CN": "PNG 或 JPG · 一张正面图像"
+  },
+  "input.multi_guide_title": {
+    "en": "Best results with four views",
+    "zh-CN": "四张视图可获得最佳效果"
+  },
+  "input.multi_guide_body": {
+    "en": "Upload Front, Back, Left and Right views of the same object.",
+    "zh-CN": "请上传同一对象的正面、背面、左侧和右侧视图。"
+  },
+  "input.four_synchronized": {
+    "en": "Four synchronized views",
+    "zh-CN": "四张同步视图"
+  },
+  "input.multi_hint": {
+    "en": "PNG or JPG · Front, Back, Left and Right",
+    "zh-CN": "PNG 或 JPG · 正面、背面、左侧和右侧"
+  },
+  "action.generate_3d": {
+    "en": "Generate 3D",
+    "zh-CN": "生成 3D"
+  },
+  "action.generate_one": {
+    "en": "Generate 3D · 1 Image",
+    "zh-CN": "生成 3D · 1 张图像"
+  },
+  "action.generate_four": {
+    "en": "Generate 3D · 4 Images",
+    "zh-CN": "生成 3D · 4 张图像"
+  },
+  "action.generate_ten": {
+    "en": "Generate 3D · 10 Images",
+    "zh-CN": "生成 3D · 10 张图像"
+  },
+  "action.generate_subtitle_one": {
+    "en": "1 front image",
+    "zh-CN": "1 张正面图"
+  },
+  "action.generate_subtitle_four": {
+    "en": "4 synchronized views",
+    "zh-CN": "4 张同步视图"
+  },
+  "action.generate_subtitle_ten": {
+    "en": "10 views · experimental 10→4 fusion",
+    "zh-CN": "10 视图 · 实验性 10→4 融合"
+  },
+  "settings.advanced": {
+    "en": "Advanced Options",
+    "zh-CN": "高级选项"
+  },
+  "settings.seed": {
+    "en": "Seed",
+    "zh-CN": "随机种子"
+  },
+  "settings.steps": {
+    "en": "Inference Steps",
+    "zh-CN": "推理步数"
+  },
+  "settings.octree": {
+    "en": "Octree Resolution",
+    "zh-CN": "八叉树分辨率"
+  },
+  "settings.guidance": {
+    "en": "Guidance Scale",
+    "zh-CN": "引导系数"
+  },
+  "settings.chunks": {
+    "en": "Number of Chunks",
+    "zh-CN": "分块数量"
+  },
+  "settings.remove_background": {
+    "en": "Remove Background",
+    "zh-CN": "移除背景"
+  },
+  "settings.randomize_seed": {
+    "en": "Randomize seed",
+    "zh-CN": "随机化种子"
+  },
+  "output.generation": {
+    "en": "Generation",
+    "zh-CN": "生成结果"
+  },
+  "output.exporting": {
+    "en": "Exporting Mesh",
+    "zh-CN": "导出网格"
+  },
+  "output.statistics": {
+    "en": "Statistics",
+    "zh-CN": "统计信息"
+  },
+  "output.mesh_stats": {
+    "en": "Mesh Stats",
+    "zh-CN": "网格统计"
+  },
+  "viewer.ready": {
+    "en": "3D preview is ready",
+    "zh-CN": "3D 预览已就绪"
+  },
+  "viewer.empty_help": {
+    "en": "Upload your input views and generate a mesh to begin.",
+    "zh-CN": "请上传输入视图并生成网格以开始预览。"
+  },
+  "viewer.display_modes": {
+    "en": "Model display modes",
+    "zh-CN": "模型显示模式"
+  },
+  "viewer.original": {
+    "en": "Original",
+    "zh-CN": "原始"
+  },
+  "viewer.white": {
+    "en": "White",
+    "zh-CN": "白模"
+  },
+  "viewer.wireframe": {
+    "en": "Wireframe",
+    "zh-CN": "线框"
+  },
+  "css.generated_mesh_placeholder": {
+    "en": "Generated mesh will appear here",
+    "zh-CN": "生成的网格将显示在此处"
+  },
+  "css.loading_preview": {
+    "en": "Loading preview…",
+    "zh-CN": "正在加载预览…"
+  },
+  "css.preview_unavailable": {
+    "en": "Preview unavailable",
+    "zh-CN": "预览不可用"
+  },
+  "theme.light": {
+    "en": "Light",
+    "zh-CN": "浅色"
+  },
+  "theme.dark": {
+    "en": "Dark",
+    "zh-CN": "深色"
+  },
+  "theme.system": {
+    "en": "System",
+    "zh-CN": "跟随系统"
+  },
+  "theme.light_aria": {
+    "en": "Light theme",
+    "zh-CN": "浅色主题"
+  },
+  "theme.dark_aria": {
+    "en": "Dark theme",
+    "zh-CN": "深色主题"
+  },
+  "theme.system_aria": {
+    "en": "System theme",
+    "zh-CN": "跟随系统主题"
+  },
+  "language.label": {
+    "en": "Language",
+    "zh-CN": "语言"
+  },
+  "common.download": {
+    "en": "Download",
+    "zh-CN": "下载"
+  },
+  "common.loading": {
+    "en": "Loading",
+    "zh-CN": "加载中"
+  },
+  "common.current": {
+    "en": "Current",
+    "zh-CN": "当前"
+  },
+  "common.time": {
+    "en": "Time",
+    "zh-CN": "时间"
+  },
+  "common.views": {
+    "en": "Views",
+    "zh-CN": "视图"
+  },
+  "common.model": {
+    "en": "Model",
+    "zh-CN": "模型"
+  },
+  "common.resolution": {
+    "en": "Resolution",
+    "zh-CN": "分辨率"
+  },
+  "common.polygons": {
+    "en": "Polygons",
+    "zh-CN": "多边形"
+  },
+  "common.vertices": {
+    "en": "Vertices",
+    "zh-CN": "顶点"
+  },
+  "common.outputs": {
+    "en": "Outputs",
+    "zh-CN": "输出"
+  },
+  "input.front": {
+    "en": "Front",
+    "zh-CN": "正面"
+  },
+  "input.back": {
+    "en": "Back",
+    "zh-CN": "背面"
+  },
+  "input.left": {
+    "en": "Left",
+    "zh-CN": "左侧"
+  },
+  "input.right": {
+    "en": "Right",
+    "zh-CN": "右侧"
+  },
+  "input.front_right": {
+    "en": "Front-right",
+    "zh-CN": "右前方"
+  },
+  "input.back_right": {
+    "en": "Back-right",
+    "zh-CN": "右后方"
+  },
+  "input.back_left": {
+    "en": "Back-left",
+    "zh-CN": "左后方"
+  },
+  "input.front_left": {
+    "en": "Front-left",
+    "zh-CN": "左前方"
+  },
+  "input.high_front": {
+    "en": "High-front",
+    "zh-CN": "高位正面"
+  },
+  "input.high_back": {
+    "en": "High-back",
+    "zh-CN": "高位背面"
+  },
+  "input.numbered_front": {
+    "en": "1 · Front",
+    "zh-CN": "1 · 正面"
+  },
+  "input.numbered_back": {
+    "en": "2 · Back",
+    "zh-CN": "2 · 背面"
+  },
+  "input.numbered_left": {
+    "en": "3 · Left",
+    "zh-CN": "3 · 左侧"
+  },
+  "input.numbered_right": {
+    "en": "4 · Right",
+    "zh-CN": "4 · 右侧"
+  },
+  "ten.guide_title": {
+    "en": "Maximum coverage with 10 synchronized views",
+    "zh-CN": "使用 10 张同步视图获得最大覆盖范围"
+  },
+  "ten.guide_body": {
+    "en": "Keep the same character, neutral A-pose, scale, lighting and transparent background in every camera.",
+    "zh-CN": "每个机位都应保持同一角色、中性 A 姿势、相同比例、光照和透明背景。"
+  },
+  "ten.badge": {
+    "en": "Native 4-view shape · 10-view texture/RC",
+    "zh-CN": "原生 4 视图形状 · 10 视图纹理/RC"
+  },
+  "ten.ready": {
+    "en": "Ready to generate",
+    "zh-CN": "可以生成"
+  },
+  "ten.remaining": {
+    "en": "Add {count} remaining view(s)",
+    "zh-CN": "还需添加 {count} 张视图"
+  },
+  "ten.completeness": {
+    "en": "Ten-view upload completeness",
+    "zh-CN": "十视图上传完整度"
+  },
+  "ten.straight_front": {
+    "en": "Straight front",
+    "zh-CN": "正前方"
+  },
+  "ten.front_three_quarter_right": {
+    "en": "Front ¾ right",
+    "zh-CN": "右前四分之三视角"
+  },
+  "ten.character_right": {
+    "en": "Character right side",
+    "zh-CN": "角色右侧"
+  },
+  "ten.rear_three_quarter_right": {
+    "en": "Rear ¾ right",
+    "zh-CN": "右后四分之三视角"
+  },
+  "ten.straight_back": {
+    "en": "Straight back",
+    "zh-CN": "正后方"
+  },
+  "ten.rear_three_quarter_left": {
+    "en": "Rear ¾ left",
+    "zh-CN": "左后四分之三视角"
+  },
+  "ten.character_left": {
+    "en": "Character left side",
+    "zh-CN": "角色左侧"
+  },
+  "ten.front_three_quarter_left": {
+    "en": "Front ¾ left",
+    "zh-CN": "左前四分之三视角"
+  },
+  "ten.hair_shoulders_above": {
+    "en": "Hair and shoulders from above",
+    "zh-CN": "从上方拍摄头发和肩部"
+  },
+  "ten.back_hair_shoulders_above": {
+    "en": "Back hair and shoulders from above",
+    "zh-CN": "从上方拍摄后侧头发和肩部"
+  },
+  "ten.angle_down": {
+    "en": "30° down",
+    "zh-CN": "向下 30°"
+  },
+  "ten.summary": {
+    "en": "All 10 images are validated and saved. Shape generation uses only the checkpoint's native Front, Left, Back and Right cameras. Diagonal and high-angle views are reserved for texture projection and RC quality scoring, avoiding unsupported 10-to-4 feature fusion during shape generation.",
+    "zh-CN": "全部 10 张图像均已验证并保存。形状生成仅使用检查点原生支持的正面、左侧、背面和右侧机位。斜角与高位视图仅用于纹理投影和 RC 质量评分，从而避免在形状生成期间使用不受支持的 10→4 特征融合。"
+  },
+  "settings.options": {
+    "en": "Options",
+    "zh-CN": "选项"
+  },
+  "settings.generation_mode": {
+    "en": "Generation Mode",
+    "zh-CN": "生成模式"
+  },
+  "settings.generation_mode_info": {
+    "en": "Recommendation: Turbo for most cases, Fast for very complex cases, Standard seldom use.",
+    "zh-CN": "建议：大多数情况使用极速模式，非常复杂的情况使用快速模式，标准模式很少需要。"
+  },
+  "settings.decoding_mode": {
+    "en": "Decoding Mode",
+    "zh-CN": "解码模式"
+  },
+  "settings.decoding_mode_info": {
+    "en": "The resolution for exporting mesh from generated vectset",
+    "zh-CN": "从生成的向量集导出网格时使用的分辨率"
+  },
+  "settings.turbo": {
+    "en": "Turbo",
+    "zh-CN": "极速"
+  },
+  "settings.fast": {
+    "en": "Fast",
+    "zh-CN": "快速"
+  },
+  "settings.standard": {
+    "en": "Standard",
+    "zh-CN": "标准"
+  },
+  "settings.low": {
+    "en": "Low",
+    "zh-CN": "低"
+  },
+  "settings.high": {
+    "en": "High",
+    "zh-CN": "高"
+  },
+  "settings.ultra": {
+    "en": "Ultra",
+    "zh-CN": "超高"
+  },
+  "export.tab": {
+    "en": "Export",
+    "zh-CN": "导出"
+  },
+  "export.file_type": {
+    "en": "File Type",
+    "zh-CN": "文件类型"
+  },
+  "export.simplify": {
+    "en": "Simplify Mesh",
+    "zh-CN": "简化网格"
+  },
+  "export.include_texture": {
+    "en": "Include Texture",
+    "zh-CN": "包含纹理"
+  },
+  "export.target_faces": {
+    "en": "Target Face Number",
+    "zh-CN": "目标面数"
+  },
+  "export.transform": {
+    "en": "Transform",
+    "zh-CN": "转换"
+  },
+  "output.generated_mesh": {
+    "en": "Generated Mesh",
+    "zh-CN": "生成的网格"
+  },
+  "output.awaiting_mesh": {
+    "en": "Awaiting generated mesh",
+    "zh-CN": "等待生成网格"
+  },
+  "output.generated_direct": {
+    "en": "Generated mesh (direct download)",
+    "zh-CN": "生成的网格（直接下载）"
+  },
+  "gallery.image_to_3d": {
+    "en": "Image to 3D Gallery",
+    "zh-CN": "图像转 3D 图库"
+  },
+  "output.generated_mesh_lower": {
+    "en": "generated mesh",
+    "zh-CN": "生成的网格"
+  },
+  "common.download_named": {
+    "en": "Download {filename}",
+    "zh-CN": "下载 {filename}"
+  },
+  "gpu.recommended": {
+    "en": "GPU · Recommended configuration",
+    "zh-CN": "GPU · 推荐配置"
+  },
+  "upload.upload_file": {
+    "en": "Upload file",
+    "zh-CN": "上传文件"
+  },
+  "upload.remove_image": {
+    "en": "Remove Image",
+    "zh-CN": "移除图像"
+  },
+  "upload.capture_camera": {
+    "en": "Capture from camera",
+    "zh-CN": "从摄像头拍摄"
+  },
+  "upload.paste_clipboard": {
+    "en": "Paste from clipboard",
+    "zh-CN": "从剪贴板粘贴"
+  },
+  "upload.preview_failed": {
+    "en": "Preview failed · choose again",
+    "zh-CN": "预览失败 · 请重新选择"
+  },
+  "upload.failed": {
+    "en": "Upload failed · choose again",
+    "zh-CN": "上传失败 · 请重新选择"
+  },
+  "upload.timed_out": {
+    "en": "Upload timed out · choose again",
+    "zh-CN": "上传超时 · 请重新选择"
+  },
+  "upload.interrupted": {
+    "en": "Upload interrupted · choose again",
+    "zh-CN": "上传已中断 · 请重新选择"
+  },
+  "upload.uploading_preview": {
+    "en": "Uploading preview…",
+    "zh-CN": "正在上传预览图…"
+  },
+  "upload.preparing_preview": {
+    "en": "Preparing preview…",
+    "zh-CN": "正在准备预览图…"
+  },
+  "upload.cannot_preview": {
+    "en": "Cannot preview this image",
+    "zh-CN": "无法预览此图像"
+  },
+  "history.title": {
+    "en": "Generation History",
+    "zh-CN": "生成历史记录"
+  },
+  "history.subtitle": {
+    "en": "All 3D models saved locally on this machine",
+    "zh-CN": "此设备本地保存的所有 3D 模型"
+  },
+  "history.model_count_one": {
+    "en": "{count} model",
+    "zh-CN": "{count} 个模型"
+  },
+  "history.model_count_other": {
+    "en": "{count} models",
+    "zh-CN": "{count} 个模型"
+  },
+  "history.refresh": {
+    "en": "Refresh history",
+    "zh-CN": "刷新历史记录"
+  },
+  "history.close": {
+    "en": "Close generation history",
+    "zh-CN": "关闭生成历史记录"
+  },
+  "history.generated_models": {
+    "en": "Generated models",
+    "zh-CN": "已生成模型"
+  },
+  "history.newest_first": {
+    "en": "Newest models appear first",
+    "zh-CN": "最新模型优先显示"
+  },
+  "history.saved_locally": {
+    "en": "Saved locally",
+    "zh-CN": "已保存到本地"
+  },
+  "history.loading_aria": {
+    "en": "Loading generation history",
+    "zh-CN": "正在加载生成历史记录"
+  },
+  "history.load_failed": {
+    "en": "History could not be loaded",
+    "zh-CN": "无法加载历史记录"
+  },
+  "history.load_failed_help": {
+    "en": "Please check that the WebUI is still running, then try again.",
+    "zh-CN": "请检查 WebUI 是否仍在运行，然后重试。"
+  },
+  "history.try_again": {
+    "en": "Try again",
+    "zh-CN": "重试"
+  },
+  "history.empty_title": {
+    "en": "No generated models yet",
+    "zh-CN": "尚无已生成的模型"
+  },
+  "history.empty_help": {
+    "en": "Your completed 3D generations will appear here automatically.",
+    "zh-CN": "已完成的 3D 生成结果将自动显示在这里。"
+  },
+  "history.readonly_title": {
+    "en": "Saved History snapshot - generation inputs and settings are read-only.",
+    "zh-CN": "已保存的历史快照 - 生成输入和设置为只读。"
+  },
+  "history.readonly_badge": {
+    "en": "History - read only",
+    "zh-CN": "历史记录 - 只读"
+  },
+  "history.saved_model": {
+    "en": "Saved model",
+    "zh-CN": "已保存的模型"
+  },
+  "history.size_kb": {
+    "en": "{value} KB",
+    "zh-CN": "{value} KB"
+  },
+  "history.size_mb": {
+    "en": "{value} MB",
+    "zh-CN": "{value} MB"
+  },
+  "history.duration_seconds": {
+    "en": "{value} s",
+    "zh-CN": "{value} 秒"
+  },
+  "history.loading": {
+    "en": "Loading",
+    "zh-CN": "加载中"
+  },
+  "history.loading_summary": {
+    "en": "Reading saved 3D models...",
+    "zh-CN": "正在读取已保存的 3D 模型..."
+  },
+  "history.unavailable": {
+    "en": "Unavailable",
+    "zh-CN": "不可用"
+  },
+  "history.unavailable_summary": {
+    "en": "Saved models could not be read",
+    "zh-CN": "无法读取已保存的模型"
+  },
+  "history.model_placeholder": {
+    "en": "3D model",
+    "zh-CN": "3D 模型"
+  },
+  "history.preview_generation": {
+    "en": "Preview generation {uid}",
+    "zh-CN": "预览生成记录 {uid}"
+  },
+  "history.input_preview_alt": {
+    "en": "Input preview for generation {uid}",
+    "zh-CN": "生成记录 {uid} 的输入预览"
+  },
+  "history.status_completed": {
+    "en": "Completed",
+    "zh-CN": "已完成"
+  },
+  "history.status_export_saved": {
+    "en": "Export saved",
+    "zh-CN": "导出已保存"
+  },
+  "history.status_legacy_mesh": {
+    "en": "Legacy mesh",
+    "zh-CN": "旧版网格"
+  },
+  "history.status_processing": {
+    "en": "Processing",
+    "zh-CN": "处理中"
+  },
+  "history.current": {
+    "en": "Current",
+    "zh-CN": "当前"
+  },
+  "history.generation_title": {
+    "en": "Generation {uid}",
+    "zh-CN": "生成记录 {uid}"
+  },
+  "history.saved_mesh": {
+    "en": "Saved mesh",
+    "zh-CN": "已保存的网格"
+  },
+  "history.metric_views": {
+    "en": "Views",
+    "zh-CN": "视图"
+  },
+  "history.metric_octree": {
+    "en": "Octree",
+    "zh-CN": "八叉树"
+  },
+  "history.metric_time": {
+    "en": "Time",
+    "zh-CN": "时间"
+  },
+  "history.metric_glb": {
+    "en": "GLB",
+    "zh-CN": "GLB"
+  },
+  "history.view_3d": {
+    "en": "View 3D",
+    "zh-CN": "查看 3D"
+  },
+  "history.open_current": {
+    "en": "Open current",
+    "zh-CN": "打开当前模型"
+  },
+  "history.open_model": {
+    "en": "Open model",
+    "zh-CN": "打开模型"
+  },
+  "history.download": {
+    "en": "Download",
+    "zh-CN": "下载"
+  },
+  "history.showing_saved_models": {
+    "en": "Showing {visible} of {total} saved models",
+    "zh-CN": "显示 {visible}/{total} 个已保存模型"
+  },
+  "gpu.configuration": {
+    "en": "GPU configuration",
+    "zh-CN": "GPU 配置"
+  },
+  "gpu.close_dialog": {
+    "en": "Close configuration dialog",
+    "zh-CN": "关闭配置对话框"
+  },
+  "gpu.profile": {
+    "en": "GPU / VRAM profile",
+    "zh-CN": "GPU / 显存配置"
+  },
+  "gpu.presets": {
+    "en": "GPU Presets",
+    "zh-CN": "GPU 预设"
+  },
+  "gpu.hardware_profile": {
+    "en": "Hardware profile",
+    "zh-CN": "硬件配置"
+  },
+  "gpu.tier_count": {
+    "en": "{count} tiers",
+    "zh-CN": "{count} 个档位"
+  },
+  "gpu.matching_priority": {
+    "en": "The matching machine profile takes priority; other profiles are shown for comparison only.",
+    "zh-CN": "优先使用与当前设备匹配的配置；其他配置仅供比较。"
+  },
+  "gpu.auto_locked": {
+    "en": "Automatically locked based on GPU, VRAM, backend, dtype, and compute capability",
+    "zh-CN": "根据 GPU、显存、后端、数据类型和计算能力自动锁定"
+  },
+  "gpu.quality_level": {
+    "en": "Quality level",
+    "zh-CN": "质量级别"
+  },
+  "gpu.select_preset_help": {
+    "en": "Select a preset to update Advanced Options directly.",
+    "zh-CN": "选择预设后将直接更新高级选项。"
+  },
+  "gpu.vram_unavailable": {
+    "en": "VRAM unavailable",
+    "zh-CN": "显存信息不可用"
+  },
+  "gpu.cc_unavailable": {
+    "en": "CC unavailable",
+    "zh-CN": "计算能力不可用"
+  },
+  "gpu.gib_vram": {
+    "en": "{value} GiB VRAM",
+    "zh-CN": "{value} GiB 显存"
+  },
+  "gpu.end_to_end_verified": {
+    "en": "End-to-end verified",
+    "zh-CN": "已完成端到端验证"
+  },
+  "gpu.pending_benchmark": {
+    "en": "Pending generation benchmark",
+    "zh-CN": "等待生成基准测试"
+  },
+  "gpu.not_available": {
+    "en": "Not available for use",
+    "zh-CN": "当前不可用"
+  },
+  "gpu.closest_reference": {
+    "en": "Closest profile · Reference only",
+    "zh-CN": "最接近的配置 · 仅供参考"
+  },
+  "gpu.no_compatible": {
+    "en": "No compatible profile",
+    "zh-CN": "无兼容配置"
+  },
+  "gpu.detected": {
+    "en": "Detected GPU: {gpu}",
+    "zh-CN": "检测到的 GPU：{gpu}"
+  },
+  "gpu.current_gpu": {
+    "en": "current GPU",
+    "zh-CN": "当前 GPU"
+  },
+  "gpu.active": {
+    "en": "Active",
+    "zh-CN": "当前启用"
+  },
+  "gpu.unavailable": {
+    "en": "Unavailable",
+    "zh-CN": "不可用"
+  },
+  "gpu.reference_no_match": {
+    "en": "Reference only · No profile matches the runtime GPU.",
+    "zh-CN": "仅供参考 · 没有配置与运行时 GPU 匹配。"
+  },
+  "gpu.reference_using": {
+    "en": "Reference only · This machine is using {gpu}.",
+    "zh-CN": "仅供参考 · 此设备正在使用 {gpu}。"
+  },
+  "gpu.saved_readonly": {
+    "en": "Saved record · Read-only",
+    "zh-CN": "已保存记录 · 只读"
+  },
+  "gpu.cannot_select": {
+    "en": "Cannot select",
+    "zh-CN": "无法选择"
+  },
+  "gpu.not_current_match": {
+    "en": "Does not match the current GPU",
+    "zh-CN": "与当前 GPU 不匹配"
+  },
+  "gpu.catalog_profiles": {
+    "en": "GPU profiles in the catalog",
+    "zh-CN": "配置目录中的 GPU 配置"
+  },
+  "gpu.saved_profile_details": {
+    "en": "Saved record profile details",
+    "zh-CN": "已保存记录的配置详情"
+  },
+  "gpu.active_profile_details": {
+    "en": "Active profile details",
+    "zh-CN": "当前配置详情"
+  },
+  "gpu.apply": {
+    "en": "Apply",
+    "zh-CN": "应用"
+  },
+  "gpu.try": {
+    "en": "Try",
+    "zh-CN": "试用"
+  },
+  "gpu.legacy_gpu_profile": {
+    "en": "Legacy GPU profile",
+    "zh-CN": "旧版 GPU 配置"
+  },
+  "gpu.custom_configuration": {
+    "en": "Custom configuration",
+    "zh-CN": "自定义配置"
+  },
+  "gpu.legacy_profile": {
+    "en": "Legacy profile",
+    "zh-CN": "旧版配置"
+  },
+  "gpu.legacy_record": {
+    "en": "Legacy record",
+    "zh-CN": "旧版记录"
+  },
+  "gpu.saved": {
+    "en": "Saved",
+    "zh-CN": "已保存"
+  },
+  "gpu.testing": {
+    "en": "In use for testing",
+    "zh-CN": "正在用于测试"
+  },
+  "gpu.in_use": {
+    "en": "In use",
+    "zh-CN": "正在使用"
+  },
+  "gpu.one_four_images": {
+    "en": "1 image & 4 images",
+    "zh-CN": "1 张图像和 4 张图像"
+  },
+  "gpu.saved_match_readonly": {
+    "en": "The saved record's GPU matches the current machine. This historical record is read-only; presets cannot be applied from this screen.",
+    "zh-CN": "已保存记录的 GPU 与当前设备匹配。此历史记录为只读，无法在此页面应用预设。"
+  },
+  "gpu.profile_matches": {
+    "en": "This profile matches the current GPU and its presets are available.",
+    "zh-CN": "此配置与当前 GPU 匹配，其预设可以使用。"
+  },
+  "gpu.history_readonly": {
+    "en": "This historical record is read-only.",
+    "zh-CN": "此历史记录为只读。"
+  },
+  "gpu.saved_record_readonly": {
+    "en": "Saved record, read-only.",
+    "zh-CN": "已保存记录，只读。"
+  },
+  "gpu.saved_legacy_compare": {
+    "en": "Saved GPU: {legacy_identity}. This profile is no longer in the catalog; {short_label} is shown as the current runtime GPU for comparison, not as the GPU from the saved record.",
+    "zh-CN": "已保存的 GPU：{legacy_identity}。此配置已不在目录中；显示 {short_label} 仅用于与当前运行时 GPU 比较，并非已保存记录中的 GPU。"
+  },
+  "gpu.legacy_no_gpu": {
+    "en": "The legacy record did not store a GPU; the displayed profile is provided only to compare the saved settings.",
+    "zh-CN": "旧版记录未保存 GPU；显示的配置仅用于比较已保存的设置。"
+  },
+  "gpu.saved_compare_short": {
+    "en": "Saved GPU: {legacy_identity} · No longer in the catalog; compared with {short_label}",
+    "zh-CN": "已保存的 GPU：{legacy_identity} · 已不在目录中；与 {short_label} 比较"
+  },
+  "gpu.no_saved_runtime_profile": {
+    "en": "Runtime profile for a record with no saved GPU",
+    "zh-CN": "未保存 GPU 的记录所使用的运行时配置"
+  },
+  "gpu.legacy_catalog_help": {
+    "en": "This saved profile is no longer in the current catalog. The generation settings below are preserved for historical reference.",
+    "zh-CN": "此已保存配置已不在当前目录中。以下生成设置仅保留用于历史参考。"
+  },
+  "gpu.standard_profile_description": {
+    "en": "Standard profile for the current machine, successfully tested with both single-image and four-image inputs.",
+    "zh-CN": "当前设备的标准配置，已成功测试单图和四图输入。"
+  },
+  "gpu.seed_chunks_note": {
+    "en": "Seed values do not increase VRAM usage. 8,000 chunks balance speed and memory. Octree 512 is not the default on the 24 GB RTX 3090.",
+    "zh-CN": "随机种子值不会增加显存占用。8,000 个分块可平衡速度与内存。24 GB RTX 3090 默认不使用八叉树分辨率 512。"
+  },
+  "gpu.first_run_note": {
+    "en": "Use for the first run or when prioritizing stability and speed.",
+    "zh-CN": "适用于首次运行，或优先考虑稳定性和速度时。"
+  },
+  "gpu.denser_mesh_note": {
+    "en": "Use when the input image is ready and a denser, smoother mesh is needed.",
+    "zh-CN": "适用于输入图像已准备好，并需要更密集、更平滑网格的情况。"
+  },
+  "gpu.blackwell_preflight": {
+    "en": "Passed CUDA 12.8, compute capability 12.0, BF16 smoke testing, dependency checks, and WebUI preflight on the target machine.",
+    "zh-CN": "已在目标设备上通过 CUDA 12.8、计算能力 12.0、BF16 冒烟测试、依赖检查和 WebUI 预检。"
+  },
+  "gpu.blackwell_provisional": {
+    "en": "Both provisional presets use the same values that completed single-image and four-image runs on the RTX 3090. They are not considered end-to-end Blackwell benchmarks until both generation modes complete on this machine.",
+    "zh-CN": "两个临时预设均使用已在 RTX 3090 上完成单图和四图运行的相同参数。只有两种生成模式都在此设备上完成后，才能视为 Blackwell 端到端基准。"
+  },
+  "gpu.blackwell_first_run": {
+    "en": "Conservative candidate for the first generation run on Blackwell.",
+    "zh-CN": "适合 Blackwell 首次生成运行的保守候选配置。"
+  },
+  "gpu.blackwell_dense_benchmark": {
+    "en": "Use to benchmark a denser mesh after the baseline run completes successfully.",
+    "zh-CN": "基准运行成功后，用于测试更密集网格的性能。"
+  },
+  "gpu.safe_default": {
+    "en": "256 · Safe default",
+    "zh-CN": "256 · 安全默认"
+  },
+  "gpu.high_quality": {
+    "en": "384 · High quality",
+    "zh-CN": "384 · 高质量"
+  },
+  "gpu.runtime_pending": {
+    "en": "Runtime verified · Generation not yet verified",
+    "zh-CN": "运行时已验证 · 生成尚未验证"
+  },
+  "gpu.baseline": {
+    "en": "256 · Baseline",
+    "zh-CN": "256 · 基准"
+  },
+  "gpu.high_candidate": {
+    "en": "384 · High resolution (candidate)",
+    "zh-CN": "384 · 高分辨率（候选）"
+  },
+  "settings.display_theme": {
+    "en": "Display Theme",
+    "zh-CN": "显示主题"
+  },
+  "settings.pwa": {
+    "en": "Progressive Web App",
+    "zh-CN": "渐进式 Web 应用"
+  },
+  "settings.pwa_disabled": {
+    "en": "Progressive Web App is not enabled for this app. To enable it, start your Gradio app with",
+    "zh-CN": "此应用尚未启用渐进式 Web 应用。若要启用，请使用以下参数启动 Gradio 应用："
+  },
+  "settings.screen_studio": {
+    "en": "Screen Studio",
+    "zh-CN": "屏幕录制工作室"
+  },
+  "settings.screen_studio_help": {
+    "en": "Screen Studio allows you to record your screen and generates a video of your app with automatically adding zoom in and zoom out effects as well as trimming the video to remove the prediction time.",
+    "zh-CN": "屏幕录制工作室可以录制屏幕并生成应用演示视频，自动添加放大和缩小效果，同时裁剪视频以移除等待预测的时间。"
+  },
+  "settings.auto_trim": {
+    "en": "Include automatic video trimming",
+    "zh-CN": "启用自动视频裁剪"
+  },
+  "settings.auto_zoom": {
+    "en": "Include automatic zoom in/out",
+    "zh-CN": "启用自动放大/缩小"
+  },
+  "settings.start_recording": {
+    "en": "Start Recording",
+    "zh-CN": "开始录制"
+  },
+  "settings.stop_recording": {
+    "en": "Stop Recording",
+    "zh-CN": "停止录制"
+  },
+  "settings.start_recording_prefix": {
+    "en": "Start recording by clicking the",
+    "zh-CN": "点击以下按钮开始录制："
+  },
+  "settings.stop_recording_prefix": {
+    "en": "Stop recording by clicking the",
+    "zh-CN": "点击以下按钮停止录制："
+  },
+  "settings.recording_body": {
+    "en": "button below and then sharing the current browser tab of your Gradio demo. Use your app as you would normally to generate a prediction.",
+    "zh-CN": "然后共享当前浏览器中的 Gradio 演示标签页。请像平常一样使用应用并生成结果。"
+  },
+  "settings.recording_footer": {
+    "en": "button in the footer of the demo.",
+    "zh-CN": "演示页面页脚中的按钮。"
+  },
+  "common.empty_value": {
+    "en": "Empty value",
+    "zh-CN": "空值"
+  },
+  "common.reset_default": {
+    "en": "Reset to default value",
+    "zh-CN": "恢复默认值"
+  },
+  "common.number_input_for": {
+    "en": "number input for {label}",
+    "zh-CN": "{label} 的数字输入框"
+  },
+  "common.range_slider_for": {
+    "en": "range slider for {label}",
+    "zh-CN": "{label} 的范围滑块"
+  },
+  "api.documentation": {
+    "en": "API documentation",
+    "zh-CN": "API 文档"
+  },
+  "api.endpoint": {
+    "en": "API endpoint",
+    "zh-CN": "API 端点"
+  },
+  "api.recorder": {
+    "en": "API Recorder",
+    "zh-CN": "API 记录器"
+  },
+  "api.choose_method": {
+    "en": "Choose one of the following ways to interact with the API.",
+    "zh-CN": "请选择以下任一种方式与 API 交互。"
+  },
+  "api.install_prefix": {
+    "en": "1. Install the",
+    "zh-CN": "1. 安装"
+  },
+  "api.install_suffix": {
+    "en": ") if you don't already have it installed.",
+    "zh-CN": "）（如果尚未安装）。"
+  },
+  "api.find_endpoint": {
+    "en": "2. Find the API endpoint below corresponding to your desired function in the app. Copy the code snippet, replacing the placeholder values with your own input data.",
+    "zh-CN": "2. 在下方找到与应用中所需功能对应的 API 端点。复制代码片段，并将占位值替换为您自己的输入数据。"
+  },
+  "api.or_use": {
+    "en": "Or use the",
+    "zh-CN": "也可以使用"
+  },
+  "api.auto_generate": {
+    "en": "to automatically generate your API requests.",
+    "zh-CN": "以自动生成 API 请求。"
+  },
+  "api.accepts": {
+    "en": "Accepts",
+    "zh-CN": "接受参数"
+  },
+  "api.default": {
+    "en": "Default:",
+    "zh-CN": "默认值："
+  },
+  "api.required": {
+    "en": "Required",
+    "zh-CN": "必填"
+  },
+  "api.returns": {
+    "en": "Returns",
+    "zh-CN": "返回值"
+  },
+  "api.input_value": {
+    "en": "The input value that is provided in the \"",
+    "zh-CN": "提供给以下输入组件的值：“"
+  },
+  "api.output_value": {
+    "en": "The output value that appears in the \"",
+    "zh-CN": "显示在以下输出组件中的值：“"
+  },
+  "api.file_input_output": {
+    "en": "For input, either path or url must be provided. For output, path is always provided.",
+    "zh-CN": "输入时必须提供 path 或 url；输出时始终提供 path。"
+  },
+  "api.component": {
+    "en": "component.",
+    "zh-CN": "组件。"
+  },
+  "api.parameter": {
+    "en": "parameter",
+    "zh-CN": "参数"
+  },
+  "api.value": {
+    "en": "value",
+    "zh-CN": "值"
+  },
+  "api.one_element": {
+    "en": "1 element",
+    "zh-CN": "1 个元素"
+  },
+  "api.elements": {
+    "en": "elements",
+    "zh-CN": "个元素"
+  },
+  "api.copy": {
+    "en": "copy",
+    "zh-CN": "复制"
+  },
+  "component.input": {
+    "en": "Input",
+    "zh-CN": "输入"
+  },
+  "component.output": {
+    "en": "Output",
+    "zh-CN": "输出"
+  },
+  "component.image": {
+    "en": "Image",
+    "zh-CN": "图像"
+  },
+  "component.checkbox": {
+    "en": "Checkbox",
+    "zh-CN": "复选框"
+  },
+  "component.dropdown": {
+    "en": "Dropdown",
+    "zh-CN": "下拉框"
+  },
+  "component.slider": {
+    "en": "Slider",
+    "zh-CN": "滑块"
+  },
+  "component.radio": {
+    "en": "Radio",
+    "zh-CN": "单选框"
+  },
+  "component.number": {
+    "en": "Number",
+    "zh-CN": "数字"
+  },
+  "component.file": {
+    "en": "File",
+    "zh-CN": "文件"
+  },
+  "component.html": {
+    "en": "Html",
+    "zh-CN": "HTML"
+  },
+  "component.json": {
+    "en": "Json",
+    "zh-CN": "JSON"
+  },
+  "component.textbox": {
+    "en": "Textbox",
+    "zh-CN": "文本框"
+  },
+  "error.invalid_mode": {
+    "en": "Invalid image mode. Reload the Web UI and try again.",
+    "zh-CN": "图像模式无效。请重新加载 WebUI 后重试。"
+  },
+  "error.ten_callback_count": {
+    "en": "Ten-view callback expected {expected} images, received {received}.",
+    "zh-CN": "十视图回调需要 {expected} 张图像，但收到 {received} 张。"
+  },
+  "error.ten_missing": {
+    "en": "The 10 Views tab requires all 10 camera views. Missing: {views}",
+    "zh-CN": "“10 视图”标签页需要全部 10 个相机视图。缺少：{views}"
+  },
+  "error.ten_unknown_keys": {
+    "en": "Ten-view input contains unsupported camera keys: {keys}",
+    "zh-CN": "十视图输入包含不受支持的相机键：{keys}"
+  },
+  "error.invalid_image": {
+    "en": "The {view} image is not a valid image.",
+    "zh-CN": "{view} 图像不是有效图像。"
+  },
+  "error.invalid_dimensions": {
+    "en": "The {view} image has invalid dimensions ({dimensions}).",
+    "zh-CN": "{view} 图像的尺寸无效（{dimensions}）。"
+  },
+  "error.transparent_image": {
+    "en": "The {view} image is fully transparent.",
+    "zh-CN": "{view} 图像完全透明。"
+  },
+  "error.single_required": {
+    "en": "The Single View tab requires one front-facing image of the object.",
+    "zh-CN": "“单视图”标签页需要一张对象的正面图像。"
+  },
+  "error.multi_required": {
+    "en": "The Multi View tab requires Front, Back, Left, and Right images. Missing: {views}",
+    "zh-CN": "“多视图”标签页需要正面、背面、左侧和右侧图像。缺少：{views}"
+  },
+  "error.preset_unavailable": {
+    "en": "This GPU preset is unavailable for the current runtime.",
+    "zh-CN": "此 GPU 预设不适用于当前运行环境。"
+  },
+  "error.background_removal_missing": {
+    "en": "Background removal is not installed. Install the Windows Web UI dependencies or upload transparent PNG files and leave Remove Background off.",
+    "zh-CN": "尚未安装背景移除功能。请安装 Windows WebUI 依赖，或上传透明 PNG 文件并关闭“移除背景”。"
+  },
+  "error.multiview_conditioning_named": {
+    "en": "Multi-view conditioning must contain named images.",
+    "zh-CN": "多视图条件输入必须包含带名称的图像。"
+  },
+  "error.multiview_input_named": {
+    "en": "Multi-view input must contain named images.",
+    "zh-CN": "多视图输入必须包含带名称的图像。"
+  },
+  "error.missing_view": {
+    "en": "Missing image for the {view} view.",
+    "zh-CN": "缺少 {view} 视图的图像。"
+  },
+  "error.missing_conditioning": {
+    "en": "Missing processed conditioning views: {views}",
+    "zh-CN": "缺少已处理的条件视图：{views}"
+  },
+  "error.mesh_tools_missing": {
+    "en": "Mesh transform tools are not installed. The generated GLB can still be downloaded directly above.",
+    "zh-CN": "尚未安装网格变换工具。仍可通过上方链接直接下载生成的 GLB。"
+  },
+  "error.invalid_uid": {
+    "en": "Invalid generation UID. Reload the Web UI and try again.",
+    "zh-CN": "生成 UID 无效。请重新加载 WebUI 后重试。"
+  },
+  "error.uid_exists": {
+    "en": "Generation UID already exists: {uid}",
+    "zh-CN": "生成 UID 已存在：{uid}"
+  },
+  "error.caption_or_image": {
+    "en": "Please provide either a caption or an image.",
+    "zh-CN": "请提供文字描述或图像。"
+  },
+  "error.text_to_3d_disabled": {
+    "en": "Text to 3D is disable. Please enable it by `python gradio_app.py --enable_t23d`.",
+    "zh-CN": "文字转 3D 功能未启用。请通过 `python gradio_app.py --enable_t23d` 启用。"
+  },
+  "error.valid_input_image": {
+    "en": "Please provide a valid input image.",
+    "zh-CN": "请提供有效的输入图像。"
+  },
+  "error.generate_first": {
+    "en": "Please generate a mesh first.",
+    "zh-CN": "请先生成网格。"
+  },
+  "error.cuda_unavailable": {
+    "en": "CUDA was requested, but PyTorch cannot access an NVIDIA GPU.",
+    "zh-CN": "已请求 CUDA，但 PyTorch 无法访问 NVIDIA GPU。"
+  },
+  "error.variants_missing": {
+    "en": "Generation did not produce all required model variants: {variants}",
+    "zh-CN": "生成过程未产出所有必需的模型变体：{variants}"
+  },
+  "error.generation_not_found": {
+    "en": "Generation not found",
+    "zh-CN": "未找到生成记录"
+  },
+  "error.mesh_not_found": {
+    "en": "Generated mesh not found",
+    "zh-CN": "未找到生成的网格"
+  },
+  "error.variant_not_found": {
+    "en": "Model variant not found",
+    "zh-CN": "未找到模型变体"
+  },
+  "generation.console.stage.request_received": {
+    "en": "Generation request accepted",
+    "zh-CN": "生成请求已接受"
+  },
+  "generation.console.stage.validating_input": {
+    "en": "Validating input payload",
+    "zh-CN": "正在验证输入数据"
+  },
+  "generation.console.stage.input_validated": {
+    "en": "Input validation completed",
+    "zh-CN": "输入验证已完成"
+  },
+  "generation.console.stage.input_saved": {
+    "en": "Input snapshots saved to source storage",
+    "zh-CN": "输入快照已保存到源存储"
+  },
+  "generation.console.stage.preprocessing_input": {
+    "en": "Preprocessing input views",
+    "zh-CN": "正在预处理输入视图"
+  },
+  "generation.console.stage.input_ready": {
+    "en": "Input tensor is ready for inference",
+    "zh-CN": "输入张量已就绪，可以开始推理"
+  },
+  "generation.console.stage.shape_generation": {
+    "en": "Starting Hunyuan3D inference pipeline",
+    "zh-CN": "正在启动 Hunyuan3D 推理流水线"
+  },
+  "generation.console.stage.prepare_conditioning": {
+    "en": "Preparing image conditioning tensors",
+    "zh-CN": "正在准备图像条件张量"
+  },
+  "generation.console.stage.encode_conditioning": {
+    "en": "Encoding vision conditioning features",
+    "zh-CN": "正在编码视觉条件特征"
+  },
+  "generation.console.stage.conditioning_ready": {
+    "en": "Vision conditioning is ready",
+    "zh-CN": "视觉条件已就绪"
+  },
+  "generation.console.stage.prepare_timestep_schedule": {
+    "en": "Building diffusion timestep schedule",
+    "zh-CN": "正在构建扩散时间步调度"
+  },
+  "generation.console.stage.latents_initialized": {
+    "en": "Latent noise tensor initialized",
+    "zh-CN": "潜变量噪声张量已初始化"
+  },
+  "generation.console.stage.diffusion_started": {
+    "en": "Diffusion sampling started",
+    "zh-CN": "扩散采样已开始"
+  },
+  "generation.console.stage.diffusion_completed": {
+    "en": "Diffusion sampling completed",
+    "zh-CN": "扩散采样已完成"
+  },
+  "generation.console.stage.vae_decoding": {
+    "en": "Decoding latent representation with ShapeVAE",
+    "zh-CN": "正在使用 ShapeVAE 解码潜变量表示"
+  },
+  "generation.console.stage.volume_decoding": {
+    "en": "Starting dense volume decoding",
+    "zh-CN": "正在启动稠密体积解码"
+  },
+  "generation.console.stage.volume_decoding_progress": {
+    "en": "Decoding dense volume chunks",
+    "zh-CN": "正在解码稠密体积分块"
+  },
+  "generation.console.stage.volume_decoding_completed": {
+    "en": "Dense volume decoding completed",
+    "zh-CN": "稠密体积解码已完成"
+  },
+  "generation.console.stage.surface_extraction": {
+    "en": "Running marching-cubes surface extraction",
+    "zh-CN": "正在运行 Marching Cubes 表面提取"
+  },
+  "generation.console.stage.surface_extraction_completed": {
+    "en": "Surface extraction completed",
+    "zh-CN": "表面提取已完成"
+  },
+  "generation.console.stage.trimesh_conversion": {
+    "en": "Converting generated surface to Trimesh",
+    "zh-CN": "正在将生成的表面转换为 Trimesh"
+  },
+  "generation.console.stage.extracting_mesh": {
+    "en": "Converting generated surface to Trimesh",
+    "zh-CN": "正在将生成的表面转换为 Trimesh"
+  },
+  "generation.console.stage.mesh_ready": {
+    "en": "Mesh geometry is ready",
+    "zh-CN": "网格几何体已就绪"
+  },
+  "generation.console.stage.exporting_glb": {
+    "en": "Exporting white GLB",
+    "zh-CN": "正在导出白模 GLB"
+  },
+  "generation.console.stage.preparing_texture_inputs": {
+    "en": "Preparing images for color projection",
+    "zh-CN": "正在准备用于颜色投影的图像"
+  },
+  "generation.console.stage.baking_original": {
+    "en": "Baking the colored Original GLB",
+    "zh-CN": "正在烘焙彩色原始 GLB"
+  },
+  "generation.console.stage.coloring_original_fallback": {
+    "en": "Building the colored Original fallback",
+    "zh-CN": "正在构建彩色原始模型的后备版本"
+  },
+  "generation.console.stage.scoring_original": {
+    "en": "Scoring face and hair consistency before publication",
+    "zh-CN": "发布前正在评估面部和头发一致性"
+  },
+  "generation.console.stage.original_ready": {
+    "en": "Colored Original GLB is ready",
+    "zh-CN": "彩色原始 GLB 已就绪"
+  },
+  "generation.console.stage.building_preview": {
+    "en": "Building interactive 3D preview",
+    "zh-CN": "正在构建交互式 3D 预览"
+  },
+  "generation.console.stage.completed": {
+    "en": "Generation completed successfully",
+    "zh-CN": "生成已成功完成"
+  },
+  "generation.console.stage.failed": {
+    "en": "Generation failed",
+    "zh-CN": "生成失败"
+  },
+  "generation.console.stage.shape_generation_detail": {
+    "en": "Launching Hunyuan3D inference · steps={steps} guidance={guidance} octree={octree} chunks={chunks}",
+    "zh-CN": "正在启动 Hunyuan3D 推理 · 步数={steps} 引导={guidance} 八叉树={octree} 分块={chunks}"
+  },
+  "generation.console.stage.prepare_conditioning_detail": {
+    "en": "Preparing {view_count} input view(s) for model conditioning",
+    "zh-CN": "正在准备 {view_count} 个输入视图用于模型条件处理"
+  },
+  "generation.console.stage.encode_conditioning_detail": {
+    "en": "Encoding vision features from tensor {image_shape} ({dtype})",
+    "zh-CN": "正在从张量 {image_shape}（{dtype}）编码视觉特征"
+  },
+  "generation.console.stage.conditioning_ready_detail": {
+    "en": "Vision conditioning ready for batch_size={batch_size}",
+    "zh-CN": "视觉条件已就绪，batch_size={batch_size}"
+  },
+  "generation.console.stage.prepare_timestep_schedule_detail": {
+    "en": "Building {scheduler} schedule with {steps} steps",
+    "zh-CN": "正在构建包含 {steps} 个步骤的 {scheduler} 调度"
+  },
+  "generation.console.stage.latents_initialized_detail": {
+    "en": "Initialized latent noise {latent_shape} on {device} as {dtype}",
+    "zh-CN": "已在 {device} 上以 {dtype} 初始化潜变量噪声 {latent_shape}"
+  },
+  "generation.console.stage.diffusion_started_detail": {
+    "en": "Starting {total_steps} real diffusion steps on CUDA",
+    "zh-CN": "正在 CUDA 上执行 {total_steps} 个实际扩散步骤"
+  },
+  "generation.console.stage.diffusion_step_detail": {
+    "en": "Step {step}/{total_steps} · t={timestep} · {step_seconds}s · ETA {eta_seconds}s · VRAM {vram_allocated}/{vram_reserved} GB",
+    "zh-CN": "步骤 {step}/{total_steps} · t={timestep} · {step_seconds}秒 · 预计剩余 {eta_seconds}秒 · 显存 {vram_allocated}/{vram_reserved} GB"
+  },
+  "generation.console.stage.diffusion_completed_detail": {
+    "en": "Diffusion sampling completed in {seconds}s",
+    "zh-CN": "扩散采样已完成，用时 {seconds} 秒"
+  },
+  "generation.console.stage.vae_decoding_detail": {
+    "en": "ShapeVAE decoding latent {latent_shape} ({dtype})",
+    "zh-CN": "ShapeVAE 正在解码潜变量 {latent_shape}（{dtype}）"
+  },
+  "generation.console.stage.volume_decoding_detail": {
+    "en": "Starting {decoder} · octree={octree} chunks={chunks}",
+    "zh-CN": "正在启动 {decoder} · 八叉树={octree} 分块={chunks}"
+  },
+  "generation.console.stage.volume_decoding_progress_detail": {
+    "en": "Volume chunk {chunk}/{total_chunks} · points {processed_points}/{total_points} · {percent}% · ETA {eta_seconds}s",
+    "zh-CN": "体积分块 {chunk}/{total_chunks} · 点数 {processed_points}/{total_points} · {percent}% · 预计剩余 {eta_seconds}秒"
+  },
+  "generation.console.stage.volume_decoding_completed_detail": {
+    "en": "Dense volume ready from {decoder} · grid={grid_shape}",
+    "zh-CN": "{decoder} 已生成稠密体积 · 网格={grid_shape}"
+  },
+  "generation.console.stage.surface_extraction_detail": {
+    "en": "Running marching cubes with {extractor}",
+    "zh-CN": "正在使用 {extractor} 运行 Marching Cubes"
+  },
+  "generation.console.stage.surface_extraction_completed_detail": {
+    "en": "Surface extraction completed · mesh_count={mesh_count}",
+    "zh-CN": "表面提取已完成 · 网格数量={mesh_count}"
+  },
+  "generation.console.stage.preparing_texture_inputs_ten": {
+    "en": "Preparing all ten calibrated images for color projection",
+    "zh-CN": "正在准备全部十张已校准图像用于颜色投影"
+  },
+  "generation.console.stage.preparing_texture_inputs_four": {
+    "en": "Preparing four cardinal images for color projection",
+    "zh-CN": "正在准备四张正交视图用于颜色投影"
+  },
+  "generation.console.stage.baking_original_ten": {
+    "en": "Baking strict visibility-aware ten-view color into Original GLB",
+    "zh-CN": "正在将严格可见性感知的十视图颜色烘焙到原始 GLB"
+  },
+  "generation.console.stage.baking_original_four": {
+    "en": "Baking visibility-aware color into Original GLB",
+    "zh-CN": "正在将可见性感知颜色烘焙到原始 GLB"
+  },
+  "generation.console.stage.coloring_original_fallback_vertex": {
+    "en": "Using multi-view vertex colors as the Original fallback",
+    "zh-CN": "正在使用多视图顶点颜色作为原始模型的后备方案"
+  },
+  "generation.console.stage.scoring_original_selecting": {
+    "en": "Selecting the clearest RC-scored Original candidate",
+    "zh-CN": "正在选择 RC 评分中最清晰的原始候选模型"
+  },
+  "generation.console.stage.scoring_original_reprojection": {
+    "en": "Scoring face and hair reprojection consistency before publication",
+    "zh-CN": "发布前正在评估面部和头发的重投影一致性"
+  },
+  "generation.console.stage.unknown": {
+    "en": "Stage: {stage}",
+    "zh-CN": "阶段：{stage}"
+  },
+  "generation.console.level.queue": {
+    "en": "QUEUE",
+    "zh-CN": "队列"
+  },
+  "generation.console.level.check": {
+    "en": "CHECK",
+    "zh-CN": "检查"
+  },
+  "generation.console.level.input": {
+    "en": "INPUT",
+    "zh-CN": "输入"
+  },
+  "generation.console.level.store": {
+    "en": "STORE",
+    "zh-CN": "保存"
+  },
+  "generation.console.level.prep": {
+    "en": "PREP",
+    "zh-CN": "预处理"
+  },
+  "generation.console.level.ready": {
+    "en": "READY",
+    "zh-CN": "就绪"
+  },
+  "generation.console.level.cuda": {
+    "en": "CUDA",
+    "zh-CN": "CUDA"
+  },
+  "generation.console.level.image": {
+    "en": "IMAGE",
+    "zh-CN": "图像"
+  },
+  "generation.console.level.encode": {
+    "en": "ENCODE",
+    "zh-CN": "编码"
+  },
+  "generation.console.level.conditioning": {
+    "en": "COND",
+    "zh-CN": "条件"
+  },
+  "generation.console.level.schedule": {
+    "en": "SCHED",
+    "zh-CN": "调度"
+  },
+  "generation.console.level.latent": {
+    "en": "LATENT",
+    "zh-CN": "潜变量"
+  },
+  "generation.console.level.step": {
+    "en": "STEP",
+    "zh-CN": "步骤"
+  },
+  "generation.console.level.vae": {
+    "en": "VAE",
+    "zh-CN": "VAE"
+  },
+  "generation.console.level.volume": {
+    "en": "VOLUME",
+    "zh-CN": "体积"
+  },
+  "generation.console.level.octree": {
+    "en": "OCTREE",
+    "zh-CN": "八叉树"
+  },
+  "generation.console.level.mesh": {
+    "en": "MESH",
+    "zh-CN": "网格"
+  },
+  "generation.console.level.write": {
+    "en": "WRITE",
+    "zh-CN": "写入"
+  },
+  "generation.console.level.color": {
+    "en": "COLOR",
+    "zh-CN": "颜色"
+  },
+  "generation.console.level.bake": {
+    "en": "BAKE",
+    "zh-CN": "烘焙"
+  },
+  "generation.console.level.score": {
+    "en": "SCORE",
+    "zh-CN": "评分"
+  },
+  "generation.console.level.view": {
+    "en": "VIEW",
+    "zh-CN": "视图"
+  },
+  "generation.console.level.done": {
+    "en": "DONE",
+    "zh-CN": "完成"
+  },
+  "generation.console.level.error": {
+    "en": "ERROR",
+    "zh-CN": "错误"
+  },
+  "generation.console.level.info": {
+    "en": "INFO",
+    "zh-CN": "信息"
+  },
+  "generation.console.level.config": {
+    "en": "CONFIG",
+    "zh-CN": "配置"
+  },
+  "generation.console.level.stats": {
+    "en": "STATS",
+    "zh-CN": "统计"
+  },
+  "generation.console.level.output": {
+    "en": "OUTPUT",
+    "zh-CN": "输出"
+  },
+  "generation.console.level.warn": {
+    "en": "WARN",
+    "zh-CN": "警告"
+  },
+  "generation.console.level.resume": {
+    "en": "RESUME",
+    "zh-CN": "恢复"
+  },
+  "generation.console.output.in_progress": {
+    "en": "Generation in progress",
+    "zh-CN": "正在生成"
+  },
+  "generation.console.output.saved_source": {
+    "en": "GLB · saved to source",
+    "zh-CN": "GLB · 已保存到源存储"
+  },
+  "generation.console.output.saved_size": {
+    "en": "GLB · {size} · saved",
+    "zh-CN": "GLB · {size} · 已保存"
+  },
+  "generation.console.target_path": {
+    "en": "Target: {path}",
+    "zh-CN": "目标：{path}"
+  },
+  "generation.console.target_waiting": {
+    "en": "Target: waiting for generation manifest",
+    "zh-CN": "目标：正在等待生成清单"
+  },
+  "generation.console.clock.live": {
+    "en": "LIVE {elapsed}",
+    "zh-CN": "实时 {elapsed}"
+  },
+  "generation.console.clock.connecting": {
+    "en": "CONNECTING TO MANIFEST",
+    "zh-CN": "正在连接生成清单"
+  },
+  "generation.console.clock.saved_source": {
+    "en": "SAVED TO SOURCE",
+    "zh-CN": "已保存到源存储"
+  },
+  "generation.console.clock.error_manifest": {
+    "en": "ERROR SAVED TO MANIFEST",
+    "zh-CN": "错误已保存到清单"
+  },
+  "generation.console.mesh_stats": {
+    "en": "vertices={vertices} faces={faces} total={total}s",
+    "zh-CN": "顶点={vertices} 面={faces} 总计={total}秒"
+  },
+  "generation.console.state.completed": {
+    "en": "COMPLETED",
+    "zh-CN": "已完成"
+  },
+  "generation.console.state.failed": {
+    "en": "FAILED",
+    "zh-CN": "失败"
+  },
+  "generation.console.state.running": {
+    "en": "RUNNING",
+    "zh-CN": "运行中"
+  },
+  "generation.console.state.restoring": {
+    "en": "RESTORING",
+    "zh-CN": "正在恢复"
+  },
+  "generation.console.state.starting": {
+    "en": "STARTING",
+    "zh-CN": "正在启动"
+  },
+  "generation.console.progress.ready": {
+    "en": "3D model is ready",
+    "zh-CN": "3D 模型已就绪"
+  },
+  "generation.console.progress.stopped_error": {
+    "en": "Generation stopped with an error",
+    "zh-CN": "生成因错误而停止"
+  },
+  "generation.console.progress.restoring": {
+    "en": "Restoring generation state",
+    "zh-CN": "正在恢复生成状态"
+  },
+  "generation.console.progress.dispatching": {
+    "en": "Dispatching request",
+    "zh-CN": "正在分派请求"
+  },
+  "generation.console.error.unknown": {
+    "en": "Unknown generation error",
+    "zh-CN": "未知生成错误"
+  },
+  "generation.console.error.detail": {
+    "en": "Generation error: {error}",
+    "zh-CN": "生成错误：{error}"
+  },
+  "generation.console.waiting.backend": {
+    "en": "Waiting for the backend worker...",
+    "zh-CN": "正在等待后端工作进程..."
+  },
+  "generation.console.waiting.queue": {
+    "en": "Waiting in the Gradio queue",
+    "zh-CN": "正在 Gradio 队列中等待"
+  },
+  "generation.console.waiting.poll_retry": {
+    "en": "Manifest polling will retry automatically",
+    "zh-CN": "生成清单轮询将自动重试"
+  },
+  "generation.console.title": {
+    "en": "Generation Console",
+    "zh-CN": "生成控制台"
+  },
+  "generation.console.pipeline": {
+    "en": "REAL-TIME INFERENCE PIPELINE",
+    "zh-CN": "实时推理流水线"
+  },
+  "generation.console.idle": {
+    "en": "IDLE",
+    "zh-CN": "空闲"
+  },
+  "generation.console.waiting_request": {
+    "en": "Waiting for a generation request",
+    "zh-CN": "正在等待生成请求"
+  },
+  "generation.console.no_active": {
+    "en": "No active generation",
+    "zh-CN": "无活动生成任务"
+  },
+  "generation.console.waiting": {
+    "en": "WAITING",
+    "zh-CN": "等待中"
+  },
+  "generation.console.initial_help": {
+    "en": "Upload input images, then press Generate 3D.",
+    "zh-CN": "上传输入图像，然后点击“生成 3D”。"
+  },
+  "generation.console.scope_help": {
+    "en": "Console shows generation/inference progress, not model training.",
+    "zh-CN": "控制台显示生成/推理进度，并非模型训练。"
+  },
+  "generation.console.storage_ready": {
+    "en": "LOCAL STORAGE READY",
+    "zh-CN": "本地存储已就绪"
+  },
+  "generation.info.title": {
+    "en": "Generation Info",
+    "zh-CN": "生成信息"
+  },
+  "gpu.count_line": {
+    "en": "GPU · {count} tiers",
+    "zh-CN": "GPU · {count} 个档位"
+  },
+  "footer.built_with": {
+    "en": "Built with Gradio",
+    "zh-CN": "使用 Gradio 构建"
+  },
+  "upload.drop_image": {
+    "en": "Drop Image Here",
+    "zh-CN": "将图像拖放到此处"
+  },
+  "upload.or": {
+    "en": "or",
+    "zh-CN": "或"
+  },
+  "upload.click": {
+    "en": "Click to Upload",
+    "zh-CN": "点击上传"
+  },
+  "upload.drop_image_aria": {
+    "en": "Drop an image file here to upload",
+    "zh-CN": "将图像文件拖放到此处以上传"
+  },
+  "upload.drop_files_aria": {
+    "en": "Click to upload or drop files",
+    "zh-CN": "点击上传或拖放文件"
+  },
+  "settings.steps_short": {
+    "en": "Steps",
+    "zh-CN": "步数"
+  },
+  "settings.guidance_short": {
+    "en": "Guidance",
+    "zh-CN": "引导"
+  },
+  "settings.chunks_short": {
+    "en": "Chunks",
+    "zh-CN": "分块"
+  },
+  "gpu.runtime_line": {
+    "en": "{vram} GiB VRAM · {backend} {dtype} · CC {compute}",
+    "zh-CN": "{vram} GiB 显存 · {backend} {dtype} · 计算能力 {compute}"
+  },
+  "gpu.end_to_end_verified_label": {
+    "en": "End-to-end verified:",
+    "zh-CN": "已完成端到端验证："
+  },
+  "settings.input_mode": {
+    "en": "Input mode",
+    "zh-CN": "输入模式"
+  },
+  "api.docs": {
+    "en": "docs",
+    "zh-CN": "文档"
+  },
+  "api.of": {
+    "en": "of",
+    "zh-CN": "包含"
+  },
+  "component.downloadbutton": {
+    "en": "Downloadbutton",
+    "zh-CN": "下载按钮"
+  },
+  "api.filedata_signature": {
+    "en": "dict(path: str | None (Path to a local file), url: str | None (Publicly available url or base64 encoded image), size: int | None (Size of image in bytes), orig_name: str | None (Original filename), mime_type: str | None (mime type of image), is_stream: bool (Can always be set to False), meta: dict(str, Any))",
+    "zh-CN": "dict(path: str | None（本地文件路径）, url: str | None（公开 URL 或 base64 编码图像）, size: int | None（图像字节大小）, orig_name: str | None（原始文件名）, mime_type: str | None（图像 MIME 类型）, is_stream: bool（始终可设为 False）, meta: dict(str, Any))"
+  },
+  "api.filedata_description": {
+    "en": "The FileData class is a subclass of the GradioModel class that represents a file object within a Gradio interface. It is used to store file data and metadata when a file is uploaded. Attributes: path: The server file path where the file is stored. url: The normalized server URL pointing to the file. size: The size of the file in bytes. orig_name: The original filename before upload. mime_type: The MIME type of the file. is_stream: Indicates whether the file is a stream. meta: Additional metadata used internally (should not be changed).",
+    "zh-CN": "FileData 类是 GradioModel 的子类，用于表示 Gradio 界面中的文件对象。上传文件时，它用于保存文件数据和元数据。属性：path：文件在服务器上的存储路径。url：指向文件的规范化服务器 URL。size：文件的字节大小。orig_name：上传前的原始文件名。mime_type：文件的 MIME 类型。is_stream：表示文件是否为流。meta：内部使用的附加元数据（不应修改）。"
+  },
+  "generation.console.mode.single": {
+    "en": "1-VIEW",
+    "zh-CN": "单视图"
+  },
+  "generation.console.mode.four": {
+    "en": "4-VIEW",
+    "zh-CN": "四视图"
+  },
+  "generation.console.mode.ten": {
+    "en": "10-VIEW",
+    "zh-CN": "十视图"
+  },
+  "generation.console.stage.face_hair_rc_selected": {
+    "en": "Selected the clearest fixed-geometry face/hair texture candidate after ten-view RC",
+    "zh-CN": "在十视图 RC 评估后，已选择固定几何体中最清晰的面部/头发纹理候选方案"
+  },
+  "viewer.fullscreen": {
+    "en": "Fullscreen",
+    "zh-CN": "全屏"
+  },
+  "viewer.exit_fullscreen": {
+    "en": "Exit fullscreen",
+    "zh-CN": "退出全屏"
+  },
+  "generation.console.zero_elapsed": {
+    "en": "+00.0s",
+    "zh-CN": "+00.0秒"
+  }
+}
