@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from .asset_manifest import SCRIPT_FRAGMENTS, STYLE_FRAGMENTS
-from .i18n import ui_translation_catalog_json
+from .i18n import ui_language_config_json, ui_translation_catalog_json
 
 _ASSET_DIRECTORY = Path(__file__).resolve().parent / "assets"
 
@@ -14,10 +14,16 @@ def _read_fragment(relative_path: str) -> str:
     with path.open("r", encoding="utf-8-sig", newline=None) as fragment:
         content = fragment.read()
     if relative_path == "scripts/05-i18n.js":
-        marker = "/*__UI_TRANSLATION_CATALOG__*/"
-        if content.count(marker) != 1:
-            raise ValueError("The UI translation catalog marker is missing or duplicated")
-        content = content.replace(marker, ui_translation_catalog_json())
+        replacements = {
+            "/*__UI_LANGUAGE_CONFIG__*/": ui_language_config_json(),
+            "/*__UI_TRANSLATION_CATALOG__*/": ui_translation_catalog_json(),
+        }
+        for marker, replacement in replacements.items():
+            if content.count(marker) != 1:
+                raise ValueError(
+                    f"The UI asset marker is missing or duplicated: {marker}"
+                )
+            content = content.replace(marker, replacement)
     return content
 
 

@@ -7,7 +7,7 @@
         white: "modeWhite",
         wireframe: "modeWireframe",
     };
-    const DEFAULT_LOCALE = "en";
+    const FALLBACK_DEFAULT_LOCALE = "zh-CN";
     const LOCALE_STORAGE_KEY = "hunyuan3d.ui-locale.v1";
     const normalizeLocale = (value) => {
         if (typeof value !== "string") {
@@ -80,6 +80,31 @@
         configError = true;
     }
 
+    const configuredEnabledLocales = Array.isArray(parsedConfig.enabledLocales)
+        ? parsedConfig.enabledLocales
+            .map(normalizeLocale)
+            .filter((locale, index, locales) => (
+                locale && locales.indexOf(locale) === index
+            ))
+        : ["en", "zh-CN"];
+    const enabledLocales = configuredEnabledLocales.length
+        ? configuredEnabledLocales
+        : [FALLBACK_DEFAULT_LOCALE];
+    const configuredDefaultLocale = normalizeLocale(
+        parsedConfig.defaultLocale
+    );
+    const defaultLocale = (
+        configuredDefaultLocale
+        && enabledLocales.includes(configuredDefaultLocale)
+    )
+        ? configuredDefaultLocale
+        : enabledLocales.includes(FALLBACK_DEFAULT_LOCALE)
+            ? FALLBACK_DEFAULT_LOCALE
+            : enabledLocales[0];
+    const enabledLocale = (value) => {
+        const locale = normalizeLocale(value);
+        return locale && enabledLocales.includes(locale) ? locale : null;
+    };
     const messageCatalog = (
         parsedConfig
         && parsedConfig.messages
@@ -91,23 +116,23 @@
         }
         try {
             if (typeof window.parent.currentUiLocale === "function") {
-                return normalizeLocale(window.parent.currentUiLocale());
+                return enabledLocale(window.parent.currentUiLocale());
             }
-            return normalizeLocale(window.parent.document.documentElement.lang);
+            return enabledLocale(window.parent.document.documentElement.lang);
         } catch (_error) {
             return null;
         }
     };
     const queryLocale = () => {
         try {
-            return normalizeLocale(new URL(window.location.href).searchParams.get("lang"));
+            return enabledLocale(new URL(window.location.href).searchParams.get("lang"));
         } catch (_error) {
             return null;
         }
     };
     const storedLocale = () => {
         try {
-            return normalizeLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
+            return enabledLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
         } catch (_error) {
             return null;
         }
@@ -116,13 +141,16 @@
         parentLocale()
         || queryLocale()
         || storedLocale()
-        || normalizeLocale(parsedConfig.locale)
-        || DEFAULT_LOCALE
+        || enabledLocale(parsedConfig.locale)
+        || defaultLocale
     );
     const message = (key, parameters = {}) => {
         const localeMessages = messageCatalog[currentLocale] || {};
-        const englishMessages = messageCatalog[DEFAULT_LOCALE] || {};
-        const template = localeMessages[key] || englishMessages[key] || key;
+        const defaultMessages = messageCatalog[defaultLocale]
+            || messageCatalog[FALLBACK_DEFAULT_LOCALE]
+            || messageCatalog.en
+            || {};
+        const template = localeMessages[key] || defaultMessages[key] || key;
         return Object.entries(parameters).reduce(
             (result, [name, value]) => {
                 const displayValue = MODE_ORDER.includes(value)
@@ -240,7 +268,7 @@
     };
 
     const applyLocale = (requestedLocale) => {
-        const nextLocale = normalizeLocale(requestedLocale) || DEFAULT_LOCALE;
+        const nextLocale = enabledLocale(requestedLocale) || defaultLocale;
         currentLocale = nextLocale;
         document.documentElement.lang = nextLocale;
         document.title = message("title");

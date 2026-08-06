@@ -62,6 +62,12 @@ from hy3dshape.texture_bake.rc_evaluator import (
 )
 from hy3dshape.utils import logger
 from webui import load_ui_assets, render_history_modal, render_topbar
+from webui.topbar_config import (
+    SHOW_API_DOCS_BUTTON,
+    SHOW_GPU_BUTTON,
+    SHOW_HISTORY_BUTTON,
+    SHOW_SETTINGS_BUTTON,
+)
 from webui.generation_inputs import (
     GenerationInputError,
     build_generation_input_bundle,
@@ -2347,7 +2353,15 @@ def build_app():
     """.format(hardware_action_label=escape(hardware_action_label)) if hardware_presets_visible else ''
 
     title_html = (
-        render_topbar(brand_name, workspace_title, rtx_profile_action)
+        render_topbar(
+            brand_name,
+            workspace_title,
+            rtx_profile_action,
+            show_api_docs_button=SHOW_API_DOCS_BUTTON,
+            show_history_button=SHOW_HISTORY_BUTTON,
+            show_settings_button=SHOW_SETTINGS_BUTTON,
+            show_gpu_button=SHOW_GPU_BUTTON,
+        )
         + render_history_modal()
     )
     custom_css, custom_js = load_ui_assets()

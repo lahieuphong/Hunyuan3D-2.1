@@ -21,6 +21,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .i18n import (
+    DEFAULT_UI_LOCALE,
+    ENABLED_UI_LOCALES,
+    SUPPORTED_UI_LOCALES,
+    normalize_ui_locale,
+)
+
 
 VARIANT_ORDER = ("original", "white", "wireframe")
 
@@ -45,16 +52,7 @@ _MODE_ICONS = {
     "white": "box",
     "wireframe": "wireframe",
 }
-VIEWER_LOCALES = ("en", "zh-CN")
-_VIEWER_LOCALE_ALIASES = {
-    "en": "en",
-    "en-us": "en",
-    "en_us": "en",
-    "zh": "zh-CN",
-    "zh-cn": "zh-CN",
-    "zh_cn": "zh-CN",
-    "zh-hans": "zh-CN",
-}
+VIEWER_LOCALES = SUPPORTED_UI_LOCALES
 _VIEWER_MESSAGES = {
     "en": {
         "title": "Hunyuan3D-2mv · 3D Model Viewer",
@@ -767,12 +765,9 @@ def _safe_json(value: object) -> str:
 
 
 def normalize_viewer_locale(locale: object) -> str:
-    """Return one of the two viewer locales, defaulting safely to English."""
+    """Return an enabled viewer locale, defaulting to Simplified Chinese."""
 
-    if not isinstance(locale, str):
-        return "en"
-    candidate = locale.strip().lower().replace("_", "-")
-    return _VIEWER_LOCALE_ALIASES.get(candidate, "en")
+    return normalize_ui_locale(locale if isinstance(locale, str) else None)
 
 
 def _viewer_message(locale: str, key: str) -> str:
@@ -865,6 +860,8 @@ def render_model_viewer_document(
     initial_source = sources.get(default_mode or "", "")
     config = {
         "defaultMode": default_mode,
+        "defaultLocale": DEFAULT_UI_LOCALE,
+        "enabledLocales": ENABLED_UI_LOCALES,
         "locale": locale_value,
         "messages": _VIEWER_MESSAGES,
         "variants": {

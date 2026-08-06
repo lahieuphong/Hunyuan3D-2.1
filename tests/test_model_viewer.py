@@ -7,9 +7,11 @@ import tempfile
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
+from unittest.mock import patch
 
 import trimesh
 
+from webui.i18n import ENABLED_UI_LOCALES
 from webui.model_viewer import (
     export_wireframe_glb,
     is_wireframe_glb,
@@ -400,20 +402,45 @@ class ModelViewerDocumentTests(unittest.TestCase):
         self.assertIn("color-scheme: dark", document)
         self.assertIn('"use strict"', document)
 
-    def test_normalizes_supported_viewer_locales_and_defaults_to_english(self):
-        self.assertEqual(normalize_viewer_locale("en-US"), "en")
-        self.assertEqual(normalize_viewer_locale("zh_Hans"), "zh-CN")
-        self.assertEqual(normalize_viewer_locale("zh-CN"), "zh-CN")
-        self.assertEqual(normalize_viewer_locale("vi"), "en")
-        self.assertEqual(normalize_viewer_locale(None), "en")
-        self.assertEqual(
-            viewer_message("generationNotFound", "en"),
-            "Generation not found",
-        )
-        self.assertEqual(
-            viewer_message("generationNotFound", "zh-CN"),
-            "未找到生成记录",
-        )
+    def test_normalizes_supported_viewer_locales_and_defaults_to_chinese(self):
+        with patch(
+            "webui.i18n.ENABLED_UI_LOCALES",
+            ("en", "zh-CN"),
+        ):
+            self.assertEqual(normalize_viewer_locale("en-US"), "en")
+            self.assertEqual(normalize_viewer_locale("zh_Hans"), "zh-CN")
+            self.assertEqual(normalize_viewer_locale("zh-CN"), "zh-CN")
+            self.assertEqual(normalize_viewer_locale("vi"), "zh-CN")
+            self.assertEqual(normalize_viewer_locale(None), "zh-CN")
+            self.assertEqual(
+                viewer_message("generationNotFound", "en"),
+                "Generation not found",
+            )
+            self.assertEqual(
+                viewer_message("generationNotFound", "zh-CN"),
+                "未找到生成记录",
+            )
+
+    def test_viewer_rejects_disabled_english_locale_sources(self):
+        with (
+            patch("webui.i18n.ENABLED_UI_LOCALES", ("zh-CN",)),
+            patch("webui.model_viewer.ENABLED_UI_LOCALES", ("zh-CN",)),
+        ):
+            self.assertEqual(normalize_viewer_locale("en"), "zh-CN")
+            document = render_model_viewer_document(
+                {"white": "/static/generation/white_mesh.glb"},
+                "white",
+                650,
+                500,
+                locale="en",
+            )
+
+        parser = _ViewerMarkupParser()
+        parser.feed(document)
+        self.assertEqual(parser.viewer_config["defaultLocale"], "zh-CN")
+        self.assertEqual(parser.viewer_config["enabledLocales"], ["zh-CN"])
+        self.assertEqual(parser.viewer_config["locale"], "zh-CN")
+        self.assertIn("const enabledLocale = (value) =>", document)
 
     def test_renders_simplified_chinese_static_viewer_copy(self):
         document = render_model_viewer_document(
@@ -453,6 +480,13 @@ class ModelViewerDocumentTests(unittest.TestCase):
         )
 
         self.assertIn("hunyuan3d.ui-locale.v1", document)
+        self.assertIn('"defaultLocale":"zh-CN"', document)
+        parser = _ViewerMarkupParser()
+        parser.feed(document)
+        self.assertEqual(
+            parser.viewer_config["enabledLocales"],
+            list(ENABLED_UI_LOCALES),
+        )
         self.assertIn("window.parent.currentUiLocale", document)
         self.assertIn('window.parent.addEventListener("ui-language-change"', document)
         self.assertIn('window.addEventListener("storage"', document)

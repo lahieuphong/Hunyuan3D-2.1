@@ -1,4 +1,8 @@
 {
+  "shell.brand": {
+    "en": "Hunyuan3D-{variant}",
+    "zh-CN": "混元3D-{variant}"
+  },
   "shell.workspace.multiview": {
     "en": "Image to 3D Generation with 1–10 Views",
     "zh-CN": "支持 1–10 视图的图像转 3D 生成"
@@ -999,6 +1003,102 @@
     "en": "button in the footer of the demo.",
     "zh-CN": "演示页面页脚中的按钮。"
   },
+  "toast.title_error": {
+    "en": "Error",
+    "zh-CN": "错误"
+  },
+  "toast.title_warning": {
+    "en": "Warning",
+    "zh-CN": "警告"
+  },
+  "toast.title_info": {
+    "en": "Info",
+    "zh-CN": "信息"
+  },
+  "toast.title_success": {
+    "en": "Success",
+    "zh-CN": "成功"
+  },
+  "toast.close": {
+    "en": "Close",
+    "zh-CN": "关闭"
+  },
+  "toast.default_error": {
+    "en": "Error raised.",
+    "zh-CN": "发生错误。"
+  },
+  "toast.default_warning": {
+    "en": "Warning issued.",
+    "zh-CN": "已发出警告。"
+  },
+  "toast.default_info": {
+    "en": "Info issued.",
+    "zh-CN": "已显示信息。"
+  },
+  "toast.default_success": {
+    "en": "Success.",
+    "zh-CN": "操作成功。"
+  },
+  "toast.recording_error": {
+    "en": "Recording Error",
+    "zh-CN": "屏幕录制错误"
+  },
+  "toast.recording_start_failed": {
+    "en": "Failed to start recording: {error}",
+    "zh-CN": "无法开始屏幕录制：{error}"
+  },
+  "toast.permission_denied_by_user": {
+    "en": "Permission denied by user",
+    "zh-CN": "用户拒绝了权限请求"
+  },
+  "toast.permission_denied": {
+    "en": "Permission denied",
+    "zh-CN": "权限被拒绝"
+  },
+  "toast.permission_denied_by_system": {
+    "en": "Permission denied by system",
+    "zh-CN": "系统拒绝了权限请求"
+  },
+  "toast.request_not_allowed": {
+    "en": "The request is not allowed by the user agent or the platform in the current context.",
+    "zh-CN": "用户代理或平台不允许在当前环境中执行此请求。"
+  },
+  "toast.request_not_allowed_denied": {
+    "en": "The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.",
+    "zh-CN": "当前环境不允许此请求，可能是用户拒绝了权限。"
+  },
+  "toast.processing_video": {
+    "en": "Processing video",
+    "zh-CN": "正在处理视频"
+  },
+  "toast.processing_wait": {
+    "en": "This may take a few seconds...",
+    "zh-CN": "这可能需要几秒钟…"
+  },
+  "toast.processing_error": {
+    "en": "Processing Error",
+    "zh-CN": "处理错误"
+  },
+  "toast.processing_fallback": {
+    "en": "Failed to process recording. Saving original version.",
+    "zh-CN": "屏幕录制处理失败，正在保存原始版本。"
+  },
+  "toast.queue_connection_can_break": {
+    "en": "On mobile, the connection can break if this tab is unfocused or the device sleeps, losing your position in queue.",
+    "zh-CN": "在移动设备上，如果此标签页失去焦点或设备休眠，连接可能会中断，导致您在队列中失去位置。"
+  },
+  "toast.queue_long_requests": {
+    "en": "There is a long queue of requests pending. Duplicate this Space to skip.",
+    "zh-CN": "有一个长时间的待处理请求队列。复制此 Space 以跳过队列。"
+  },
+  "toast.queue_lost_connection": {
+    "en": "Lost connection due to leaving page. Rejoining queue...",
+    "zh-CN": "由于离开页面，连接已丢失。正在重新加入队列…"
+  },
+  "toast.queue_waiting_for_inputs": {
+    "en": "Waiting for file(s) to finish uploading, please retry.",
+    "zh-CN": "等待文件上传完成，请稍后重试。"
+  },
   "common.empty_value": {
     "en": "Empty value",
     "zh-CN": "空值"
@@ -1172,8 +1272,8 @@
     "zh-CN": "{view} 图像不是有效图像。"
   },
   "error.invalid_dimensions": {
-    "en": "The {view} image has invalid dimensions ({dimensions}).",
-    "zh-CN": "{view} 图像的尺寸无效（{dimensions}）。"
+    "en": "The {view} image has invalid dimensions ({width}×{height}).",
+    "zh-CN": "{view} 图像的尺寸无效（{width}×{height}）。"
   },
   "error.transparent_image": {
     "en": "The {view} image is fully transparent.",

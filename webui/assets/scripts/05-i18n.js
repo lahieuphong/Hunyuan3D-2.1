@@ -1,8 +1,21 @@
 
+        const uiLanguageConfig = Object.freeze(
+            /*__UI_LANGUAGE_CONFIG__*/
+        );
         const uiTranslationCatalog = Object.freeze(
             /*__UI_TRANSLATION_CATALOG__*/
         );
-        const uiSupportedLocales = Object.freeze(["en", "zh-CN"]);
+        const uiSupportedLocales = Object.freeze(
+            Object.entries(uiLanguageConfig.flags)
+                .filter(([, enabled]) => enabled === true)
+                .map(([locale]) => locale)
+        );
+        const uiDefaultLocale = uiLanguageConfig.defaultLocale;
+        if (!uiSupportedLocales.includes(uiDefaultLocale)) {
+            throw new Error(
+                "The default WebUI language must remain enabled"
+            );
+        }
         const uiLocaleStorageKey = "hunyuan3d.ui-locale.v1";
         const uiTextBindings = new WeakMap();
         const uiAttributeBindings = new WeakMap();
@@ -14,11 +27,19 @@
         let uiLastAppliedLocale = null;
         let uiTranslationFrame = 0;
 
-        const normalizeUiLocale = (locale) => (
-            String(locale || "").toLowerCase().startsWith("zh")
+        const normalizeUiLocale = (locale) => {
+            const requested = String(locale || "")
+                .toLowerCase()
+                .replaceAll("_", "-");
+            const candidate = requested.startsWith("zh")
                 ? "zh-CN"
-                : "en"
-        );
+                : requested.startsWith("en")
+                    ? "en"
+                    : uiDefaultLocale;
+            return uiSupportedLocales.includes(candidate)
+                ? candidate
+                : uiDefaultLocale;
+        };
 
         const storedUiLocale = (() => {
             try {
@@ -28,12 +49,10 @@
                 return null;
             }
         })();
-        if (storedUiLocale) {
-            document.documentElement.lang = storedUiLocale;
-        }
+        document.documentElement.lang = storedUiLocale ?? uiDefaultLocale;
 
         const currentUiLocale = () => normalizeUiLocale(
-            document.documentElement.lang || storedUiLocale || "en"
+            document.documentElement.lang || storedUiLocale || uiDefaultLocale
         );
 
         const formatUiTranslation = (template, params = {}) => (
@@ -48,7 +67,9 @@
             const entry = uiTranslationCatalog[key];
             if (!entry) return key;
             return formatUiTranslation(
-                entry[normalizeUiLocale(locale)] ?? entry.en,
+                entry[normalizeUiLocale(locale)]
+                    ?? entry[uiDefaultLocale]
+                    ?? entry.en,
                 params
             );
         };
@@ -333,6 +354,9 @@
                 });
             }
             const locale = currentUiLocale();
+            if (document.documentElement.lang !== locale) {
+                document.documentElement.lang = locale;
+            }
             if (document.body) document.body.dataset.uiLocale = locale;
             if (locale !== uiLastAppliedLocale) {
                 uiLastAppliedLocale = locale;

@@ -1,8 +1,12 @@
 
-        const supportedAppLanguages = Object.freeze([
-            {code: "en", label: "English"},
-            {code: "zh-CN", label: "简体中文"},
-        ]);
+        const supportedAppLanguages = Object.freeze(
+            [
+                {code: "en", label: "English"},
+                {code: "zh-CN", label: "简体中文"},
+            ].filter(
+                (language) => uiSupportedLocales.includes(language.code)
+            )
+        );
         const nativeLanguageInputSelector = (
             '.api-docs input[role="listbox"][aria-label="Language"], '
             + '.api-docs input[role="listbox"][aria-label="语言"]'
@@ -178,7 +182,10 @@
                     const desiredLocale = currentUiLocale();
                     const desiredLanguage = supportedAppLanguages.find(
                         (candidate) => candidate.code === desiredLocale
-                    ) ?? supportedAppLanguages[0];
+                    ) ?? supportedAppLanguages.find(
+                        (candidate) => candidate.code === uiDefaultLocale
+                    );
+                    if (!desiredLanguage) return;
                     select.value = desiredLanguage.code;
                     select.setAttribute("aria-label", uiT("language.label"));
 

@@ -7,9 +7,29 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from .language_config import DEFAULT_UI_LOCALE, UI_LANGUAGE_FLAGS
+
 
 SUPPORTED_UI_LOCALES = ("en", "zh-CN")
 _CATALOG_PATH = Path(__file__).resolve().parent / "data" / "ui_translations.json"
+
+if set(UI_LANGUAGE_FLAGS) != set(SUPPORTED_UI_LOCALES):
+    raise ValueError(
+        "UI_LANGUAGE_FLAGS must define exactly: "
+        + ", ".join(SUPPORTED_UI_LOCALES)
+    )
+if DEFAULT_UI_LOCALE not in SUPPORTED_UI_LOCALES:
+    raise ValueError(f"Unsupported default UI locale: {DEFAULT_UI_LOCALE}")
+if not UI_LANGUAGE_FLAGS[DEFAULT_UI_LOCALE]:
+    raise ValueError(
+        "Simplified Chinese must remain enabled because it is the default UI language"
+    )
+
+ENABLED_UI_LOCALES = tuple(
+    locale for locale in SUPPORTED_UI_LOCALES if UI_LANGUAGE_FLAGS[locale]
+)
+if not ENABLED_UI_LOCALES:
+    raise ValueError("At least one WebUI language must be enabled")
 
 
 @lru_cache(maxsize=1)
@@ -40,11 +60,22 @@ def ui_translation_catalog() -> dict[str, dict[str, str]]:
 
 
 def normalize_ui_locale(locale: str | None) -> str:
-    """Reduce browser locale values to the two locales supported by this app."""
-    return "zh-CN" if str(locale or "").lower().startswith("zh") else "en"
+    """Resolve a browser locale to one of the currently enabled locales."""
+    requested = str(locale or "").lower().replace("_", "-")
+    if requested.startswith("zh"):
+        candidate = "zh-CN"
+    elif requested.startswith("en"):
+        candidate = "en"
+    else:
+        candidate = DEFAULT_UI_LOCALE
+    return candidate if candidate in ENABLED_UI_LOCALES else DEFAULT_UI_LOCALE
 
 
-def translate_ui(key: str, locale: str = "en", **params: object) -> str:
+def translate_ui(
+    key: str,
+    locale: str = DEFAULT_UI_LOCALE,
+    **params: object,
+) -> str:
     """Translate one catalog key and interpolate named parameters."""
     normalized_locale = normalize_ui_locale(locale)
     try:
@@ -70,10 +101,27 @@ def ui_translation_catalog_json() -> str:
     )
 
 
+def ui_language_config_json() -> str:
+    """Serialize language flags and the Chinese default for the JS bundle."""
+    return json.dumps(
+        {
+            "defaultLocale": DEFAULT_UI_LOCALE,
+            "flags": {
+                locale: UI_LANGUAGE_FLAGS[locale]
+                for locale in SUPPORTED_UI_LOCALES
+            },
+        },
+        separators=(",", ":"),
+    )
+
+
 __all__ = [
+    "DEFAULT_UI_LOCALE",
+    "ENABLED_UI_LOCALES",
     "SUPPORTED_UI_LOCALES",
     "normalize_ui_locale",
     "translate_ui",
+    "ui_language_config_json",
     "ui_translation_catalog",
     "ui_translation_catalog_json",
 ]
