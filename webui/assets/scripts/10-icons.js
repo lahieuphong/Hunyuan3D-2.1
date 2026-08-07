@@ -27,26 +27,60 @@
                 + paths + '</svg>';
         };
 
-        const syncGenerateButtonCopy = (forcedMode = null) => {
-            const generateButton = document.getElementById("generate-3d-button");
-            if (!generateButton) return;
+        const normalizeUiInputMode = (value) => {
+            if (value === "ten" || value === "ten-view") return "ten";
+            if (value === "four" || value === "multi-view") return "four";
+            return "single";
+        };
 
-            const normalizeUiMode = (value) => {
-                if (value === "ten" || value === "ten-view") return "ten";
-                if (value === "four" || value === "multi-view") return "four";
-                return "single";
-            };
+        const activeUiInputMode = (forcedMode = null) => {
+            if (typeof forcedMode === "string") {
+                return normalizeUiInputMode(forcedMode);
+            }
+            if (typeof forcedMode === "boolean") {
+                return forcedMode ? "four" : "single";
+            }
+
+            const activeRoute = tabRoutes.find((route) => (
+                promptRouteIsActive(route)
+            ));
+            if (activeRoute) return normalizeUiInputMode(activeRoute.slug);
+
+            const routeMode = new URL(window.location.href).searchParams.get("tab");
+            if (routeMode) return normalizeUiInputMode(routeMode);
+
             const selectedTabId = document.querySelector(
                 '#prompt-mode-tabs button[role="tab"][aria-selected="true"]'
             )?.dataset.tabId;
-            const detectedMode = selectedTabId === "tab_ten_prompt"
+            return selectedTabId === "tab_ten_prompt"
                 ? "ten"
                 : selectedTabId === "tab_mv_prompt" ? "four" : "single";
-            const mode = typeof forcedMode === "string"
-                ? normalizeUiMode(forcedMode)
-                : typeof forcedMode === "boolean"
-                    ? (forcedMode ? "four" : "single")
-                    : detectedMode;
+        };
+
+        const syncWorkspaceTitle = (mode) => {
+            const topbar = document.getElementById("app-topbar");
+            if (topbar?.dataset.uiDynamicInputTitle !== "true") return;
+            const workspaceTitle = document.querySelector(
+                "#app-topbar .app-title-block h1"
+            );
+            if (!workspaceTitle) return;
+            const titleNamespace = topbar.dataset.uiTurboMode === "true"
+                ? "shell.workspace.turbo."
+                : "shell.workspace.";
+            const titleKey = titleNamespace + mode;
+            const nextTitle = uiT(titleKey);
+            if (workspaceTitle.textContent !== nextTitle) {
+                workspaceTitle.textContent = nextTitle;
+            }
+            updateUiDocumentTitle();
+        };
+
+        const syncGenerateButtonCopy = (forcedMode = null) => {
+            const mode = activeUiInputMode(forcedMode);
+            syncWorkspaceTitle(mode);
+
+            const generateButton = document.getElementById("generate-3d-button");
+            if (!generateButton) return;
             let copy = generateButton.querySelector(".generate-button-copy");
             if (!copy) {
                 copy = document.createElement("span");

@@ -458,7 +458,7 @@ class ModelViewerDocumentTests(unittest.TestCase):
         parser.feed(document)
 
         self.assertIn('<html lang="zh-CN">', document)
-        self.assertIn("Hunyuan3D-2mv · 3D 模型查看器", document)
+        self.assertIn("混元3D-2mv · 3D 模型查看器", document)
         self.assertIn('aria-label="生成的 3D 模型预览"', document)
         self.assertIn(">点击并拖动以旋转<", document)
         self.assertIn(">滚动以缩放<", document)

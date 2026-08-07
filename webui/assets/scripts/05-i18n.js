@@ -301,6 +301,18 @@
             document.querySelectorAll("iframe").forEach(observeUiFrame);
         };
 
+        const updateUiDocumentTitle = () => {
+            const brand = normalizeUiText(
+                document.querySelector("#app-topbar .app-brand strong")?.textContent
+            );
+            const workspace = normalizeUiText(
+                document.querySelector("#app-topbar .app-title-block h1")?.textContent
+            );
+            if (!brand || !workspace) return;
+            const separator = currentUiLocale() === "zh-CN" ? "：" : ": ";
+            document.title = `${brand}${separator}${workspace}`;
+        };
+
         const translatePendingUi = () => {
             const roots = [...uiPendingTranslationRoots];
             uiPendingTranslationRoots.clear();
@@ -377,4 +389,5 @@
             } else {
                 translatePendingUi();
             }
+            updateUiDocumentTitle();
         };

@@ -108,6 +108,18 @@ class TopbarConfigTests(unittest.TestCase):
 
         self.assertNotIn('id="app-rtx-profile"', rendered)
 
+    def test_renderer_exposes_dynamic_title_runtime_flags(self):
+        rendered = render_topbar(
+            "Brand",
+            "Workspace",
+            HARDWARE_ACTION,
+            dynamic_input_titles=True,
+            turbo_mode=True,
+        )
+
+        self.assertIn('data-ui-dynamic-input-title="true"', rendered)
+        self.assertIn('data-ui-turbo-mode="true"', rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

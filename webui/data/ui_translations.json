@@ -7,9 +7,49 @@
     "en": "Image to 3D Generation with 1–10 Views",
     "zh-CN": "支持 1–10 视图的图像转 3D 生成"
   },
+  "shell.workspace.single": {
+    "en": "Single-View Image to 3D Generation",
+    "zh-CN": "单视图图像转 3D 生成"
+  },
+  "shell.workspace.four": {
+    "en": "Four-View Image to 3D Generation",
+    "zh-CN": "四视图图像转 3D 生成"
+  },
+  "shell.workspace.ten": {
+    "en": "Ten-View Image to 3D Generation",
+    "zh-CN": "十视图图像转 3D 生成"
+  },
   "shell.workspace.default": {
     "en": "High Resolution Textured 3D Assets Generation",
     "zh-CN": "高分辨率纹理 3D 资产生成"
+  },
+  "shell.workspace.mini": {
+    "en": "Strong 0.6B Image to Shape Generator",
+    "zh-CN": "强大的 0.6B 图像转形状生成器"
+  },
+  "shell.workspace.turbo.default": {
+    "en": "Fast High Resolution Textured 3D Assets Generation",
+    "zh-CN": "快速高分辨率纹理 3D 资产生成"
+  },
+  "shell.workspace.turbo.multiview": {
+    "en": "Fast Image to 3D Generation with 1–10 Views",
+    "zh-CN": "快速支持 1–10 视图的图像转 3D 生成"
+  },
+  "shell.workspace.turbo.single": {
+    "en": "Fast Single-View Image to 3D Generation",
+    "zh-CN": "快速单视图图像转 3D 生成"
+  },
+  "shell.workspace.turbo.four": {
+    "en": "Fast Four-View Image to 3D Generation",
+    "zh-CN": "快速四视图图像转 3D 生成"
+  },
+  "shell.workspace.turbo.ten": {
+    "en": "Fast Ten-View Image to 3D Generation",
+    "zh-CN": "快速十视图图像转 3D 生成"
+  },
+  "shell.workspace.turbo.mini": {
+    "en": "Fast Strong 0.6B Image to Shape Generator",
+    "zh-CN": "快速强大的 0.6B 图像转形状生成器"
   },
   "shell.subtitle": {
     "en": "Transform images into high-quality 3D assets with AI",

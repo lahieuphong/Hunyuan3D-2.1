@@ -10,6 +10,8 @@ def render_topbar(
     show_history_button: bool = True,
     show_settings_button: bool = True,
     show_gpu_button: bool = True,
+    dynamic_input_titles: bool = False,
+    turbo_mode: bool = False,
 ) -> str:
     """Render the application topbar without depending on runtime globals."""
     api_docs_action = """
@@ -47,8 +49,11 @@ def render_topbar(
         </nav>
     """ if actions.strip() else ""
 
+    dynamic_input_titles_value = "true" if dynamic_input_titles else "false"
+    turbo_mode_value = "true" if turbo_mode else "false"
+
     return f"""
-    <header id="app-topbar" class="app-topbar">
+    <header id="app-topbar" class="app-topbar" data-ui-dynamic-input-title="{dynamic_input_titles_value}" data-ui-turbo-mode="{turbo_mode_value}">
         <div class="app-brand" aria-label="{brand_name}">
             <span class="app-brand-mark" aria-hidden="true">
                 <img class="app-standard-logo" src="/favicon.ico" alt="" draggable="false">

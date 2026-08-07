@@ -62,6 +62,7 @@ from hy3dshape.texture_bake.rc_evaluator import (
 )
 from hy3dshape.utils import logger
 from webui import load_ui_assets, render_history_modal, render_topbar
+from webui.i18n import translate_ui
 from webui.topbar_config import (
     SHOW_API_DOCS_BUTTON,
     SHOW_GPU_BUTTON,
@@ -2281,13 +2282,29 @@ def mount_gradio_at_root(app: FastAPI, demo: gr.Blocks) -> FastAPI:
 
 def build_app():
     title = 'Hunyuan3D-2: High Resolution Textured 3D Assets Generation'
+    title_variant = '2'
+    workspace_title_key = 'shell.workspace.default'
     if MV_MODE:
         title = 'Hunyuan3D-2mv: Image to 3D Generation with 1–10 Views'
+        title_variant = '2mv'
+        workspace_title_key = 'shell.workspace.multiview'
     if 'mini' in args.subfolder:
         title = 'Hunyuan3D-2mini: Strong 0.6B Image to Shape Generator'
+        title_variant = '2mini'
+        workspace_title_key = 'shell.workspace.mini'
 
     if TURBO_MODE:
         title = title.replace(':', '-Turbo: Fast ')
+        title_variant = f'{title_variant}-Turbo'
+        workspace_title_key = workspace_title_key.replace(
+            'shell.workspace.',
+            'shell.workspace.turbo.',
+        )
+
+    browser_title = '{}：{}'.format(
+        translate_ui('shell.brand', variant=title_variant),
+        translate_ui(workspace_title_key),
+    )
 
     title_parts = title.split(':', 1)
     brand_name = title_parts[0]
@@ -2361,6 +2378,8 @@ def build_app():
             show_history_button=SHOW_HISTORY_BUTTON,
             show_settings_button=SHOW_SETTINGS_BUTTON,
             show_gpu_button=SHOW_GPU_BUTTON,
+            dynamic_input_titles=MV_MODE,
+            turbo_mode=TURBO_MODE,
         )
         + render_history_modal()
     )
@@ -2371,7 +2390,7 @@ def build_app():
 
     with gr.Blocks(
         theme=gr.Theme(),
-        title=title,
+        title=browser_title,
         analytics_enabled=False,
         css=custom_css,
         js=custom_js,

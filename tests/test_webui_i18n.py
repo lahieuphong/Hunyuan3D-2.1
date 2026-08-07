@@ -192,6 +192,45 @@ class WebUiI18nTests(unittest.TestCase):
             "混元3D-2mv",
         )
         self.assertEqual(
+            "{}：{}".format(
+                translate_ui("shell.brand", "zh-CN", variant="2mv"),
+                translate_ui("shell.workspace.multiview", "zh-CN"),
+            ),
+            "混元3D-2mv：支持 1–10 视图的图像转 3D 生成",
+        )
+        self.assertEqual(
+            translate_ui("shell.workspace.mini", "zh-CN"),
+            "强大的 0.6B 图像转形状生成器",
+        )
+        self.assertEqual(
+            translate_ui("shell.workspace.turbo.multiview", "zh-CN"),
+            "快速支持 1–10 视图的图像转 3D 生成",
+        )
+        self.assertEqual(
+            [
+                translate_ui("shell.workspace.turbo.single", "zh-CN"),
+                translate_ui("shell.workspace.turbo.four", "zh-CN"),
+                translate_ui("shell.workspace.turbo.ten", "zh-CN"),
+            ],
+            [
+                "快速单视图图像转 3D 生成",
+                "快速四视图图像转 3D 生成",
+                "快速十视图图像转 3D 生成",
+            ],
+        )
+        self.assertEqual(
+            [
+                translate_ui("shell.workspace.single", "zh-CN"),
+                translate_ui("shell.workspace.four", "zh-CN"),
+                translate_ui("shell.workspace.ten", "zh-CN"),
+            ],
+            [
+                "单视图图像转 3D 生成",
+                "四视图图像转 3D 生成",
+                "十视图图像转 3D 生成",
+            ],
+        )
+        self.assertEqual(
             translate_ui("action.generate_3d", "zh-CN"),
             "生成 3D",
         )
@@ -243,6 +282,15 @@ class WebUiI18nTests(unittest.TestCase):
         self.assertNotIn("/*__UI_TRANSLATION_CATALOG__*/", javascript)
         self.assertIn('"action.generate_3d"', javascript)
         self.assertIn("installUiLocalization();", javascript)
+        self.assertIn("updateUiDocumentTitle", javascript)
+        self.assertIn("document.title =", javascript)
+        self.assertIn("syncWorkspaceTitle", javascript)
+        self.assertIn('"shell.workspace.single"', javascript)
+        self.assertIn('"shell.workspace.four"', javascript)
+        self.assertIn('"shell.workspace.ten"', javascript)
+        self.assertIn("promptRouteIsActive", javascript)
+        self.assertIn("uiDynamicInputTitle", javascript)
+        self.assertIn("uiTurboMode", javascript)
 
     def test_windows_launcher_messages_are_simplified_chinese_utf8(self):
         source = (REPOSITORY_ROOT / "START_WEBUI.bat").read_text(

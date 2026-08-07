@@ -85,7 +85,7 @@ _VIEWER_MESSAGES = {
         "variantNotFound": "Model variant not found",
     },
     "zh-CN": {
-        "title": "Hunyuan3D-2mv · 3D 模型查看器",
+        "title": "混元3D-2mv · 3D 模型查看器",
         "modelPreview": "生成的 3D 模型预览",
         "preview": "预览",
         "clickDrag": "点击并拖动以旋转",
