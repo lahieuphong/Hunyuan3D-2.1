@@ -70,11 +70,11 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
                 with runtime_match(app.HardwareMatch(runtime_id, "exact", True)):
                     restored = app.restore_generation_from_request(
                         forged_state,
-                        _Request("http://127.0.0.1:8080/?tab=multi-view"),
+                        _Request("http://127.0.0.1:8080/?tab=multi-view"), # type: ignore
                     )
 
-                self.assertEqual(restored[23]["hardware_id"], runtime_id)
-                self.assertEqual(restored[23]["preset_id"], "safe")
+                self.assertEqual(restored[23]["hardware_id"], runtime_id) # type: ignore
+                self.assertEqual(restored[23]["preset_id"], "safe") # type: ignore
                 self.assertEqual(restored[24]["value"], runtime_id)
                 self.assertIn(f'data-hardware-id="{runtime_id}"', restored[25])
                 self.assertIn(f'data-hardware-id="{forged_id}"', restored[25])
@@ -245,7 +245,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             with runtime_match(app.HardwareMatch(hardware_id, "exact", True)):
                 restored = app.restore_generation_from_request(
                     browser_state,
-                    _Request("http://127.0.0.1:8080/?tab=single-view"),
+                    _Request("http://127.0.0.1:8080/?tab=single-view"), # type: ignore
                 )
         finally:
             if previous_turbo_mode is None:
@@ -285,7 +285,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         with runtime_match(app.HardwareMatch(None, "unavailable", False)):
             restored = app.restore_generation_from_request(
                 browser_state,
-                _Request("http://127.0.0.1:8080/?tab=single-view"),
+                _Request("http://127.0.0.1:8080/?tab=single-view"), # type: ignore
             )
             hardware, preset = app.build_generation_hardware_metadata(
                 hardware_id,
@@ -314,7 +314,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
         ):
             restored = app.restore_generation_from_request(
                 browser_state,
-                _Request("http://127.0.0.1:8080/?tab=single-view"),
+                _Request("http://127.0.0.1:8080/?tab=single-view"), # type: ignore
             )
             hardware, preset = app.build_generation_hardware_metadata(
                 hardware_id,
@@ -437,7 +437,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
                     browser_state,
                     _Request(
                         f"http://127.0.0.1:8080/?tab=multi-view&generation={generation_uid}"
-                    ),
+                    ), # type: ignore
                 )
             finally:
                 for name, value in original_values.items():
@@ -523,7 +523,7 @@ class GradioHardwareIntegrationTests(unittest.TestCase):
             try:
                 restored = app.restore_generation_from_request(
                     None,
-                    _Request(f"http://127.0.0.1:8080/?generation={generation_uid}"),
+                    _Request(f"http://127.0.0.1:8080/?generation={generation_uid}"), # type: ignore
                 )
             finally:
                 for name, value in original_values.items():

@@ -151,11 +151,11 @@ class OriginalVariantGenerationTests(unittest.TestCase):
             self.assertTrue(result.output_path.is_file())
             assert result.quality_gate is not None
             self.assertEqual(
-                result.quality_gate["promotion"]["mode"],
+                result.quality_gate["promotion"]["mode"], # type: ignore
                 "rc-hard-gate",
             )
             self.assertEqual(
-                result.quality_gate["rc"]["result"]["score"],
+                result.quality_gate["rc"]["result"]["score"], # type: ignore
                 91.25,
             )
 
@@ -359,7 +359,7 @@ class OriginalVariantGenerationTests(unittest.TestCase):
             self.assertIn("forced bake failure", result.fallback_reason or "")
             self.assertEqual(glb_color_payload(result.output_path), "vertex-color")
             assert result.quality_gate is not None
-            self.assertTrue(result.quality_gate["rc"]["required"])
+            self.assertTrue(result.quality_gate["rc"]["required"]) # type: ignore
 
     def test_ten_view_api_autowires_default_rc_evaluator(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temporary_directory:
@@ -697,16 +697,16 @@ class OriginalVariantGenerationTests(unittest.TestCase):
 
             self.assertEqual(result.method, "cardinal-method")
             self.assertEqual(
-                result.quality_gate["promotion"]["mode"],
+                result.quality_gate["promotion"]["mode"], # type: ignore
                 "rc-best-available-degraded",
             )
             self.assertFalse(
-                result.quality_gate["promotion"]["passed_hard_gates"]
+                result.quality_gate["promotion"]["passed_hard_gates"] # type: ignore
             )
             self.assertEqual(
                 [
                     item["identifier"]
-                    for item in result.quality_gate["candidate_ranking"]
+                    for item in result.quality_gate["candidate_ranking"] # type: ignore
                 ],
                 ["cardinal", "ten-view", "vertex"],
             )
@@ -884,11 +884,11 @@ class OriginalVariantGenerationTests(unittest.TestCase):
             vertex.assert_called_once()
             self.assertEqual(result.method, 'cardinal-method')
             self.assertEqual(
-                result.quality_gate['promotion']['mode'],
+                result.quality_gate['promotion']['mode'], # type: ignore
                 'rc-best-scored',
             )
             self.assertTrue(
-                result.quality_gate['promotion']['passed_hard_gates']
+                result.quality_gate['promotion']['passed_hard_gates'] # type: ignore
             )
             self.assertEqual(
                 (folder / 'textured_mesh.glb').read_bytes(),

@@ -51,15 +51,15 @@ class _InlineThread:
 
 def _load_api_server_for_test():
     model_worker_stub = ModuleType("model_worker")
-    model_worker_stub.ModelWorker = _StubModelWorker
+    model_worker_stub.ModelWorker = _StubModelWorker # type: ignore
 
     logger_utils_stub = ModuleType("logger_utils")
-    logger_utils_stub.build_logger = lambda *_args, **_kwargs: logging.getLogger(
+    logger_utils_stub.build_logger = lambda *_args, **_kwargs: logging.getLogger( # type: ignore
         "api-server-worker-guard-test"
     )
 
     torch_stub = ModuleType("torch")
-    torch_stub.cuda = SimpleNamespace(CudaError=RuntimeError)
+    torch_stub.cuda = SimpleNamespace(CudaError=RuntimeError) # type: ignore
 
     module_name = "_api_server_worker_guard_test"
     spec = importlib.util.spec_from_file_location(module_name, API_SERVER_PATH)
@@ -97,7 +97,7 @@ class ApiServerWorkerGuardTests(unittest.TestCase):
         sys.modules.pop(cls.api_server.__name__, None)
 
     def setUp(self) -> None:
-        self.api_server.worker = None
+        self.api_server.worker = None # type: ignore
         _InlineThread.instances.clear()
 
     def test_generation_endpoints_return_503_when_worker_is_missing(self):
@@ -119,7 +119,7 @@ class ApiServerWorkerGuardTests(unittest.TestCase):
 
     def test_generate_uses_initialized_worker(self):
         fake_worker = _FakeWorker(self.output_path)
-        self.api_server.worker = fake_worker
+        self.api_server.worker = fake_worker # type: ignore
 
         response = self.client.post(
             "/generate",
@@ -134,7 +134,7 @@ class ApiServerWorkerGuardTests(unittest.TestCase):
 
     def test_send_binds_initialized_worker_to_background_thread(self):
         fake_worker = _FakeWorker(self.output_path)
-        self.api_server.worker = fake_worker
+        self.api_server.worker = fake_worker # type: ignore
 
         with patch.object(self.api_server.threading, "Thread", _InlineThread):
             response = self.client.post(
@@ -152,7 +152,7 @@ class ApiServerWorkerGuardTests(unittest.TestCase):
     def test_health_reports_worker_readiness(self):
         unavailable_response = self.client.get("/health")
 
-        self.api_server.worker = _FakeWorker(self.output_path)
+        self.api_server.worker = _FakeWorker(self.output_path) # type: ignore
         healthy_response = self.client.get("/health")
 
         self.assertEqual(unavailable_response.status_code, 503)

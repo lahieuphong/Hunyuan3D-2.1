@@ -1,16 +1,19 @@
 """
 Pydantic models for Hunyuan3D API server.
 """
-from typing import Optional, Literal
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class GenerationRequest(BaseModel):
     """Request model for 3D generation API"""
     image: str = Field(
-        ..., 
+        ...,
         description="Base64 encoded input image for 3D generation",
-        example="iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGP8z4AATAxEcQAz0QEHOoQ+uAAAAABJRU5ErkJggg=="
+        json_schema_extra={
+            "example": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGP8z4AATAxEcQAz0QEHOoQ+uAAAAABJRU5ErkJggg=="
+        },
     )
     remove_background: bool = Field(
         True,
@@ -24,7 +27,7 @@ class GenerationRequest(BaseModel):
         1234,
         description="Random seed for reproducible generation",
         ge=0,
-        le=2**32-1
+        le=2**32 - 1,
     )
     octree_resolution: int = Field(
         256,
@@ -79,4 +82,4 @@ class StatusResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Response model for health check"""
     status: str = Field(..., description="Health status")
-    worker_id: str = Field(..., description="Worker identifier") 
+    worker_id: str = Field(..., description="Worker identifier")

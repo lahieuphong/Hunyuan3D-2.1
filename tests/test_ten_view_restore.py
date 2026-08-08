@@ -81,7 +81,7 @@ class TenViewRestoreTests(unittest.TestCase):
                     _Request(
                         "http://127.0.0.1:8080/"
                         f"?tab=ten-view&generation={generation_uid}"
-                    ),
+                    ), # type: ignore
                 )
                 restored_preview_paths = [
                     Path(update["value"])

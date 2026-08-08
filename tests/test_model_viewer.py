@@ -102,7 +102,7 @@ class StoredGenerationFileTests(unittest.TestCase):
                 suffix=".glb",
             )
             self.assertIsNotNone(resolved)
-            self.assertEqual(Path(resolved).resolve(), safe_mesh.resolve())
+            self.assertEqual(Path(resolved).resolve(), safe_mesh.resolve()) # type: ignore
 
             rejected = (
                 "../outside.glb",

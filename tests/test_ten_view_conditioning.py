@@ -98,7 +98,7 @@ class TenViewPreprocessorTests(unittest.TestCase):
             mask = torch.ones((1, 1, 2, 2))
             return image, mask
 
-        processor.load_image = fake_load
+        processor.load_image = fake_load # type: ignore
         return processor
 
     def test_ten_views_emit_four_native_indices_and_blend_matrix(self):
