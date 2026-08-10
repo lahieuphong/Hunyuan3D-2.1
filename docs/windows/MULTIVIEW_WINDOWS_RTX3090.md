@@ -16,7 +16,7 @@ Tài liệu này ghi lại cấu hình multi-view đã chạy thành công trên
 Kết quả thử đã được lưu tại:
 
 ```text
-hy3dshape/output_folder/inference/multiview_sample_4views.glb
+hy3dshape/output_folder/webui/inference/multiview_sample_4views.glb
 ```
 
 ## Source đã được điều chỉnh
@@ -56,7 +56,7 @@ Bốn camera mẫu cách nhau đúng 90 độ và có FOV/khoảng cách gần t
 ## Chạy bằng bốn ảnh của bạn
 
 ```cmd
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\infer_windows_multiview.ps1" -Front "E:\anh_4_huong\front.png" -Left "E:\anh_4_huong\left.png" -Back "E:\anh_4_huong\back.png" -Right "E:\anh_4_huong\right.png" -Output ".\hy3dshape\output_folder\inference\vat_the_cua_toi.glb"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\infer_windows_multiview.ps1" -Front "E:\anh_4_huong\front.png" -Left "E:\anh_4_huong\left.png" -Back "E:\anh_4_huong\back.png" -Right "E:\anh_4_huong\right.png" -Output ".\hy3dshape\output_folder\webui\inference\vat_the_cua_toi.glb"
 ```
 
 Yêu cầu cho cả bốn ảnh:
@@ -72,7 +72,7 @@ Yêu cầu cho cả bốn ảnh:
 Sau khi test 256 thành công, có thể tăng giải mã mesh:
 
 ```cmd
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\infer_windows_multiview.ps1" -Front "E:\anh_4_huong\front.png" -Left "E:\anh_4_huong\left.png" -Back "E:\anh_4_huong\back.png" -Right "E:\anh_4_huong\right.png" -Output ".\hy3dshape\output_folder\inference\vat_the_hq.glb" -Steps 30 -OctreeResolution 380
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\infer_windows_multiview.ps1" -Front "E:\anh_4_huong\front.png" -Left "E:\anh_4_huong\left.png" -Back "E:\anh_4_huong\back.png" -Right "E:\anh_4_huong\right.png" -Output ".\hy3dshape\output_folder\webui\inference\vat_the_hq.glb" -Steps 30 -OctreeResolution 380
 ```
 
 Resolution cao hơn làm bước VAE/mesh chậm hơn và dùng nhiều bộ nhớ hơn. Nên giữ 256 cho lần đầu của mỗi bộ ảnh.

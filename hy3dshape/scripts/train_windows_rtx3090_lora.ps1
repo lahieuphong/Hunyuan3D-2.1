@@ -60,7 +60,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     else {
         "lora_rtx3090_windows"
     }
-    $OutputDir = Join-Path $ShapeRoot "output_folder\dit\$outputName"
+    $OutputDir = Join-Path $ShapeRoot "output_folder\webui\training\$outputName"
 }
 
 if (-not (Test-Path -LiteralPath $Config -PathType Leaf)) {

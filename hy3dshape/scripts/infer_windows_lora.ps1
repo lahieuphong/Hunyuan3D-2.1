@@ -27,10 +27,10 @@ if ([string]::IsNullOrWhiteSpace($Image)) {
     $Image = Join-Path $ShapeRoot "tools\mini_trainset\preprocessed\00a4cff37043361068376104a292f5b44b5eacbd174651553b6a7ae35647a2a6\render_cond\000.png"
 }
 if ([string]::IsNullOrWhiteSpace($Adapter)) {
-    $Adapter = Join-Path $ShapeRoot "output_folder\dit\mini_test_01\lora\final"
+    $Adapter = Join-Path $ShapeRoot "output_folder\webui\training\mini_test_01\lora\final"
 }
 if ([string]::IsNullOrWhiteSpace($Output)) {
-    $Output = Join-Path $ShapeRoot "output_folder\inference\mini_test_01_lora_000.glb"
+    $Output = Join-Path $ShapeRoot "output_folder\webui\inference\mini_test_01_lora_000.glb"
 }
 
 if (-not (Test-Path -LiteralPath $Image -PathType Leaf)) {

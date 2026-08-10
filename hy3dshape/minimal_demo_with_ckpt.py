@@ -24,11 +24,11 @@ import torch
 import yaml
 from hy3dshape.utils import instantiate_from_config 
 # For example, you can convert deepspeed weights to a single file
-# cd output_folder/dit/overfitting_depth_16_token_4096_lr1e4/ckpt/ckpt-step=00004000.ckpt
+# cd output_folder/webui/training/overfitting_depth_16_token_4096_lr1e4/ckpt/ckpt-step=00004000.ckpt
 # python3 zero_to_fp32.py ./ ./out --max_shard_size 30GB
-# then you can get output_folder/dit/overfitting_depth_16_token_4096_lr1e4/ckpt/ckpt-step=00004000.ckpt/out/pytorch_model.bin
-ckpt_cfg_path = 'output_folder/dit/overfitting_depth_16_token_4096_lr1e4/hunyuandit-mini-overfitting-flowmatching-dinol518-bf16-lr1e4-4096.yaml'
-ckpt_path = 'output_folder/dit/overfitting_depth_16_token_4096_lr1e4/ckpt/ckpt-step=00004000.ckpt/out/pytorch_model.bin'
+# then you can get output_folder/webui/training/overfitting_depth_16_token_4096_lr1e4/ckpt/ckpt-step=00004000.ckpt/out/pytorch_model.bin
+ckpt_cfg_path = 'output_folder/webui/training/overfitting_depth_16_token_4096_lr1e4/hunyuandit-mini-overfitting-flowmatching-dinol518-bf16-lr1e4-4096.yaml'
+ckpt_path = 'output_folder/webui/training/overfitting_depth_16_token_4096_lr1e4/ckpt/ckpt-step=00004000.ckpt/out/pytorch_model.bin'
 config = yaml.safe_load(open(ckpt_cfg_path, 'r'))
 model = instantiate_from_config(config['model']['params']['denoiser_cfg'])
 sd = torch.load(ckpt_path)

@@ -108,6 +108,7 @@ from webui.model_viewer import (
     stored_generation_file as resolve_stored_generation_file,
     viewer_message,
 )
+from webui.storage import prepare_webui_storage
 
 MAX_SEED = 10_000_000
 HISTORY_INPUT_PREVIEW_MAX_EDGE = 384
@@ -129,6 +130,26 @@ class GenerationStaticFiles(StaticFiles):
             )
             response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
+
+
+def mount_generation_static_files(
+    app: FastAPI,
+    generation_directory: str | os.PathLike[str],
+    environment_maps_directory: str | os.PathLike[str],
+) -> None:
+    """Expose generation assets without publishing sibling storage folders."""
+
+    app.mount(
+        '/static/env_maps',
+        StaticFiles(directory=environment_maps_directory),
+        name='environment-maps',
+    )
+    app.mount(
+        '/static',
+        GenerationStaticFiles(directory=generation_directory, html=True),
+        name='static',
+    )
+
 
 GPU_PRESET_CATALOG = load_gpu_preset_catalog()
 GENERATION_MODES = {5: 'Turbo', 10: 'Fast', 30: 'Standard'}
@@ -3196,7 +3217,23 @@ if __name__ == '__main__':
     parser.add_argument('--host', type=str, default='127.0.0.1')
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--mc_algo', type=str, default='mc')
-    parser.add_argument('--cache-path', type=str, default='./save_dir')
+    storage_group = parser.add_mutually_exclusive_group()
+    storage_group.add_argument(
+        '--cache-path',
+        type=str,
+        default=None,
+        help='Legacy flat generation directory. Prefer --storage-root.',
+    )
+    storage_group.add_argument(
+        '--storage-root',
+        type=str,
+        default=None,
+        help=(
+            'Managed WebUI storage root. Generations are stored in the '
+            'generations subdirectory. Use --cache-path only for a legacy '
+            'flat generation directory.'
+        ),
+    )
     parser.add_argument('--enable_t23d', action='store_true')
     parser.add_argument('--disable_tex', action='store_true')
     parser.add_argument('--enable_flashvdm', action='store_true')
@@ -3207,8 +3244,13 @@ if __name__ == '__main__':
     parser.add_argument('--dtype', choices=['float16', 'bfloat16', 'float32'], default='float16')
     args = parser.parse_args()
     
-    SAVE_DIR = args.cache_path
-    os.makedirs(SAVE_DIR, exist_ok=True)
+    if args.cache_path:
+        SAVE_DIR = args.cache_path
+        os.makedirs(SAVE_DIR, exist_ok=True)
+    else:
+        storage_root = args.storage_root or './hy3dshape/output_folder/webui'
+        storage_layout = prepare_webui_storage(storage_root)
+        SAVE_DIR = str(storage_layout.generations)
 
     MV_MODE = 'mv' in f'{args.model_path}/{args.subfolder}'.lower()
     TURBO_MODE = 'turbo' in args.subfolder
@@ -3417,9 +3459,11 @@ if __name__ == '__main__':
             headers={'Cache-Control': 'no-store'},
         )
     
-    # create a static directory to store the static files
+    # Only the generation store is public. Logs, checkpoints, QA artefacts and
+    # other managed output directories must never be exposed through /static.
     static_dir = Path(SAVE_DIR).absolute()
     static_dir.mkdir(parents=True, exist_ok=True)
+    environment_maps_dir = Path(__file__).resolve().parent / 'assets' / 'env_maps'
     gradio_fonts_dir = (
         Path(gr.__file__).resolve().parent
         / 'templates'
@@ -3450,12 +3494,7 @@ if __name__ == '__main__':
             StaticFiles(directory=gradio_fonts_dir),
             name='gradio-fonts',
         )
-    app.mount(
-        "/static",
-        GenerationStaticFiles(directory=static_dir, html=True),
-        name="static",
-    )
-    shutil.copytree('./assets/env_maps', os.path.join(static_dir, 'env_maps'), dirs_exist_ok=True)
+    mount_generation_static_files(app, static_dir, environment_maps_dir)
 
     if args.low_vram_mode:
         torch.cuda.empty_cache()

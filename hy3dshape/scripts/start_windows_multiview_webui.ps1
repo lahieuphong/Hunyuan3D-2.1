@@ -11,7 +11,9 @@ param(
     [switch]$Stop,
     [switch]$PreflightOnly,
     [ValidateRange(30, 600)]
-    [int]$StartupTimeoutSeconds = 300
+    [int]$StartupTimeoutSeconds = 300,
+    [ValidateRange(1, 100)]
+    [int]$LogRetentionLaunches = 5
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,9 +25,12 @@ $RepoRoot = Split-Path -Parent $ShapeRoot
 $AppPath = Join-Path $RepoRoot "gradio_app.py"
 $DefaultPython = Join-Path $RepoRoot ".venv-win\Scripts\python.exe"
 $Python = if ([string]::IsNullOrWhiteSpace($PythonExecutable)) { $DefaultPython } else { $PythonExecutable }
-$OutputDir = Join-Path $ShapeRoot "output_folder\webui"
-$LogsDir = Join-Path $OutputDir "logs"
-$PidFile = Join-Path $LogsDir ("webui-{0}.pid" -f $Port)
+$OutputRoot = Join-Path $ShapeRoot "output_folder\webui"
+$GenerationsDir = Join-Path $OutputRoot "generations"
+$LogsDir = Join-Path $OutputRoot "logs"
+$RuntimeDir = Join-Path $OutputRoot "runtime"
+$PidFile = Join-Path $RuntimeDir ("webui-{0}.pid" -f $Port)
+$LegacyPidFile = Join-Path $LogsDir ("webui-{0}.pid" -f $Port)
 $RequirementsFile = Join-Path $ShapeRoot "requirements-windows-multiview-ui.txt"
 
 $ModelsRoot = Join-Path $RepoRoot ".cache\hy3dgen"
@@ -47,25 +52,29 @@ $Url = "http://${BrowserHost}:$Port"
 $HealthUrl = "$Url/health"
 
 New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
+New-Item -ItemType Directory -Force -Path $RuntimeDir | Out-Null
 
 function Get-ManagedProcess {
-    if (-not (Test-Path -LiteralPath $PidFile)) {
-        return $null
-    }
+    foreach ($candidatePidFile in @($PidFile, $LegacyPidFile)) {
+        if (-not (Test-Path -LiteralPath $candidatePidFile)) {
+            continue
+        }
 
-    $serverProcessIdText = (Get-Content -LiteralPath $PidFile -Raw).Trim()
-    $serverProcessId = 0
-    if (-not [int]::TryParse($serverProcessIdText, [ref]$serverProcessId)) {
-        Remove-Item -LiteralPath $PidFile -Force
-        return $null
-    }
+        $serverProcessIdText = (Get-Content -LiteralPath $candidatePidFile -Raw).Trim()
+        $serverProcessId = 0
+        if (-not [int]::TryParse($serverProcessIdText, [ref]$serverProcessId)) {
+            Remove-Item -LiteralPath $candidatePidFile -Force
+            continue
+        }
 
-    $process = Get-Process -Id $serverProcessId -ErrorAction SilentlyContinue
-    if ($null -eq $process) {
-        Remove-Item -LiteralPath $PidFile -Force
-        return $null
+        $process = Get-Process -Id $serverProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $process) {
+            Remove-Item -LiteralPath $candidatePidFile -Force
+            continue
+        }
+        return $process
     }
-    return $process
+    return $null
 }
 
 function Get-WebUiHealth {
@@ -74,6 +83,79 @@ function Get-WebUiHealth {
     }
     catch {
         return $null
+    }
+}
+
+function Remove-StaleWebUiLaunchLogs {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CurrentStdoutLog,
+        [Parameter(Mandatory = $true)]
+        [string]$CurrentStderrLog
+    )
+
+    $launchLogPattern = '^webui_(\d{8}_\d{6})\.(stdout|stderr)\.log$'
+    $currentLaunchMatch = [regex]::Match(
+        [IO.Path]::GetFileName($CurrentStdoutLog),
+        $launchLogPattern
+    )
+    if (-not $currentLaunchMatch.Success) {
+        Write-Warning "Cannot determine the current launch from $CurrentStdoutLog; skipping log retention."
+        return
+    }
+
+    $currentPaths = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+    [void]$currentPaths.Add([IO.Path]::GetFullPath($CurrentStdoutLog))
+    [void]$currentPaths.Add([IO.Path]::GetFullPath($CurrentStderrLog))
+
+    $launchLogs = @(
+        Get-ChildItem -LiteralPath $LogsDir -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $match = [regex]::Match($_.Name, $launchLogPattern)
+                if ($match.Success) {
+                    [pscustomobject]@{
+                        LaunchId = $match.Groups[1].Value
+                        File = $_
+                    }
+                }
+            }
+    )
+
+    $keepLaunchIds = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    [void]$keepLaunchIds.Add($currentLaunchMatch.Groups[1].Value)
+    $orderedLaunchIds = @(
+        $launchLogs |
+            ForEach-Object { $_.LaunchId } |
+            Sort-Object -Unique -Descending
+    )
+    foreach ($launchId in $orderedLaunchIds) {
+        if ($keepLaunchIds.Count -ge $LogRetentionLaunches) {
+            break
+        }
+        [void]$keepLaunchIds.Add($launchId)
+    }
+
+    $removedCount = 0
+    foreach ($entry in $launchLogs) {
+        $fullPath = [IO.Path]::GetFullPath($entry.File.FullName)
+        if ($currentPaths.Contains($fullPath) -or $keepLaunchIds.Contains($entry.LaunchId)) {
+            continue
+        }
+        try {
+            Remove-Item -LiteralPath $entry.File.FullName -Force -ErrorAction Stop
+            $removedCount += 1
+        }
+        catch {
+            Write-Warning "Could not remove stale Web UI log '$($entry.File.FullName)': $($_.Exception.Message)"
+        }
+    }
+
+    if ($removedCount -gt 0) {
+        Write-Host "Removed $removedCount stale Web UI log file(s); retained up to $LogRetentionLaunches launches."
     }
 }
 
@@ -93,6 +175,7 @@ if ($Stop) {
     Stop-Process -Id $managedProcess.Id -Force
     Wait-Process -Id $managedProcess.Id -Timeout 15 -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $LegacyPidFile -Force -ErrorAction SilentlyContinue
     Write-Host "Stopped Web UI process $($managedProcess.Id)."
     exit 0
 }
@@ -102,6 +185,7 @@ if ($null -ne $managedProcess) {
     if ($null -ne $health -and $health.status -eq "ready") {
         $serverProcessId = if ($null -ne $health.pid) { [int]$health.pid } else { $managedProcess.Id }
         Set-Content -LiteralPath $PidFile -Value $serverProcessId -Encoding ascii
+        Remove-Item -LiteralPath $LegacyPidFile -Force -ErrorAction SilentlyContinue
         Write-Host "Web UI is already running at $Url (PID $serverProcessId)."
         if ($OpenBrowser) {
             Start-Process $Url
@@ -160,7 +244,8 @@ finally {
 
 Write-Host "Model: $Model/$Subfolder"
 Write-Host "Weights: $ModelWeights"
-Write-Host "Output: $OutputDir"
+Write-Host "Output root: $OutputRoot"
+Write-Host "Generations: $GenerationsDir"
 Write-Host "URL: $Url"
 
 if ($ListenHost -notin @("127.0.0.1", "localhost", "::1")) {
@@ -184,7 +269,7 @@ $PythonArgs = @(
     "--subfolder", $Subfolder,
     "--host", $ListenHost,
     "--port", $Port.ToString(),
-    "--cache-path", $OutputDir,
+    "--storage-root", $OutputRoot,
     "--device", "cuda",
     "--use_safetensors",
     "--variant", "fp16",
@@ -239,6 +324,9 @@ while ((Get-Date) -lt $deadline) {
     if ($null -ne $health -and $health.status -eq "ready") {
         $serverProcessId = if ($null -ne $health.pid) { [int]$health.pid } else { $process.Id }
         Set-Content -LiteralPath $PidFile -Value $serverProcessId -Encoding ascii
+        Remove-StaleWebUiLaunchLogs `
+            -CurrentStdoutLog $StdoutLog `
+            -CurrentStderrLog $StderrLog
         Write-Host "Web UI is ready: $Url"
         Write-Host "PID: $serverProcessId"
         Write-Host "stdout: $StdoutLog"

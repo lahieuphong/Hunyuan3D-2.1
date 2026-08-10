@@ -7,9 +7,9 @@ benchmark remains easy to reproduce.
 
 Example:
   .venv-win/Scripts/python.exe hy3dshape/scripts/score_face_candidates.py \
-    --input-json hy3dshape/output_folder/quality_tests/face_seed_search.json \
-    --reference-dir hy3dshape/output_folder/quality_tests/gohan_rgba_clean \
-    --output-dir hy3dshape/output_folder/quality_tests/face_seed_scores
+    --input-json hy3dshape/output_folder/webui/quality_tests/face_seed_search.json \
+    --reference-dir hy3dshape/output_folder/webui/quality_tests/gohan_rgba_clean \
+    --output-dir hy3dshape/output_folder/webui/quality_tests/face_seed_scores
 """
 
 from __future__ import annotations
@@ -37,7 +37,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-json", type=Path)
     parser.add_argument("--reference-dir", type=Path)
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--webui-root", type=Path, default=Path("hy3dshape/output_folder/webui"))
+    parser.add_argument(
+        "--webui-root",
+        type=Path,
+        default=Path("hy3dshape/output_folder/webui/generations"),
+    )
     parser.add_argument(
         "--blender",
         type=Path,

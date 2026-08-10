@@ -180,7 +180,7 @@ Kết quả smoke test đã xác nhận trên máy này ngày 2026-07-16:
 - LoRA có 5.160.960 / 3.055.919.680 tham số trainable (0,1689%).
 - Hai optimizer step hoàn tất trong khoảng 6,7 giây; loss từng batch là `1,13` và `1,23`, đều hữu hạn và không OOM.
 - Kiểm tra trong bộ nhớ xác nhận 200 tensor trainable đã đổi, tổng cộng 2.752.567 phần tử.
-- Adapter rank 8 gồm 336 tensor FP32/5.160.960 phần tử đã được đọc lại thành công từ `hy3dshape/output_folder/dit/lora_rtx3090_windows_smoke/lora/final`.
+- Adapter rank 8 gồm 336 tensor FP32/5.160.960 phần tử đã được đọc lại thành công từ output tạm của smoke test. Artefact này có thể dọn sau khi xác minh vì launcher sẽ tạo lại khi chạy `-SmokeTest`.
 - Toàn bộ 2.752.512 phần tử `lora_B` trong file đã lưu đều khác 0; `max_abs` khoảng `4,9974e-7`, chứng minh adapter không còn là trạng thái khởi tạo.
 - Nạp lại chính adapter `final` vào model pretrained giữ chính xác 336/336 tensor và dtype FP32, xác nhận luồng resume không làm đổi trọng số.
 
@@ -215,7 +215,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\hy3dshape\scripts\train_w
 Output mặc định:
 
 ```text
-hy3dshape/output_folder/dit/lora_rtx3090_windows_pilot_200/
+hy3dshape/output_folder/webui/training/lora_rtx3090_windows_pilot_200/
 ├── training_config_source.yaml
 ├── training_config_effective.yaml
 ├── log/
@@ -239,7 +239,7 @@ powershell -ExecutionPolicy Bypass -File `
 Output mặc định:
 
 ```text
-hy3dshape/output_folder/dit/lora_rtx3090_windows/
+hy3dshape/output_folder/webui/training/lora_rtx3090_windows/
 ├── training_config_source.yaml
 ├── training_config_effective.yaml
 ├── log/

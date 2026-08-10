@@ -89,7 +89,7 @@ It takes 10 GB VRAM for shape generation, 21GB for texture generation and 29GB f
 
 ## Project Documentation
 
-- Windows + RTX 3090: [Web UI](docs/windows/WEB_UI_WINDOWS_RTX3090.md) · [4-view inference](docs/windows/MULTIVIEW_WINDOWS_RTX3090.md) · [Shape LoRA training](docs/windows/TRAINING_WINDOWS_RTX3090.md)
+- Windows + RTX 3090: [Web UI](docs/windows/WEB_UI_WINDOWS_RTX3090.md) · [output layout](docs/windows/OUTPUT_LAYOUT.md) · [4-view inference](docs/windows/MULTIVIEW_WINDOWS_RTX3090.md) · [Shape LoRA training](docs/windows/TRAINING_WINDOWS_RTX3090.md)
 - API: [Documentation](docs/api/API_DOCUMENTATION.md) · [Testing summary](docs/api/API_TESTING_SUMMARY.md)
 
 

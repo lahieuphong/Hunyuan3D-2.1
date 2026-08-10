@@ -36,7 +36,7 @@ if ([string]::IsNullOrWhiteSpace($Left)) { $Left = Join-Path $SampleRoot "005.pn
 if ([string]::IsNullOrWhiteSpace($Back)) { $Back = Join-Path $SampleRoot "006.png" }
 if ([string]::IsNullOrWhiteSpace($Right)) { $Right = Join-Path $SampleRoot "004.png" }
 if ([string]::IsNullOrWhiteSpace($Output)) {
-    $Output = Join-Path $ShapeRoot "output_folder\inference\multiview_sample_4views.glb"
+    $Output = Join-Path $ShapeRoot "output_folder\webui\inference\multiview_sample_4views.glb"
 }
 
 $ViewPaths = [ordered]@{

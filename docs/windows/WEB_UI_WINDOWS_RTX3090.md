@@ -128,7 +128,7 @@ Khi lượt Generate hoàn tất thành công, UUID trên URL cũng là tên th�
 và thư mục có dạng:
 
 ```text
-hy3dshape\output_folder\webui\<uuid>\
+hy3dshape\output_folder\webui\generations\<uuid>\
 ├── generation.json
 ├── input_front.png
 ├── white_mesh.glb
@@ -142,11 +142,15 @@ Nếu Generate lỗi, manifest và những input đã lưu được vẫn đư�
 GLB/HTML có thể chưa tồn tại. Cache Web UI giữ tối đa 200 thư mục generation và
 tự xóa thư mục cũ nhất khi tạo lượt mới.
 
-Log server và PID nằm tại:
+Log server và PID được tách khỏi dữ liệu generation:
 
 ```text
 hy3dshape\output_folder\webui\logs
+hy3dshape\output_folder\webui\runtime
 ```
+
+Xem toàn bộ quy ước thư mục và lệnh chuyển dữ liệu cũ tại
+[`OUTPUT_LAYOUT.md`](OUTPUT_LAYOUT.md).
 
 ## Giới hạn hiện tại
 
