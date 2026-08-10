@@ -9,7 +9,8 @@ from pathlib import Path
 from PIL import Image
 
 import gradio_app as app
-from hy3dshape.ten_view import TEN_VIEW_KEYS
+from hy3dshape.six_view import SIX_VIEW_KEYS
+from hy3dshape.ten_view import CANONICAL_VIEW_KEYS
 from webui.history import list_generation_history
 
 
@@ -18,8 +19,8 @@ class _Request:
         self.headers = {"referer": referer}
 
 
-class TenViewRestoreTests(unittest.TestCase):
-    def test_history_restores_all_ten_native_gradio_images(self):
+class SixViewRestoreTests(unittest.TestCase):
+    def test_history_restores_all_six_native_gradio_images(self):
         generation_uid = str(uuid.uuid4())
         original_values = {
             name: getattr(app, name, None)
@@ -35,9 +36,9 @@ class TenViewRestoreTests(unittest.TestCase):
             root = Path(temporary_directory)
             folder = root / generation_uid
             folder.mkdir()
-            (folder / "white_mesh.glb").write_bytes(b"glTF-ten-view-test")
+            (folder / "white_mesh.glb").write_bytes(b"glTF-six-view-test")
             inputs = {}
-            for index, key in enumerate(TEN_VIEW_KEYS):
+            for index, key in enumerate(SIX_VIEW_KEYS):
                 filename = f"input_{key}.png"
                 Image.new(
                     "RGBA",
@@ -53,11 +54,12 @@ class TenViewRestoreTests(unittest.TestCase):
                         "generation_uid": generation_uid,
                         "status": "completed",
                         "events": [],
-                        "input_mode": "ten",
+                        "input_mode": "six",
                         "params": {
-                            "input_mode": "ten",
-                            "views_provided": list(TEN_VIEW_KEYS),
-                            "views_used": list(TEN_VIEW_KEYS),
+                            "input_mode": "six",
+                            "views_provided": list(SIX_VIEW_KEYS),
+                            "views_used": list(CANONICAL_VIEW_KEYS),
+                            "shape_views_used": list(CANONICAL_VIEW_KEYS),
                             "steps": 10,
                             "guidance_scale": 5.0,
                             "seed": 1234,
@@ -80,12 +82,12 @@ class TenViewRestoreTests(unittest.TestCase):
                     None,
                     _Request(
                         "http://127.0.0.1:8080/"
-                        f"?tab=ten-view&generation={generation_uid}"
-                    ), # type: ignore
+                        f"?tab=six-view&generation={generation_uid}"
+                    ),  # type: ignore
                 )
                 restored_preview_paths = [
                     Path(update["value"])
-                    for update in restored[29:39]
+                    for update in restored[40:46]
                 ]
                 restored_preview_sizes = []
                 for preview_path in restored_preview_paths:
@@ -100,25 +102,26 @@ class TenViewRestoreTests(unittest.TestCase):
                         setattr(app, name, value)
 
         self.assertEqual(len(restored), 46)
-        self.assertEqual(restored[0], "ten")
+        self.assertEqual(restored[0], "six")
         for legacy_image_update in restored[1:6]:
             self.assertIsNone(legacy_image_update["value"])
-        self.assertEqual(restored[16]["value"], "Generate 3D · 10 Images")
-        self.assertIn('data-input-mode="ten"', restored[22])
-        self.assertIn("10 / 10", restored[28])
-        self.assertIn("Ready to generate", restored[28])
+        self.assertEqual(restored[16]["value"], "Generate 3D · 6 Images")
+        self.assertIn('data-input-mode="six"', restored[22])
+
+        self.assertIn("0 / 10", restored[28])
+        self.assertTrue(all(update["value"] is None for update in restored[29:39]))
+        self.assertIn("6 / 6", restored[39])
+        self.assertIn("Ready to generate", restored[39])
         self.assertEqual(
             [path.name for path in restored_preview_paths],
-            [f"input_{key}.preview.webp" for key in TEN_VIEW_KEYS],
+            [f"input_{key}.preview.webp" for key in SIX_VIEW_KEYS],
         )
-        self.assertEqual(restored_preview_sizes, [(8, 8)] * len(TEN_VIEW_KEYS))
+        self.assertEqual(restored_preview_sizes, [(8, 8)] * len(SIX_VIEW_KEYS))
         self.assertTrue(
-            all(update["interactive"] is False for update in restored[29:39])
+            all(update["interactive"] is False for update in restored[40:46])
         )
-        self.assertIn("0 / 6", restored[39])
-        self.assertTrue(all(update["value"] is None for update in restored[40:46]))
-        self.assertEqual(history_item["input_mode"], "ten")
-        self.assertEqual(history_item["view_count"], 10)
+        self.assertEqual(history_item["input_mode"], "six")
+        self.assertEqual(history_item["view_count"], 6)
         self.assertIn("input_front.png", history_item["assets"]["thumbnail_url"])
 
 

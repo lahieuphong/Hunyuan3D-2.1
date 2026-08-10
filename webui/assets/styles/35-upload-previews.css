@@ -1,12 +1,12 @@
 
     /* Keep multi-view thumbnails visible while Gradio replaces its native
        preview with upload progress. This layer never changes component data. */
-    :where(.mv-image, .ten-view-image) [data-testid="image"],
-    :where(.mv-image, .ten-view-image) .upload-container {
+    :where(.mv-image, .six-view-image, .ten-view-image) [data-testid="image"],
+    :where(.mv-image, .six-view-image, .ten-view-image) .upload-container {
         position: relative;
     }
 
-    :where(.mv-image, .ten-view-image) .upload-container {
+    :where(.mv-image, .six-view-image, .ten-view-image) .upload-container {
         min-width: 0;
         overflow: hidden;
     }
@@ -25,16 +25,16 @@
         z-index: 2;
     }
 
-    :is(.mv-image, .ten-view-image).is-upload-preview-settling
+    :is(.mv-image, .six-view-image, .ten-view-image).is-upload-preview-settling
     .mv-upload-local-preview {
         opacity: 0;
     }
 
-    :is(.mv-image, .ten-view-image):is(
+    :is(.mv-image, .six-view-image, .ten-view-image):is(
         .is-uploading-preview,
         .is-upload-preview-error
     ) > .wrap.default.full,
-    :is(.mv-image, .ten-view-image)
+    :is(.mv-image, .six-view-image, .ten-view-image)
     > .wrap.default.full.mv-native-upload-status-suppressed {
         opacity: 0 !important;
         pointer-events: none !important;
@@ -75,14 +75,14 @@
         width: 9px;
     }
 
-    :is(.mv-image, .ten-view-image).is-upload-preview-error
+    :is(.mv-image, .six-view-image, .ten-view-image).is-upload-preview-error
     .mv-upload-preview-status {
         background: rgba(50, 18, 29, 0.92);
         border-color: rgba(255, 111, 143, 0.5);
         color: #ffc2d0;
     }
 
-    :is(.mv-image, .ten-view-image).is-upload-preview-error
+    :is(.mv-image, .six-view-image, .ten-view-image).is-upload-preview-error
     .mv-upload-preview-status::before {
         animation: none;
         border: 0;

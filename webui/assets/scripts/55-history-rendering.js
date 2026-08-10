@@ -145,13 +145,10 @@
                 return;
             }
             const url = currentAppUrl();
-            if (item.input_mode === "ten") {
-                url.searchParams.set("tab", "ten-view");
-            } else if (item.input_mode === "four") {
-                url.searchParams.set("tab", "multi-view");
-            } else if (item.input_mode === "single") {
-                url.searchParams.set("tab", "single-view");
-            }
+            const route = tabRoutes.find((candidate) => (
+                candidate.mode === item.input_mode
+            ));
+            if (route) url.searchParams.set("tab", route.slug);
             url.searchParams.set("generation", item.generation_uid);
             url.searchParams.delete("view");
             window.location.assign(url);

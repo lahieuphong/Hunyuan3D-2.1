@@ -1,9 +1,13 @@
 
         const tabRoutes = [
-            {slug: "single-view", index: 0, tabId: "tab_single_prompt", label: "Single View", labelKey: "input.single"},
-            {slug: "multi-view", index: 1, tabId: "tab_mv_prompt", label: "Multi View (1–4)", labelKey: "input.multi"},
-            {slug: "ten-view", index: 2, tabId: "tab_ten_prompt", label: "10 Views", labelKey: "input.ten"},
+            {mode: "single", slug: "single-view", index: 0, tabId: "tab_single_prompt", label: "Single View", labelKey: "input.single"},
+            {mode: "four", slug: "multi-view", index: 1, tabId: "tab_mv_prompt", label: "Multi View (1–4)", labelKey: "input.multi"},
+            {mode: "six", slug: "six-view", index: 2, tabId: "tab_six_prompt", label: "6 Views", labelKey: "input.six"},
+            {mode: "ten", slug: "ten-view", index: 3, tabId: "tab_ten_prompt", label: "10 Views", labelKey: "input.ten"},
         ];
+        const promptRouteForMode = (mode) => (
+            tabRoutes.find((route) => route.mode === mode) || tabRoutes[0]
+        );
         let tabRouteInitialized = false;
 
         const currentAppUrl = () => {

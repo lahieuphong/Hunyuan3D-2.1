@@ -7,9 +7,12 @@ already shipped in this repository.  The quality-validated default consumes
 the four cardinal reference images and embeds a real texture in
 ``textured_mesh.glb``.  A native ten-view consensus bake remains available as
 an explicit option and as a fallback when the cardinal bake cannot complete.
+Six-view requests use a separate orthographic vertex-color projection so the
+Top and Bottom references contribute to the published GLB while shape
+conditioning remains on the checkpoint's four native camera slots.
 
 If Blender is unavailable or its bake fails, a deterministic vertex-color
-fallback projects every supplied camera (up to all ten UI views) onto the
+fallback projects every supplied supported camera onto the
 surface.  The fallback is still a genuinely colored GLB (``COLOR_0``), never a
 renamed copy of the white mesh.
 """
@@ -34,6 +37,12 @@ import numpy as np
 import trimesh
 from PIL import Image
 from trimesh.visual.color import ColorVisuals
+
+from hy3dshape.six_view import (
+    SIX_VIEW_ANGLES,
+    SIX_VIEW_AUXILIARY_KEYS,
+    SIX_VIEW_KEYS,
+)
 
 from .calibration import ViewFrame, fit_orthographic_from_alpha
 from .face_hair_rc import (
@@ -64,6 +73,10 @@ VIEW_ANGLES = {
     "high_back": (180.0, 30.0),
 }
 TEN_VIEW_KEYS = tuple(VIEW_ANGLES)
+SUPPORTED_VIEW_ANGLES = {
+    **VIEW_ANGLES,
+    **SIX_VIEW_ANGLES,
+}
 DEFAULT_TEXTURE_SIZE = 4096
 DEFAULT_ATLAS_TILE_SIZE = 1536
 DEFAULT_TIMEOUT_SECONDS = 600
@@ -846,7 +859,7 @@ def _normalized_images(
     images: Mapping[str, Image.Image],
 ) -> dict[str, Image.Image]:
     normalized: dict[str, Image.Image] = {}
-    for name in VIEW_ANGLES:
+    for name in SUPPORTED_VIEW_ANGLES:
         image = images.get(name)
         if not isinstance(image, Image.Image):
             continue
@@ -1210,17 +1223,22 @@ def _vertex_color_fallback(
     images: Mapping[str, Image.Image],
     output_folder: Path,
     *,
-    fallback_reason: str,
+    fallback_reason: str | None,
     stage_callback: Callable[[str, str], None] | None,
     quality_evaluator: CandidateQualityEvaluator | None,
     candidate_identifier: str | None = None,
     preserve_candidate: bool = False,
+    method: str = "multi-view-vertex-color-fallback",
+    source_strategy: str | None = None,
+    stage: str = "coloring_original_fallback",
+    stage_message: str = "Using multi-view vertex colors as the Original fallback",
+    view_order: Sequence[str] | None = None,
 ) -> OriginalVariantResult:
     started = time.perf_counter()
     if stage_callback:
         stage_callback(
-            "coloring_original_fallback",
-            "Using multi-view vertex colors as the Original fallback",
+            stage,
+            stage_message,
         )
     loaded = trimesh.load(str(mesh_path), force="mesh", process=False)
     if not isinstance(loaded, trimesh.Trimesh) or not len(loaded.vertices):
@@ -1231,41 +1249,65 @@ def _vertex_color_fallback(
     frames: dict[str, ViewFrame] = {}
     arrays: dict[str, np.ndarray] = {}
     provisional = {}
+    fit_modes: dict[str, str] = {}
     for name, image in images.items():
-        angles = VIEW_ANGLES.get(name)
+        angles = SUPPORTED_VIEW_ANGLES.get(name)
         if angles is None:
             continue
         frame = _view_frame(name, *angles)
         rgba = np.asarray(image.convert("RGBA"), dtype=np.uint8)
         alpha = rgba[..., 3]
+        fit_mode = (
+            "contain"
+            if name in SIX_VIEW_AUXILIARY_KEYS
+            else "height"
+        )
         frames[name] = frame
         arrays[name] = rgba
+        fit_modes[name] = fit_mode
         provisional[name] = fit_orthographic_from_alpha(
             alpha,
             vertices,
             frame,
-            fit_mode="height",
+            fit_mode=fit_mode,
         )
     if not provisional:
         raise OriginalVariantError("No calibrated image view is available for coloring.")
-    shared_scale = float(
-        np.median(
-            [calibration.pixels_per_unit_v for calibration in provisional.values()]
-        )
+    horizontal_scales = [
+        calibration.pixels_per_unit_v
+        for name, calibration in provisional.items()
+        if name not in SIX_VIEW_AUXILIARY_KEYS
+    ]
+    polar_scales = [
+        calibration.pixels_per_unit_v
+        for name, calibration in provisional.items()
+        if name in SIX_VIEW_AUXILIARY_KEYS
+    ]
+    shared_horizontal_scale = float(np.median(horizontal_scales))
+    shared_polar_scale = (
+        float(np.median(polar_scales))
+        if polar_scales
+        else shared_horizontal_scale
     )
 
     sampled_colors: list[np.ndarray] = []
     sampled_weights: list[np.ndarray] = []
     views_used: list[str] = []
-    for name in VIEW_ANGLES:
+    projection_order = tuple(view_order or SUPPORTED_VIEW_ANGLES)
+    for name in projection_order:
         rgba = arrays.get(name)
         if rgba is None:
             continue
+        shared_scale = (
+            shared_polar_scale
+            if name in SIX_VIEW_AUXILIARY_KEYS
+            else shared_horizontal_scale
+        )
         calibration = fit_orthographic_from_alpha(
             rgba[..., 3],
             vertices,
             frames[name],
-            fit_mode="height",
+            fit_mode=fit_modes[name],
             pixels_per_unit=shared_scale,
         )
         silhouette = alpha_confidence_map(
@@ -1324,6 +1366,9 @@ def _vertex_color_fallback(
     payload = glb_color_payload(pending_output)
     if payload != "vertex-color":
         raise OriginalVariantError("Vertex-color fallback did not produce COLOR_0.")
+    resolved_source_strategy = source_strategy or (
+        "all-supplied-views" if len(views_used) > 1 else "front-only"
+    )
     report_path = _candidate_artifact_path(
         output_folder,
         "vertex_color_report.json",
@@ -1341,6 +1386,8 @@ def _vertex_color_fallback(
                     ).resolve()
                 ),
                 "views_used": views_used,
+                "method": method,
+                "source_strategy": resolved_source_strategy,
                 "fallback_reason": fallback_reason,
                 "diffusion": asdict(diffusion_stats),
             },
@@ -1353,11 +1400,9 @@ def _vertex_color_fallback(
         pending_output,
         output_path,
         color_payload=payload,
-        method="multi-view-vertex-color-fallback",
+        method=method,
         views_used=tuple(views_used),
-        source_strategy=(
-            "all-supplied-views" if len(views_used) > 1 else "front-only"
-        ),
+        source_strategy=resolved_source_strategy,
         images=images,
         quality_evaluator=quality_evaluator,
         stage_callback=stage_callback,
@@ -1370,17 +1415,57 @@ def _vertex_color_fallback(
     return OriginalVariantResult(
         output_path=output_path,
         color_payload=payload,
-        method="multi-view-vertex-color-fallback",
+        method=method,
         views_used=tuple(views_used),
-        source_strategy=(
-            "all-supplied-views" if len(views_used) > 1 else "front-only"
-        ),
+        source_strategy=resolved_source_strategy,
         seconds=time.perf_counter() - started,
         report_path=report_path,
         fallback_reason=fallback_reason,
         quality_gate_path=quality_gate_path,
         quality_gate=quality_gate,
     )
+
+
+def _project_six_view_colors(
+    mesh_path: Path,
+    images: Mapping[str, Image.Image],
+    output_folder: Path,
+    *,
+    stage_callback: Callable[[str, str], None] | None,
+) -> OriginalVariantResult:
+    """Publish a GLB whose colors are projected from all six real cameras."""
+
+    selected = {
+        name: images[name]
+        for name in SIX_VIEW_KEYS
+        if name in images
+    }
+    missing = [name for name in SIX_VIEW_KEYS if name not in selected]
+    if missing:
+        raise OriginalVariantError(
+            "Six-view color projection is missing: " + ", ".join(missing)
+        )
+    result = _vertex_color_fallback(
+        mesh_path,
+        selected,
+        output_folder,
+        fallback_reason=None,
+        stage_callback=stage_callback,
+        quality_evaluator=None,
+        method="six-view-orthographic-vertex-projection",
+        source_strategy="native-four-shape-six-view-color",
+        stage="baking_original",
+        stage_message=(
+            "Projecting Front, Back, Left, Right, Top and Bottom colors "
+            "onto the generated mesh"
+        ),
+        view_order=SIX_VIEW_KEYS,
+    )
+    if result.views_used != SIX_VIEW_KEYS:
+        raise OriginalVariantError(
+            "Six-view projection did not consume every calibrated camera."
+        )
+    return result
 
 
 def create_original_variant(
@@ -1394,6 +1479,7 @@ def create_original_variant(
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     stage_callback: Callable[[str, str], None] | None = None,
     prefer_ten_view: bool = False,
+    prefer_six_view: bool = False,
     quality_evaluator: CandidateQualityEvaluator | None = None,
 ) -> OriginalVariantResult:
     """Create ``textured_mesh.glb`` and guarantee it contains real color data."""
@@ -1409,6 +1495,7 @@ def create_original_variant(
     normalized = _normalized_images(images)
 
     bake_errors: list[str] = []
+    six_view_available = all(name in normalized for name in SIX_VIEW_KEYS)
     ten_view_available = all(name in normalized for name in TEN_VIEW_KEYS)
     if ten_view_available and quality_evaluator is None:
         quality_evaluator = _default_ten_view_quality_evaluator(
@@ -1417,6 +1504,17 @@ def create_original_variant(
         )
     rc_best_of = ten_view_available
     evaluated_candidates: list[_EvaluatedOriginalCandidate] = []
+
+    if prefer_six_view and six_view_available:
+        try:
+            return _project_six_view_colors(
+                source_mesh,
+                normalized,
+                folder,
+                stage_callback=stage_callback,
+            )
+        except (OSError, OriginalVariantError, ValueError) as error:
+            bake_errors.append("six-view: " + _command_error(error))
 
     if prefer_ten_view and ten_view_available:
         try:
@@ -1558,6 +1656,7 @@ __all__ = [
     "DEFAULT_TEXTURE_SIZE",
     "OriginalVariantError",
     "OriginalVariantResult",
+    "SIX_VIEW_KEYS",
     "create_original_variant",
     "glb_color_payload",
     "resolve_blender_executable",

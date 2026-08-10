@@ -14,3 +14,13 @@ body[data-ui-locale="zh-CN"]
 .ten-view-image[data-ten-view-preview-state="error"]::after {
     content: "预览不可用";
 }
+
+body[data-ui-locale="zh-CN"]
+.six-view-image::after {
+    content: "正在加载预览…";
+}
+
+body[data-ui-locale="zh-CN"]
+.six-view-image[data-six-view-preview-state="error"]::after {
+    content: "预览不可用";
+}

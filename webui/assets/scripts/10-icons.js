@@ -29,6 +29,7 @@
 
         const normalizeUiInputMode = (value) => {
             if (value === "ten" || value === "ten-view") return "ten";
+            if (value === "six" || value === "six-view" || value === "6-view") return "six";
             if (value === "four" || value === "multi-view") return "four";
             return "single";
         };
@@ -44,7 +45,7 @@
             const activeRoute = tabRoutes.find((route) => (
                 promptRouteIsActive(route)
             ));
-            if (activeRoute) return normalizeUiInputMode(activeRoute.slug);
+            if (activeRoute) return activeRoute.mode;
 
             const routeMode = new URL(window.location.href).searchParams.get("tab");
             if (routeMode) return normalizeUiInputMode(routeMode);
@@ -52,9 +53,8 @@
             const selectedTabId = document.querySelector(
                 '#prompt-mode-tabs button[role="tab"][aria-selected="true"]'
             )?.dataset.tabId;
-            return selectedTabId === "tab_ten_prompt"
-                ? "ten"
-                : selectedTabId === "tab_mv_prompt" ? "four" : "single";
+            return tabRoutes.find((route) => route.tabId === selectedTabId)?.mode
+                || "single";
         };
 
         const syncWorkspaceTitle = (mode) => {
@@ -92,11 +92,13 @@
             }
             const title = copy.querySelector("strong");
             const subtitle = copy.querySelector("small");
-            const nextSubtitle = mode === "ten"
-                ? uiT("action.generate_subtitle_ten")
-                : mode === "four"
-                    ? uiT("action.generate_subtitle_four")
-                    : uiT("action.generate_subtitle_one");
+            const subtitleKey = {
+                single: "action.generate_subtitle_one",
+                four: "action.generate_subtitle_four",
+                six: "action.generate_subtitle_six",
+                ten: "action.generate_subtitle_ten",
+            }[mode] || "action.generate_subtitle_one";
+            const nextSubtitle = uiT(subtitleKey);
             const generateTitle = uiT("action.generate_3d");
             if (title.textContent !== generateTitle) {
                 title.textContent = generateTitle;

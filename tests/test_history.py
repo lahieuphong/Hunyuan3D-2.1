@@ -218,6 +218,59 @@ class GenerationHistoryMetadataTests(unittest.TestCase):
             self.assertNotIn("hardware", item)
             self.assertNotIn("preset", item)
 
+    def test_six_view_aliases_have_a_six_view_history_fallback(self):
+        for input_mode in ("six", "6-view", "six-view"):
+            with self.subTest(input_mode=input_mode):
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    root = Path(temporary_directory)
+                    self._create_generation(
+                        root,
+                        input_mode=input_mode,
+                        params={
+                            "input_mode": input_mode,
+                            "steps": 30,
+                            "guidance_scale": 5.0,
+                            "seed": 1234,
+                            "octree_resolution": 384,
+                            "num_chunks": 8000,
+                        },
+                    )
+
+                    item = list_generation_history(root)["items"][0]
+
+                    self.assertEqual(item["input_mode"], "six")
+                    self.assertEqual(item["view_count"], 6)
+
+    def test_six_view_history_prefers_persisted_view_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._create_generation(
+                root,
+                input_mode="six",
+                params={
+                    "input_mode": "six",
+                    "views_provided": [
+                        "front",
+                        "back",
+                        "left",
+                        "right",
+                        "top",
+                        "bottom",
+                    ],
+                    "views_used": ["front", "left", "back", "right"],
+                    "steps": 30,
+                    "guidance_scale": 5.0,
+                    "seed": 1234,
+                    "octree_resolution": 384,
+                    "num_chunks": 8000,
+                },
+            )
+
+            item = list_generation_history(root)["items"][0]
+
+            self.assertEqual(item["input_mode"], "six")
+            self.assertEqual(item["view_count"], 6)
+
 
 if __name__ == "__main__":
     unittest.main()

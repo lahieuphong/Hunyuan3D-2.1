@@ -17,6 +17,7 @@
             installHistoryReviewMode();
             installTenViewHistoryLoading();
             installGenerationRouting();
+            installGenerationWorkspaceLoading();
             syncGenerationHistoryFromUrl();
             syncGenerationConsoleFromUrl();
         };

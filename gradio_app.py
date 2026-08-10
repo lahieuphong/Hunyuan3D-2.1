@@ -55,13 +55,19 @@ import uuid
 import numpy as np
 from PIL import Image
 
+from hy3dshape.six_view import SIX_VIEW_KEYS
 from hy3dshape.ten_view import TEN_VIEW_KEYS
 from hy3dshape.texture_bake.generation import create_original_variant
 from hy3dshape.texture_bake.rc_evaluator import (
     FaceHairRCCandidateEvaluator,
 )
 from hy3dshape.utils import logger
-from webui import load_ui_assets, render_history_modal, render_topbar
+from webui import (
+    load_ui_assets,
+    render_generation_loading,
+    render_history_modal,
+    render_topbar,
+)
 from webui.i18n import translate_ui
 from webui.topbar_config import (
     SHOW_API_DOCS_BUTTON,
@@ -74,7 +80,15 @@ from webui.generation_inputs import (
     build_generation_input_bundle,
     image_has_opaque_alpha,
     normalize_input_mode,
+    ordered_six_view_images,
     ordered_ten_view_images,
+)
+from webui.six_view_inputs import (
+    SIX_VIEW_DEFINITIONS,
+    render_six_view_guide,
+    render_six_view_progress,
+    render_six_view_slot_header,
+    render_six_view_summary,
 )
 from webui.ten_view_inputs import (
     TEN_VIEW_DEFINITIONS,
@@ -556,7 +570,7 @@ def build_generation_hardware_metadata(hardware_id, params):
 
 
 def get_background_remover():
-    """Load rembg for explicit or ten-view automatic background removal."""
+    """Load rembg for explicit or synchronized-view background removal."""
     global _RMBG_WORKER
     if _RMBG_WORKER is None:
         try:
@@ -579,9 +593,10 @@ def _preprocess_multiview_image_sets(
 ):
     """Prepare separate shape and texture image mappings.
 
-    Ten-view shape inference intentionally consumes only the four native
-    cardinal cameras. Texture baking and RC evaluation must retain all ten
-    processed references, including diagonal and elevated cameras.
+    Six- and ten-view shape inference intentionally consume only the four
+    native cardinal cameras. Texture projection must retain every processed
+    reference, including the six-view top/bottom cameras and ten-view
+    diagonal/elevated cameras.
     """
 
     if not isinstance(conditioning_images, dict):
@@ -596,7 +611,7 @@ def _preprocess_multiview_image_sets(
         if source_image is None:
             raise gr.Error(f"Missing image for the {name} view.")
         automatic_rembg = (
-            input_mode == 'ten'
+            input_mode in {'six', 'ten'}
             and image_has_opaque_alpha(source_image)
         )
         should_remove = (
@@ -1278,6 +1293,8 @@ def restore_generation_from_request(
         render_ten_view_progress(),
     ) + tuple(
         gr.update(interactive=True) for _ in TEN_VIEW_KEYS
+    ) + (render_six_view_progress(),) + tuple(
+        gr.update(interactive=True) for _ in SIX_VIEW_KEYS
     )
     try:
         generation_uid = generation_uid_query_from_request(request)
@@ -1326,7 +1343,7 @@ def restore_generation_from_request(
             raw_input_mode,
         )
         input_mode = 'single'
-    if input_mode in {'four', 'ten'} and not MV_MODE:
+    if input_mode in {'four', 'six', 'ten'} and not MV_MODE:
         logger.warning(
             "Cannot restore a multi-view generation in single-view mode: %s",
             generation_uid,
@@ -1358,6 +1375,18 @@ def restore_generation_from_request(
     back_image = input_path(inputs.get('back'), 'input_back.png')
     left_image = input_path(inputs.get('left'), 'input_left.png')
     right_image = input_path(inputs.get('right'), 'input_right.png')
+    six_view_source_paths = {
+        key: input_path(inputs.get(key), f'input_{key}.png')
+        for key in SIX_VIEW_KEYS
+    }
+    six_view_paths = {
+        key: (
+            ensure_history_input_preview(save_folder, source_path)
+            if source_path
+            else None
+        )
+        for key, source_path in six_view_source_paths.items()
+    }
     ten_view_source_paths = {
         key: input_path(inputs.get(key), f'input_{key}.png')
         for key in TEN_VIEW_KEYS
@@ -1512,6 +1541,7 @@ def restore_generation_from_request(
         gr.update(
             value=(
                 'Generate 3D · 10 Images' if input_mode == 'ten'
+                else 'Generate 3D · 6 Images' if input_mode == 'six'
                 else 'Generate 3D · 4 Images' if input_mode == 'four'
                 else 'Generate 3D · 1 Image'
             ),
@@ -1541,6 +1571,15 @@ def restore_generation_from_request(
             interactive=False,
         )
         for key in TEN_VIEW_KEYS
+    ) + (render_six_view_progress(*(
+        six_view_paths[key] if input_mode == 'six' else None
+        for key in SIX_VIEW_KEYS
+    )),) + tuple(
+        gr.update(
+            value=six_view_paths[key] if input_mode == 'six' else None,
+            interactive=False,
+        )
+        for key in SIX_VIEW_KEYS
     )
 
 @spaces_api.GPU(duration=60)
@@ -1563,6 +1602,7 @@ def _gen_shape(
     hardware_metadata=None,
     preset_metadata=None,
     ten_view_images=None,
+    six_view_images=None,
 ):
     tracking_enabled = generation_uid is not None and bool(str(generation_uid).strip())
     save_folder = None
@@ -1613,6 +1653,7 @@ def _gen_shape(
                 'right': mv_image_right,
                 },
                 ten_view_images,
+                six_view_images=six_view_images,
             )
         except GenerationInputError as error:
             raise gr.Error(str(error)) from error
@@ -1989,6 +2030,12 @@ def generation_all(
     ten_image_front_left=None,
     ten_image_high_front=None,
     ten_image_high_back=None,
+    six_image_front=None,
+    six_image_back=None,
+    six_image_left=None,
+    six_image_right=None,
+    six_image_top=None,
+    six_image_bottom=None,
 ):
     start_time_0 = time.time()
     mesh, image, save_folder, stats, seed, _ = _gen_shape(
@@ -2017,6 +2064,14 @@ def generation_all(
             ten_image_front_left,
             ten_image_high_front,
             ten_image_high_back,
+        )),
+        six_view_images=ordered_six_view_images((
+            six_image_front,
+            six_image_back,
+            six_image_left,
+            six_image_right,
+            six_image_top,
+            six_image_bottom,
         )),
     )
     path = export_mesh(mesh, save_folder, textured=False)
@@ -2097,6 +2152,12 @@ def shape_generation(
     ten_image_front_left=None,
     ten_image_high_front=None,
     ten_image_high_back=None,
+    six_image_front=None,
+    six_image_back=None,
+    six_image_left=None,
+    six_image_right=None,
+    six_image_top=None,
+    six_image_bottom=None,
     request: gr.Request | None = None,
 ):
     start_time_0 = time.time()
@@ -2141,6 +2202,14 @@ def shape_generation(
                 ten_image_high_front,
                 ten_image_high_back,
             )),
+            six_view_images=ordered_six_view_images((
+                six_image_front,
+                six_image_back,
+                six_image_left,
+                six_image_right,
+                six_image_top,
+                six_image_bottom,
+            )),
         )
     except GenerationUidConflictError as exc:
         raise gr.Error(str(exc)) from exc
@@ -2176,7 +2245,9 @@ def shape_generation(
                 message=message,
             )
 
-        ten_view_mode = normalize_input_mode(input_mode) == 'ten'
+        normalized_input_mode = normalize_input_mode(input_mode)
+        ten_view_mode = normalized_input_mode == 'ten'
+        six_view_mode = normalized_input_mode == 'six'
         quality_evaluator = (
             FaceHairRCCandidateEvaluator()
             if ten_view_mode
@@ -2188,6 +2259,7 @@ def shape_generation(
             save_folder,
             stage_callback=report_texture_stage,
             prefer_ten_view=ten_view_mode,
+            prefer_six_view=six_view_mode,
             quality_evaluator=quality_evaluator,
         )
         stats['time']['texture generation'] = time.time() - texture_started
@@ -2495,6 +2567,53 @@ def build_app():
                         """)
 
                     with gr.Tab(
+                        '6 Views',
+                        id='tab_six_prompt',
+                        visible=MV_MODE,
+                    ) as tab_six:
+                        gr.HTML(
+                            render_six_view_guide(),
+                            elem_id='six-view-guide-host',
+                        )
+                        six_view_progress = gr.HTML(
+                            render_six_view_progress(),
+                            elem_id='six-view-progress-host',
+                        )
+                        six_view_components = {}
+                        with gr.Row(
+                            elem_id='six-view-upload-grid',
+                            elem_classes='six-view-upload-grid',
+                        ):
+                            for index, definition in enumerate(SIX_VIEW_DEFINITIONS):
+                                with gr.Column(
+                                    min_width=100,
+                                    elem_classes='six-view-slot',
+                                ):
+                                    gr.HTML(
+                                        render_six_view_slot_header(
+                                            index + 1,
+                                            definition,
+                                        ),
+                                        elem_classes='six-view-slot-header-host',
+                                    )
+                                    six_view_components[definition.key] = gr.Image(
+                                        label=definition.label,
+                                        show_label=False,
+                                        type='pil',
+                                        image_mode='RGBA',
+                                        height=160,
+                                        min_width=100,
+                                        interactive=False,
+                                        elem_id=f'six-image-{definition.key}',
+                                        elem_classes=['six-view-image', 'ui-upload'],
+                                    )
+                        gr.HTML(
+                            render_six_view_summary(),
+                            elem_id='six-view-summary-host',
+                        )
+                    six_view_inputs = list(six_view_components.values())
+
+                    with gr.Tab(
                         '10 Views',
                         id='tab_ten_prompt',
                         visible=MV_MODE,
@@ -2563,6 +2682,14 @@ def build_app():
                         visible=False,
                         elem_id='ten-shape-generation-api-bridge',
                     )
+                    six_shape_generation_api_bridge = gr.Button(
+                        value='Six-view Shape Generation API',
+                        visible=False,
+                        elem_id='six-shape-generation-api-bridge',
+                    )
+                    six_api_empty_ten_inputs = [
+                        gr.State(None) for _ in TEN_VIEW_KEYS
+                    ]
 
                 if not MV_MODE:
                     with gr.Group(elem_id='mesh-download-card'):
@@ -2649,10 +2776,22 @@ Fast for very complex cases, Standard seldom use.',
             with gr.Column(scale=6, elem_id='viewport-panel'):
                 with gr.Tabs(selected='gen_mesh_panel', elem_id='output-tabs') as tabs_output:
                     with gr.Tab('Generation', id='gen_mesh_panel'):
+                        gr.HTML(
+                            render_generation_loading('preview'),
+                            elem_id='mesh-viewer-loading',
+                        )
                         html_gen_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output', elem_id='mesh-viewer')
                     with gr.Tab('Exporting Mesh', id='export_mesh_panel'):
+                        gr.HTML(
+                            render_generation_loading('export'),
+                            elem_id='mesh-export-loading',
+                        )
                         html_export_mesh = gr.HTML(HTML_OUTPUT_PLACEHOLDER, label='Output', elem_id='mesh-export-viewer')
                     with gr.Tab('Statistics', id='stats_panel'):
+                        gr.HTML(
+                            render_generation_loading('statistics'),
+                            elem_id='mesh-stats-loading',
+                        )
                         stats = gr.Json(
                             {},
                             label='Mesh Stats',
@@ -2871,6 +3010,15 @@ Fast for very complex cases, Standard seldom use.',
             queue=False,
             api_name=False,
         )
+        tab_six.select(
+            fn=lambda: (
+                'six',
+                gr.update(value='Generate 3D · 6 Images'),
+            ),
+            outputs=[input_mode, btn],
+            queue=False,
+            api_name=False,
+        )
         tab_ten.select(
             fn=lambda: (
                 'ten',
@@ -2880,6 +3028,17 @@ Fast for very complex cases, Standard seldom use.',
             queue=False,
             api_name=False,
         )
+
+        for six_view_input in six_view_inputs:
+            six_view_input.input(
+                fn=render_six_view_progress,
+                inputs=six_view_inputs,
+                outputs=[six_view_progress],
+                queue=False,
+                show_progress='hidden',
+                preprocess=False,
+                api_name=False,
+            )
 
         for ten_view_input in ten_view_inputs:
             ten_view_input.input(
@@ -2926,6 +3085,8 @@ Fast for very complex cases, Standard seldom use.',
                 hardware_profile_note,
                 ten_view_progress,
                 *ten_view_inputs,
+                six_view_progress,
+                *six_view_inputs,
             ],
             queue=False,
             show_progress='hidden',
@@ -3002,16 +3163,17 @@ Fast for very complex cases, Standard seldom use.',
                 randomize_seed,
                 hardware_profile,
                 *ten_view_inputs,
+                *six_view_inputs,
             ],
             outputs=[file_out, html_gen_mesh, stats, seed],
             show_progress='hidden' if MV_MODE else 'full',
             api_name=False,
-        ).then(
+        ).success(
             lambda: (gr.update(visible=False, value=False), gr.update(interactive=True), gr.update(interactive=True),
                      gr.update(interactive=False)),
             outputs=[export_texture, reduce_face, confirm_export, file_export],
             show_progress='hidden',
-        ).then(
+        ).success(
             lambda: gr.update(selected='gen_mesh_panel'),
             outputs=[tabs_output],
             show_progress='hidden',
@@ -3065,6 +3227,32 @@ Fast for very complex cases, Standard seldom use.',
             api_name='shape_generation_ten',
         )
 
+        six_shape_generation_api_bridge.click(
+            shape_generation,
+            inputs=[
+                caption,
+                input_mode,
+                image,
+                mv_image_front,
+                mv_image_back,
+                mv_image_left,
+                mv_image_right,
+                num_steps,
+                cfg_scale,
+                seed,
+                octree_resolution,
+                check_box_rembg,
+                num_chunks,
+                randomize_seed,
+                hardware_profile,
+                *six_api_empty_ten_inputs,
+                *six_view_inputs,
+            ],
+            outputs=[file_out, html_gen_mesh, stats, seed],
+            show_progress='hidden' if MV_MODE else 'full',
+            api_name='shape_generation_six',
+        )
+
         btn_all.click(
             generation_all,
             inputs=[
@@ -3083,15 +3271,16 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
                 *ten_view_inputs,
+                *six_view_inputs,
             ],
             outputs=[file_out, file_out2, html_gen_mesh, stats, seed],
             show_progress='full',
-        ).then(
+        ).success(
             lambda: (gr.update(visible=True, value=True), gr.update(interactive=False), gr.update(interactive=True),
                      gr.update(interactive=False)),
             outputs=[export_texture, reduce_face, confirm_export, file_export],
             show_progress='hidden',
-        ).then(
+        ).success(
             lambda: gr.update(selected='gen_mesh_panel'),
             outputs=[tabs_output],
             show_progress='hidden',

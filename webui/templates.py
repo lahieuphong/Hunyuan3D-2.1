@@ -1,6 +1,63 @@
 """Small HTML templates used by the Gradio application shell."""
 
 
+_GENERATION_LOADING_COPY = {
+    "preview": (
+        "Generating 3D preview",
+        "Building geometry and the interactive preview from your input views.",
+        "box",
+    ),
+    "export": (
+        "Preparing mesh for export",
+        "The downloadable mesh will appear after generation is finalized.",
+        "download",
+    ),
+    "statistics": (
+        "Calculating mesh statistics",
+        "Polygon, vertex and timing data will appear when the mesh is ready.",
+        "terminal",
+    ),
+}
+
+
+def render_generation_loading(kind: str) -> str:
+    """Render a stable loading host that Gradio output updates cannot replace."""
+    try:
+        title, description, icon = _GENERATION_LOADING_COPY[kind]
+    except KeyError as error:
+        raise ValueError(f"Unknown generation loading kind: {kind}") from error
+
+    return f"""
+    <section class="generation-workspace-loading" data-generation-loading-kind="{kind}" data-state="idle" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+        <div class="generation-loading-grid" aria-hidden="true"></div>
+        <div class="generation-loading-card">
+            <div class="generation-loading-visual" aria-hidden="true">
+                <span class="generation-loading-orbit"></span>
+                <span class="generation-loading-icon ui-icon-slot" data-ui-icon="{icon}"></span>
+            </div>
+            <div class="generation-loading-copy">
+                <span class="generation-loading-phase">
+                    <i aria-hidden="true"></i>
+                    <span data-generation-loading-phase>Preparing request</span>
+                </span>
+                <h3 data-generation-loading-title>{title}</h3>
+                <p data-generation-loading-message>{description}</p>
+            </div>
+            <div class="generation-loading-progress">
+                <div class="generation-loading-progress-meta">
+                    <span>Live generation progress</span>
+                    <strong data-generation-loading-percent>0%</strong>
+                </div>
+                <div class="generation-loading-progress-track" role="progressbar" aria-label="Live generation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span data-generation-loading-bar></span>
+                </div>
+            </div>
+            <p class="generation-loading-console-hint">Live progress is available in Generation Console.</p>
+        </div>
+    </section>
+    """
+
+
 def render_topbar(
     brand_name: str,
     workspace_title: str,

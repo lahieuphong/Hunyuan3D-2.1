@@ -15,6 +15,10 @@
     "en": "Four-View Image to 3D Generation",
     "zh-CN": "四视图图像转 3D 生成"
   },
+  "shell.workspace.six": {
+    "en": "Six-View Image to 3D Generation",
+    "zh-CN": "六视图图像转 3D 生成"
+  },
   "shell.workspace.ten": {
     "en": "Ten-View Image to 3D Generation",
     "zh-CN": "十视图图像转 3D 生成"
@@ -42,6 +46,10 @@
   "shell.workspace.turbo.four": {
     "en": "Fast Four-View Image to 3D Generation",
     "zh-CN": "快速四视图图像转 3D 生成"
+  },
+  "shell.workspace.turbo.six": {
+    "en": "Fast Six-View Image to 3D Generation",
+    "zh-CN": "快速六视图图像转 3D 生成"
   },
   "shell.workspace.turbo.ten": {
     "en": "Fast Ten-View Image to 3D Generation",
@@ -82,6 +90,10 @@
   "input.multi": {
     "en": "Multi View (1–4)",
     "zh-CN": "多视图（1–4）"
+  },
+  "input.six": {
+    "en": "6 Views",
+    "zh-CN": "6 视图"
   },
   "input.ten": {
     "en": "10 Views",
@@ -131,6 +143,10 @@
     "en": "Generate 3D · 4 Images",
     "zh-CN": "生成 3D · 4 张图像"
   },
+  "action.generate_six": {
+    "en": "Generate 3D · 6 Images",
+    "zh-CN": "生成 3D · 6 张图像"
+  },
   "action.generate_ten": {
     "en": "Generate 3D · 10 Images",
     "zh-CN": "生成 3D · 10 张图像"
@@ -142,6 +158,10 @@
   "action.generate_subtitle_four": {
     "en": "4 synchronized views",
     "zh-CN": "4 张同步视图"
+  },
+  "action.generate_subtitle_six": {
+    "en": "6 synchronized views",
+    "zh-CN": "6 张同步视图"
   },
   "action.generate_subtitle_ten": {
     "en": "10 views · experimental 10→4 fusion",
@@ -194,6 +214,114 @@
   "output.mesh_stats": {
     "en": "Mesh Stats",
     "zh-CN": "网格统计"
+  },
+  "generation.loading.preview_title": {
+    "en": "Generating 3D preview",
+    "zh-CN": "正在生成 3D 预览"
+  },
+  "generation.loading.preview_body": {
+    "en": "Building geometry and the interactive preview from your input views.",
+    "zh-CN": "正在根据输入视图构建几何体和交互式预览。"
+  },
+  "generation.loading.export_title": {
+    "en": "Preparing mesh for export",
+    "zh-CN": "正在准备用于导出的网格"
+  },
+  "generation.loading.export_body": {
+    "en": "The downloadable mesh will appear after generation is finalized.",
+    "zh-CN": "生成完成后，可下载的网格将显示在此处。"
+  },
+  "generation.loading.statistics_title": {
+    "en": "Calculating mesh statistics",
+    "zh-CN": "正在计算网格统计信息"
+  },
+  "generation.loading.statistics_body": {
+    "en": "Polygon, vertex and timing data will appear when the mesh is ready.",
+    "zh-CN": "网格就绪后，将显示多边形、顶点和耗时数据。"
+  },
+  "generation.loading.progress_label": {
+    "en": "Live generation progress",
+    "zh-CN": "实时生成进度"
+  },
+  "generation.loading.console_hint": {
+    "en": "Live progress is available in Generation Console.",
+    "zh-CN": "可在生成控制台中查看实时进度。"
+  },
+  "generation.loading.phase.queued": {
+    "en": "Preparing request",
+    "zh-CN": "正在准备请求"
+  },
+  "generation.loading.phase.restoring": {
+    "en": "Restoring result",
+    "zh-CN": "正在恢复结果"
+  },
+  "generation.loading.phase.inputs": {
+    "en": "Preparing inputs",
+    "zh-CN": "正在准备输入"
+  },
+  "generation.loading.phase.geometry": {
+    "en": "Generating geometry",
+    "zh-CN": "正在生成几何体"
+  },
+  "generation.loading.phase.mesh": {
+    "en": "Decoding mesh",
+    "zh-CN": "正在解码网格"
+  },
+  "generation.loading.phase.asset": {
+    "en": "Building final asset",
+    "zh-CN": "正在构建最终资产"
+  },
+  "generation.loading.phase.preview": {
+    "en": "Preparing preview",
+    "zh-CN": "正在准备预览"
+  },
+  "generation.loading.phase.finalizing": {
+    "en": "Finalizing output",
+    "zh-CN": "正在完成输出"
+  },
+  "generation.loading.phase.complete": {
+    "en": "Ready",
+    "zh-CN": "已就绪"
+  },
+  "generation.loading.phase.failed": {
+    "en": "Generation stopped",
+    "zh-CN": "生成已停止"
+  },
+  "generation.loading.finalizing_title": {
+    "en": "Finalizing 3D result",
+    "zh-CN": "正在完成 3D 结果"
+  },
+  "generation.loading.finalizing_body": {
+    "en": "The mesh is ready. Preparing the viewer, download and statistics…",
+    "zh-CN": "网格已就绪，正在准备预览、下载文件和统计信息…"
+  },
+  "generation.loading.complete_title": {
+    "en": "3D model ready",
+    "zh-CN": "3D 模型已就绪"
+  },
+  "generation.loading.complete_body": {
+    "en": "Opening the generated result…",
+    "zh-CN": "正在打开生成结果…"
+  },
+  "generation.loading.failed_title": {
+    "en": "Generation could not be completed",
+    "zh-CN": "生成未能完成"
+  },
+  "generation.loading.failed_body": {
+    "en": "Review the Generation Console for details, then adjust the input or settings and try again.",
+    "zh-CN": "请在生成控制台中查看详情，然后调整输入或设置并重试。"
+  },
+  "generation.loading.output_file": {
+    "en": "Preparing output file…",
+    "zh-CN": "正在准备输出文件…"
+  },
+  "generation.loading.output_finalizing": {
+    "en": "Finalizing GLB…",
+    "zh-CN": "正在完成 GLB…"
+  },
+  "generation.loading.output_failed": {
+    "en": "No output was created",
+    "zh-CN": "未创建输出文件"
   },
   "viewer.ready": {
     "en": "3D preview is ready",
@@ -315,6 +443,14 @@
     "en": "Right",
     "zh-CN": "右侧"
   },
+  "input.top": {
+    "en": "Top",
+    "zh-CN": "顶部"
+  },
+  "input.bottom": {
+    "en": "Bottom",
+    "zh-CN": "底部"
+  },
   "input.front_right": {
     "en": "Front-right",
     "zh-CN": "右前方"
@@ -354,6 +490,66 @@
   "input.numbered_right": {
     "en": "4 · Right",
     "zh-CN": "4 · 右侧"
+  },
+  "input.numbered_top": {
+    "en": "5 · Top",
+    "zh-CN": "5 · 顶部"
+  },
+  "input.numbered_bottom": {
+    "en": "6 · Bottom",
+    "zh-CN": "6 · 底部"
+  },
+  "six.guide_title": {
+    "en": "Complete coverage with six synchronized views",
+    "zh-CN": "使用六张同步视图获得完整覆盖"
+  },
+  "six.guide_body": {
+    "en": "Keep the same object, scale, lighting and background in Front, Back, Left, Right, Top and Bottom views.",
+    "zh-CN": "正面、背面、左侧、右侧、顶部和底部视图应保持同一对象、比例、光照和背景。"
+  },
+  "six.badge": {
+    "en": "Native 4-view geometry · 6-view color projection",
+    "zh-CN": "原生 4 视图几何体 · 6 视图颜色投影"
+  },
+  "six.ready": {
+    "en": "Ready to generate",
+    "zh-CN": "可以生成"
+  },
+  "six.remaining": {
+    "en": "Add {count} remaining view(s)",
+    "zh-CN": "还需添加 {count} 张视图"
+  },
+  "six.completeness": {
+    "en": "Six-view upload completeness",
+    "zh-CN": "六视图上传完整度"
+  },
+  "six.object_left": {
+    "en": "Object left side",
+    "zh-CN": "对象左侧"
+  },
+  "six.object_right": {
+    "en": "Object right side",
+    "zh-CN": "对象右侧"
+  },
+  "six.directly_above": {
+    "en": "Directly above",
+    "zh-CN": "正上方"
+  },
+  "six.directly_below": {
+    "en": "Directly below",
+    "zh-CN": "正下方"
+  },
+  "six.angle_down": {
+    "en": "90° down",
+    "zh-CN": "向下 90°"
+  },
+  "six.angle_up": {
+    "en": "90° up",
+    "zh-CN": "向上 90°"
+  },
+  "six.summary": {
+    "en": "All six images are validated and saved. Geometry uses the checkpoint's native Front, Left, Back and Right cameras. All six views, including Top and Bottom, are used for orthographic color projection.",
+    "zh-CN": "全部六张图像均已验证并保存。几何体使用检查点原生支持的正面、左侧、背面和右侧机位。全部六个视图（包括顶部和底部）都用于正交颜色投影。"
   },
   "ten.guide_title": {
     "en": "Maximum coverage with 10 synchronized views",
@@ -1295,6 +1491,18 @@
     "en": "Invalid image mode. Reload the Web UI and try again.",
     "zh-CN": "图像模式无效。请重新加载 WebUI 后重试。"
   },
+  "error.six_callback_count": {
+    "en": "Six-view callback expected {expected} images, received {received}.",
+    "zh-CN": "六视图回调需要 {expected} 张图像，但收到 {received} 张。"
+  },
+  "error.six_missing": {
+    "en": "The 6 Views tab requires all 6 camera views. Missing: {views}",
+    "zh-CN": "“6 视图”标签页需要全部 6 个相机视图。缺少：{views}"
+  },
+  "error.six_unknown_keys": {
+    "en": "Six-view input contains unsupported camera keys: {keys}",
+    "zh-CN": "六视图输入包含不受支持的相机键：{keys}"
+  },
   "error.ten_callback_count": {
     "en": "Ten-view callback expected {expected} images, received {received}.",
     "zh-CN": "十视图回调需要 {expected} 张图像，但收到 {received} 张。"
@@ -1598,6 +1806,10 @@
   "generation.console.stage.baking_original_ten": {
     "en": "Baking strict visibility-aware ten-view color into Original GLB",
     "zh-CN": "正在将严格可见性感知的十视图颜色烘焙到原始 GLB"
+  },
+  "generation.console.stage.baking_original_six": {
+    "en": "Projecting Front, Back, Left, Right, Top and Bottom colors onto the generated mesh",
+    "zh-CN": "正在将正面、背面、左侧、右侧、顶部和底部颜色投影到生成的网格上"
   },
   "generation.console.stage.baking_original_four": {
     "en": "Baking visibility-aware color into Original GLB",
@@ -1954,6 +2166,10 @@
   "generation.console.mode.four": {
     "en": "4-VIEW",
     "zh-CN": "四视图"
+  },
+  "generation.console.mode.six": {
+    "en": "6-VIEW",
+    "zh-CN": "六视图"
   },
   "generation.console.mode.ten": {
     "en": "10-VIEW",

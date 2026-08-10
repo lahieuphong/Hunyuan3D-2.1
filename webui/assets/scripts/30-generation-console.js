@@ -69,6 +69,7 @@
             const key = {
                 "1-VIEW": "generation.console.mode.single",
                 "4-VIEW": "generation.console.mode.four",
+                "6-VIEW": "generation.console.mode.six",
                 "10-VIEW": "generation.console.mode.ten",
             }[mode];
             return key ? generationConsoleT(key, {}, mode) : mode;
@@ -368,6 +369,13 @@
                 }
             }
             if (stage === "baking_original") {
+                if (rawMessage.includes("Top and Bottom colors")) {
+                    return generationConsoleT(
+                        "generation.console.stage.baking_original_six",
+                        {},
+                        "Projecting Front, Back, Left, Right, Top and Bottom colors onto the generated mesh"
+                    );
+                }
                 if (rawMessage.includes("strict visibility-aware ten-view")) {
                     return generationConsoleT(
                         "generation.console.stage.baking_original_ten",
@@ -453,6 +461,7 @@
             if (bar) bar.style.width = safeProgress + "%";
             if (percent) percent.textContent = Math.round(safeProgress) + "%";
             if (stageElement && stage) stageElement.textContent = stage;
+            syncGenerationWorkspaceProgress(safeProgress, stage);
         };
 
         const setGenerationConsoleState = (state, label) => {
@@ -494,6 +503,7 @@
                 "generation-info-views",
                 mode === "10-VIEW"
                     ? "10"
+                    : mode === "6-VIEW" ? "6"
                     : mode === "4-VIEW" ? "4" : mode === "1-VIEW" ? "1" : "\u2014"
             );
             setGenerationDetail("generation-info-time", "\u2014");
@@ -516,7 +526,11 @@
                 : params.views_used;
             const viewCount = Array.isArray(viewList)
                 ? viewList.length
-                : params.input_mode === "ten" ? 10 : params.input_mode === "four" ? 4 : params.input_mode ? 1 : "\u2014";
+                : params.input_mode === "ten"
+                    ? 10
+                    : params.input_mode === "six"
+                        ? 6
+                        : params.input_mode === "four" ? 4 : params.input_mode ? 1 : "\u2014";
             const totalSeconds = Number(stats.time?.total);
             const faces = stats.number_of_faces ?? manifest.number_of_faces;
             const vertices = stats.number_of_vertices ?? manifest.number_of_vertices;
@@ -630,12 +644,14 @@
             });
 
             const lastEvent = (manifest.events || []).at(-1);
+            const lastEventMessage = lastEvent
+                ? generationConsoleEventMessage(lastEvent, manifest)
+                : generationConsoleStageMessage(manifest.stage);
             setGenerationConsoleProgress(
                 manifest.progress,
-                lastEvent
-                    ? generationConsoleEventMessage(lastEvent, manifest)
-                    : generationConsoleStageMessage(manifest.stage)
+                lastEventMessage
             );
+            syncGenerationWorkspaceManifest(manifest, lastEventMessage);
 
             const clock = generationConsoleElement("generation-console-clock");
             if (clock) {
@@ -876,8 +892,7 @@
         };
 
         const startGenerationConsole = (uid, resumed = false) => {
-            const root = generationConsoleElement("generation-console");
-            if (!root || !uid) return;
+            if (!uid) return;
 
             stopGenerationConsolePolling();
             generationConsoleUid = uid;
@@ -888,11 +903,15 @@
             generationConsoleLastManifest = null;
             generationConsoleResumed = resumed;
             const inputTab = currentAppUrl().searchParams.get("tab");
-            generationConsoleMode = inputTab === "ten-view"
-                ? "10-VIEW"
-                : inputTab === "multi-view"
-                    ? "4-VIEW"
-                    : "1-VIEW";
+            const routeMode = tabRoutes.find((route) => route.slug === inputTab)?.mode
+                || "single";
+            generationConsoleMode = {
+                single: "1-VIEW",
+                four: "4-VIEW",
+                six: "6-VIEW",
+                ten: "10-VIEW",
+            }[routeMode] || "1-VIEW";
+            startGenerationWorkspaceLoading(uid, resumed);
             renderGenerationConsoleInitial();
 
             window.setTimeout(pollGenerationManifest, 120);
@@ -922,7 +941,13 @@
             if (uid && uid !== generationConsoleUid) startGenerationConsole(uid, true);
         };
 
-        const beginGeneration = () => {
+        const beginGeneration = (event) => {
+            const buttonRoot = document.getElementById("generate-3d-button");
+            if (buttonRoot?.getAttribute("aria-busy") === "true") {
+                event?.preventDefault();
+                event?.stopImmediatePropagation();
+                return;
+            }
             const url = currentAppUrl();
             const uid = createGenerationUid();
             url.searchParams.set("generation", uid);

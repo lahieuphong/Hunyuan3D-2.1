@@ -31,9 +31,7 @@
             if (!historyReviewRouteUid || !reviewState) return;
 
             const reviewMode = reviewState.dataset.inputMode;
-            const expectedRoute = reviewMode === "ten"
-                ? tabRoutes[2]
-                : reviewMode === "four" ? tabRoutes[1] : tabRoutes[0];
+            const expectedRoute = promptRouteForMode(reviewMode);
             const reviewUrl = currentAppUrl();
             if (reviewUrl.searchParams.get("tab") !== expectedRoute.slug) {
                 reviewUrl.searchParams.set("tab", expectedRoute.slug);
@@ -42,8 +40,8 @@
 
             // Gradio moves tabs that do not fit the narrow desktop rail into an
             // overflow menu. Select the saved route before read-only controls
-            // are disabled so a ten-view History snapshot cannot be locked on
-            // the default Single View panel.
+            // are disabled so a multi-view History snapshot cannot be locked
+            // on the default Single View panel.
             if (!promptRouteIsActive(expectedRoute)) {
                 activatePromptTab(expectedRoute);
             }

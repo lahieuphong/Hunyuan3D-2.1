@@ -189,6 +189,7 @@ def _history_item(folder: Path) -> tuple[dict[str, Any], float] | None:
     input_mode_value = _text(manifest.get("input_mode") or params.get("input_mode"))
     input_mode = (
         "ten" if input_mode_value in {"ten", "10-view", "ten-view"}
+        else "six" if input_mode_value in {"six", "6-view", "six-view"}
         else "four" if input_mode_value in {"four", "4-view", "multi-view"}
         else "single" if input_mode_value in {"single", "1-view", "single-view"}
         else None
@@ -203,6 +204,7 @@ def _history_item(folder: Path) -> tuple[dict[str, Any], float] | None:
     if not view_count and input_mode:
         view_count = (
             10 if input_mode == "ten"
+            else 6 if input_mode == "six"
             else 4 if input_mode == "four"
             else 1
         )

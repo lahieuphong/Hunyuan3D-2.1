@@ -210,11 +210,13 @@ class WebUiI18nTests(unittest.TestCase):
             [
                 translate_ui("shell.workspace.turbo.single", "zh-CN"),
                 translate_ui("shell.workspace.turbo.four", "zh-CN"),
+                translate_ui("shell.workspace.turbo.six", "zh-CN"),
                 translate_ui("shell.workspace.turbo.ten", "zh-CN"),
             ],
             [
                 "快速单视图图像转 3D 生成",
                 "快速四视图图像转 3D 生成",
+                "快速六视图图像转 3D 生成",
                 "快速十视图图像转 3D 生成",
             ],
         )
@@ -222,11 +224,13 @@ class WebUiI18nTests(unittest.TestCase):
             [
                 translate_ui("shell.workspace.single", "zh-CN"),
                 translate_ui("shell.workspace.four", "zh-CN"),
+                translate_ui("shell.workspace.six", "zh-CN"),
                 translate_ui("shell.workspace.ten", "zh-CN"),
             ],
             [
                 "单视图图像转 3D 生成",
                 "四视图图像转 3D 生成",
+                "六视图图像转 3D 生成",
                 "十视图图像转 3D 生成",
             ],
         )
@@ -234,6 +238,13 @@ class WebUiI18nTests(unittest.TestCase):
             translate_ui("action.generate_3d", "zh-CN"),
             "生成 3D",
         )
+        self.assertEqual(translate_ui("input.six", "zh-CN"), "6 视图")
+        self.assertEqual(
+            translate_ui("action.generate_six", "zh-CN"),
+            "生成 3D · 6 张图像",
+        )
+        self.assertEqual(translate_ui("input.top", "zh-CN"), "顶部")
+        self.assertEqual(translate_ui("input.bottom", "zh-CN"), "底部")
         self.assertEqual(
             translate_ui("history.generation_title", "zh-CN", uid="abc"),
             "生成记录 abc",
@@ -287,6 +298,7 @@ class WebUiI18nTests(unittest.TestCase):
         self.assertIn("syncWorkspaceTitle", javascript)
         self.assertIn('"shell.workspace.single"', javascript)
         self.assertIn('"shell.workspace.four"', javascript)
+        self.assertIn('"shell.workspace.six"', javascript)
         self.assertIn('"shell.workspace.ten"', javascript)
         self.assertIn("promptRouteIsActive", javascript)
         self.assertIn("uiDynamicInputTitle", javascript)

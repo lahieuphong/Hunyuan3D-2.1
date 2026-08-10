@@ -102,7 +102,7 @@ class TenViewAssetContractTests(unittest.TestCase):
             javascript.index('document.body.classList.add("is-history-review")'),
         )
 
-    def test_input_mode_switcher_keeps_all_three_tabs_on_one_row(self):
+    def test_input_mode_switcher_keeps_all_four_tabs_on_one_row(self):
         css = (
             REPOSITORY_ROOT / "webui/assets/styles/70-left-rail-settings.css"
         ).read_text(encoding="utf-8")
@@ -112,7 +112,7 @@ class TenViewAssetContractTests(unittest.TestCase):
             css,
         )
         self.assertIn("flex: 1 1 100%;", css)
-        self.assertIn("flex: 1 1 auto !important;", css)
+        self.assertIn("flex: 1 1 0 !important;", css)
         self.assertIn("text-overflow: ellipsis;", css)
         self.assertNotIn(
             "grid-template-columns: repeat(2, minmax(0, 1fr));",

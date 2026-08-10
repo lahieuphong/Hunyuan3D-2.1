@@ -7,6 +7,11 @@ from dataclasses import dataclass
 
 from PIL import Image
 
+from hy3dshape.six_view import (
+    SIX_VIEW_AUXILIARY_KEYS,
+    SIX_VIEW_CONDITIONING_STRATEGY,
+    SIX_VIEW_KEYS,
+)
 from hy3dshape.ten_view import (
     CANONICAL_VIEW_KEYS,
     TEN_VIEW_AUXILIARY_KEYS,
@@ -17,6 +22,7 @@ from hy3dshape.ten_view import (
 
 MAX_TEN_VIEW_PIXELS = 40_000_000
 TEN_VIEW_MODE_ALIASES = frozenset({"ten", "10-view", "ten-view"})
+SIX_VIEW_MODE_ALIASES = frozenset({"six", "6-view", "six-view"})
 FOUR_VIEW_MODE_ALIASES = frozenset({"four", "4-view", "multi-view"})
 SINGLE_VIEW_MODE_ALIASES = frozenset({"single", "1-view", "single-view"})
 
@@ -42,6 +48,8 @@ def normalize_input_mode(value: object) -> str:
     normalized = str(value or "single").strip().lower()
     if normalized in TEN_VIEW_MODE_ALIASES:
         return "ten"
+    if normalized in SIX_VIEW_MODE_ALIASES:
+        return "six"
     if normalized in FOUR_VIEW_MODE_ALIASES:
         return "four"
     if normalized in SINGLE_VIEW_MODE_ALIASES:
@@ -62,24 +70,44 @@ def ordered_ten_view_images(
     return dict(zip(TEN_VIEW_KEYS, values, strict=True))
 
 
-def _validate_ten_view_images(
+def ordered_six_view_images(
+    values: Sequence[Image.Image | None],
+) -> dict[str, Image.Image | None]:
+    """Map Gradio's positional six image values onto semantic camera keys."""
+
+    if len(values) != len(SIX_VIEW_KEYS):
+        raise GenerationInputError(
+            f"Six-view callback expected {len(SIX_VIEW_KEYS)} images, "
+            f"received {len(values)}."
+        )
+    return dict(zip(SIX_VIEW_KEYS, values, strict=True))
+
+
+def _validate_named_view_images(
     images: Mapping[str, Image.Image | None],
+    keys: Sequence[str],
+    *,
+    tab_label: str,
+    input_label: str,
 ) -> dict[str, Image.Image]:
-    missing = [key for key in TEN_VIEW_KEYS if key not in images or images[key] is None]
+    """Validate a fixed semantic camera set without duplicating mode policy."""
+
+    missing = [key for key in keys if key not in images or images[key] is None]
     if missing:
         raise GenerationInputError(
-            "The 10 Views tab requires all 10 camera views. Missing: "
+            f"The {tab_label} tab requires all {len(keys)} camera views. Missing: "
             + ", ".join(key.replace("_", " ").title() for key in missing)
         )
 
-    unknown = sorted(set(images) - set(TEN_VIEW_KEYS))
+    unknown = sorted(set(images) - set(keys))
     if unknown:
         raise GenerationInputError(
-            "Ten-view input contains unsupported camera keys: " + ", ".join(unknown)
+            f"{input_label} input contains unsupported camera keys: "
+            + ", ".join(unknown)
         )
 
     validated: dict[str, Image.Image] = {}
-    for key in TEN_VIEW_KEYS:
+    for key in keys:
         image = images[key]
         if not isinstance(image, Image.Image):
             raise GenerationInputError(
@@ -99,11 +127,34 @@ def _validate_ten_view_images(
     return validated
 
 
+def _validate_ten_view_images(
+    images: Mapping[str, Image.Image | None],
+) -> dict[str, Image.Image]:
+    return _validate_named_view_images(
+        images,
+        TEN_VIEW_KEYS,
+        tab_label="10 Views",
+        input_label="Ten-view",
+    )
+
+
+def _validate_six_view_images(
+    images: Mapping[str, Image.Image | None],
+) -> dict[str, Image.Image]:
+    return _validate_named_view_images(
+        images,
+        SIX_VIEW_KEYS,
+        tab_label="6 Views",
+        input_label="Six-view",
+    )
+
+
 def build_generation_input_bundle(
     input_mode: object,
     single_image: Image.Image | None,
     four_view_images: Mapping[str, Image.Image | None],
     ten_view_images: Mapping[str, Image.Image | None] | None = None,
+    six_view_images: Mapping[str, Image.Image | None] | None = None,
 ) -> GenerationInputBundle:
     """Validate a UI mode without changing the existing 1/4-view behavior."""
 
@@ -158,6 +209,31 @@ def build_generation_input_bundle(
             },
         )
 
+    if mode == "six":
+        validated_six = _validate_six_view_images(six_view_images or {})
+        cardinal_conditioning = {
+            key: validated_six[key] for key in CANONICAL_VIEW_KEYS
+        }
+        return GenerationInputBundle(
+            mode=mode,
+            provided_images=validated_six,
+            conditioning_images=cardinal_conditioning,
+            primary_image=validated_six["front"],
+            metadata={
+                "views_provided": list(SIX_VIEW_KEYS),
+                "views_used": list(CANONICAL_VIEW_KEYS),
+                "shape_views_used": list(CANONICAL_VIEW_KEYS),
+                "conditioned_view_count": len(CANONICAL_VIEW_KEYS),
+                "conditioning_strategy": SIX_VIEW_CONDITIONING_STRATEGY,
+                "model_native_view_limit": len(CANONICAL_VIEW_KEYS),
+                "texture_projection_views": list(SIX_VIEW_KEYS),
+                "auxiliary_views_reserved_for_texture_projection": list(
+                    SIX_VIEW_AUXILIARY_KEYS
+                ),
+                "experimental_conditioning": False,
+            },
+        )
+
     validated_ten = _validate_ten_view_images(ten_view_images or {})
     cardinal_conditioning = {
         key: validated_ten[key] for key in CANONICAL_VIEW_KEYS
@@ -195,8 +271,10 @@ __all__ = [
     "GenerationInputBundle",
     "GenerationInputError",
     "MAX_TEN_VIEW_PIXELS",
+    "SIX_VIEW_MODE_ALIASES",
     "build_generation_input_bundle",
     "image_has_opaque_alpha",
     "normalize_input_mode",
+    "ordered_six_view_images",
     "ordered_ten_view_images",
 ]
